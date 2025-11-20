@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[metadata]
+name = "benchdocparser"
+version = "0.1.0"
+
+[project]
+name = "benchdocparser"
+version = "0.1.0"
+authors = []
+description = ""
+readme = "README.md"
+requires-python = "~=3.12.0"
+dependencies = [
+    "devtools>=0.12.2",
+    "docker>=7.1.0",
+    "html-to-markdown>=1.9.0",
+    "loguru>=0.7.3",
+    "nest-asyncio>=1.6.0",
+    "numpy>=2.3.2",
+    "openai>=1.102.0",
+    "orjson>=3.11.3",
+    "pillow>=11.3.0",
+    "pydantic",
+    "pypdfium2>=4.30.0",
+    "rapidfuzz>=3.14.0",
+    "unidecode>=1.4.0",
+    "mlflow>=3.5.1",
+    "fire>=0.7.1",
+    "lxml>=6.0.2",
+    "datasets>=4.4.1",
+    "openpyxl>=3.1.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "jupyter"
+]
+st_app = [
+    "streamlit>=1.49.0",
+]
+test = [
+    "pre-commit",
+    "pytest",
+    "pytest-cov",
+    "pytest-mock",
+    "ruff",
+    "isort",
+    "pre-commit",
+    "yq",
+    "nbconvert>=7.16.6",
+]
+
+[tool.setuptools.packages.find]
+include = ["benchdocparser"]  
+
+[project.scripts]
+dparse = "benchdocparser.annotation.diff_viewer.diff_viewer:main"
+dbench = "benchdocparser.run_benchmark:main"
+dview = "benchdocparser.st_viewer.st_viewer:main"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "A"]
+ignore = ["E741", "B006"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402"]
+
+[tool.uv]
+config-settings = { editable_mode = "compat" }
+
+[tool.uv.sources]
+

@@ -1,0 +1,161 @@
+import os
+from pathlib import Path
+
+import fire
+import pandas as pd
+from joblib import Parallel, delayed
+from loguru import logger
+import datetime
+from benchdocparser.data_model.document import Document
+from benchdocparser.bench_tests.benchmark_tsts import BaselineTest, load_tests_from_ds
+from benchdocparser.utils import bootstrap_and_format_results
+from benchdocparser.registries import converter_config_registry, docker_config_registry
+from benchdocparser.create_dataset import create_dataset
+from tqdm import tqdm
+
+
+IN_FOLDER = (
+    Path("/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/validated_tests/tiny_test_tests_first_batch/tests/tiny_text_long_text/")
+)
+OUT_FOLDER = (
+    Path("/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/validated_tests/tiny_test_tests_first_batch/preds2")
+)
+
+
+def process_and_run_benchmark(
+    model="gemini-2.5-flash-lite",
+    uri: str | None =None,
+    retry: str | None =None,
+    num_concurrent_pages: int =100,
+    num_concurrent_files: int =100,
+    debug: bool =False,
+    gpu: int=2,
+    regenerate: bool =False,
+    in_folder: Path|str = IN_FOLDER,
+    save_folder: Path|str = OUT_FOLDER,
+    retrylast: bool =False,
+):
+    in_folder = Path(in_folder)
+    save_folder = Path(save_folder)
+
+    if not in_folder.exists():
+        raise ValueError(f"Input folder does not exist: {in_folder}")
+    if not in_folder.is_dir():
+        raise ValueError(f"Input path is not a directory: {in_folder}")
+
+    ds = create_dataset(in_folder)
+
+    try:
+        if retrylast:
+            retry = save_folder/model
+            previous_runs =  sorted(os.listdir(retry))
+            if len(previous_runs) > 0:
+                retry = retry / previous_runs[-1]
+            else:
+                raise ValueError("No previous runs found, do not use the retrylast flag")
+
+        if retry is None or regenerate:
+
+            files = [in_folder/path for path in sorted(set(ds["pdf_path"]))]
+
+            if len(files) == 0:
+                raise ValueError(f"No PDF files found in the input folder: {in_folder}\nDataset paths: {ds['pdf_path'][:5]}")
+
+            save_folder = save_folder/model/(datetime.datetime.now().strftime("%Y-%m-%dT%Hh%Mm%Ss"))
+
+            if uri is None:
+                docker_config = docker_config_registry.get(model)
+
+            if docker_config is not None:
+                docker_config.gpu_device_ids = [gpu]
+                server = docker_config.get_server(auto_stop=True)
+                server.start()
+                client = docker_config.get_client()
+            else:
+                client = converter_config_registry.get(model, uri=uri).get_client()
+            client.num_concurrent_pages = num_concurrent_pages
+            client.num_concurrent_files = num_concurrent_files
+            client.debug = debug
+            client.save_folder = str(save_folder/ "results")
+            client.batch(files)
+
+        else:
+            save_folder = Path(retry)
+
+        df = run_pb_benchmark(ds, out_folder=save_folder / "results")
+
+        by_type_df = bootstrap_and_format_results(df, "type", "result")
+
+        logger.info("By type:")
+        logger.info(by_type_df)
+        logger.info("average result:")
+        avg = df.loc[df.type != "baseline"]["result"].mean()
+        logger.info(avg)
+
+        if not debug:
+            df.to_parquet(save_folder / "test_results.parquet")
+            by_type_df.to_excel(save_folder / "by_type.xlsx")
+
+
+    except Exception:
+        raise
+
+
+def run_pb_benchmark(
+    ds,
+    out_folder: Path,
+    num_workers: int = 1,
+):
+    files = list(out_folder.rglob("*.zip"))
+
+    def worker(file_path):
+        _ds = ds.filter(lambda x: file_path.stem in x["pdf_path"])
+        doc = Document.from_zip(file_path)
+        md_text = doc.text
+        tests_name = Path(doc.file_path).parent.name
+
+
+        tests = load_tests_from_ds(_ds)
+
+        tests.append(
+            BaselineTest(
+                pdf=str(doc.file_path),
+                page=int(tests_name.split("_")[-1].removeprefix("page")),
+                id=f"{tests_name}-baseline",
+                type="baseline",
+            )
+        )
+
+        results = []
+
+        for test in tests:
+            passed, explanation = test.run(md_text)
+            _dict = {
+                "test_id": test.id,
+                "result": passed,
+                "explanation": explanation,
+                "tests_name": tests_name,
+                "pdf_path": str(doc.file_path),
+                "doc_path": str(file_path),
+            } | test.model_dump()
+
+            results.append(_dict)
+
+        return results
+
+    results = Parallel(n_jobs=num_workers)(
+        delayed(worker)(file_path) for file_path in tqdm(files)
+    )
+
+
+    df = pd.DataFrame([r for r in results for r in r])
+
+    return df
+
+
+def main():
+    fire.Fire(process_and_run_benchmark)
+
+
+if __name__ == "__main__":
+    main()

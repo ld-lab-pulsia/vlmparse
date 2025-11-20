@@ -1,0 +1,41 @@
+import re
+
+import numpy as np
+import PIL
+import pypdfium2 as pdfium
+from loguru import logger
+
+
+
+def convert_pdfium(file_path, dpi):
+    pdf = pdfium.PdfDocument(file_path)
+    pil_images = []
+    for page in pdf:
+        pil_images.append(page.render(scale=dpi / 72).to_pil())
+    return pil_images
+def custom_ceil(a, precision=0):
+    return np.round(a + 0.5 * 10 ** (-precision), precision)
+
+def convert_pdfium_to_images(file_path, dpi=175):
+    try:
+
+        images = convert_pdfium(file_path, dpi=dpi)
+        images = [
+            img.convert("L").convert("RGB") if img.mode != "RGB" else img
+            for img in images
+        ]
+
+    except PIL.Image.DecompressionBombError as e:
+        logger.exception(
+            f"Got problem size document with {file_path}"
+        )
+        cur_size, limit_size = map(int, re.findall(r"\d+", str(e)))
+        factor = custom_ceil(cur_size / limit_size, precision=1)
+        logger.warning(
+            f"Try again by reducing DPI for doc {file_path} from {dpi} to {dpi//factor}"
+        )
+        dpi = dpi // factor
+        images = convert_pdfium(file_path, dpi=dpi)
+    
+    return images
+
