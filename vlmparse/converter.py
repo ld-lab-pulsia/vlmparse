@@ -5,14 +5,14 @@ from loguru import logger
 from pathlib import Path
 import traceback
 
-from .base_model import BenchDocParserBaseModel
+from .base_model import VLMParseBaseModel
 from .data_model.document import Document, Page, ProcessingError
 
 from .build_doc import convert_pdfium_to_images
 
 nest_asyncio.apply()
 
-class ConverterConfig(BenchDocParserBaseModel):
+class ConverterConfig(VLMParseBaseModel):
     dpi: int = 175
     max_image_size: int | None = None
 

@@ -2,8 +2,8 @@
 from pathlib import Path
 from pydantic import Field
 
-from benchdocparser.servers.docker_server import DockerServerConfig
-from benchdocparser.clients.openai_converter import OpenAIConverterConfig
+from vlmparse.servers.docker_server import DockerServerConfig
+from vlmparse.clients.openai_converter import OpenAIConverterConfig
 
 DOCKERFILE_DIR = Path(__file__).parent.parent.parent / "docker_pipelines"
 

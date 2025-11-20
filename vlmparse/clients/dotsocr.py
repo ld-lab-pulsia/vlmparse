@@ -5,14 +5,14 @@ import math
 from PIL import Image
 from typing import Literal, ClassVar
 
-from benchdocparser.servers.docker_server import DockerServerConfig
-from benchdocparser.clients.openai_converter import OpenAIConverterClient
-from benchdocparser.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_tables
-from benchdocparser.clients.pipe_utils.utils import clean_response
-from benchdocparser.data_model.document import Page, Item, BoundingBox
-from benchdocparser.utils import to_base64
+from vlmparse.servers.docker_server import DockerServerConfig
+from vlmparse.clients.openai_converter import OpenAIConverterClient
+from vlmparse.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_tables
+from vlmparse.clients.pipe_utils.utils import clean_response
+from vlmparse.data_model.document import Page, Item, BoundingBox
+from vlmparse.utils import to_base64
 from loguru import logger
-from benchdocparser.clients.openai_converter import OpenAIConverterConfig
+from vlmparse.clients.openai_converter import OpenAIConverterConfig
 
 
 DOCKERFILE_DIR = Path(__file__).parent.parent.parent / "docker_pipelines"

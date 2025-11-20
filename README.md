@@ -24,7 +24,7 @@ uv sync --extra test --extra st_app
 ## Quick Start
 
 ```python
-from benchdocparser.registries import converter_config_registry
+from vlmparse.registries import converter_config_registry
 
 # Get a converter configuration
 config = converter_config_registry.get("gemini-2.5-flash-lite")

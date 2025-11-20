@@ -19,8 +19,8 @@ mock_pdf.__getitem__ = MagicMock(return_value=MagicMock(render=MagicMock(return_
 mock_pdfium.PdfDocument = MagicMock(return_value=mock_pdf)
 sys.modules['pypdfium2'] = mock_pdfium
 
-from benchdocparser.cli import DParseCLI
-from benchdocparser.data_model.document import Document, Page
+from vlmparse.cli import DParseCLI
+from vlmparse.data_model.document import Document, Page
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ def cli():
 @pytest.fixture
 def mock_docker_server():
     """Mock Docker server for serve tests."""
-    with patch("benchdocparser.registries.docker_config_registry") as mock_registry:
+    with patch("vlmparse.registries.docker_config_registry") as mock_registry:
         # Create mock Docker config
         mock_config = MagicMock()
         mock_server = MagicMock()
@@ -51,7 +51,7 @@ def mock_docker_server():
 @pytest.fixture
 def mock_converter_client():
     """Mock converter client for convert tests."""
-    with patch("benchdocparser.registries.converter_config_registry") as mock_registry:
+    with patch("vlmparse.registries.converter_config_registry") as mock_registry:
         # Create mock converter (not client, CLI calls get_client)
         mock_converter = MagicMock()
         mock_config = MagicMock()
@@ -122,7 +122,7 @@ class TestServeCommand:
     
     def test_serve_unknown_model(self, cli):
         """Test serve command with unknown model (should warn and return)."""
-        with patch("benchdocparser.registries.docker_config_registry") as mock_registry:
+        with patch("vlmparse.registries.docker_config_registry") as mock_registry:
             mock_registry.get.return_value = None
             
             # Should not raise an exception, just log warning
@@ -138,7 +138,7 @@ class TestConvertCommand:
         """Test convert with a single PDF file."""
         mock_registry, mock_config, mock_converter = mock_converter_client
         
-        with patch("benchdocparser.registries.docker_config_registry"):
+        with patch("vlmparse.registries.docker_config_registry"):
             cli.convert(input=[str(file_path)], model="lightonocr", uri="http://localhost:8000/v1")
         
         # Verify config was retrieved
@@ -154,7 +154,7 @@ class TestConvertCommand:
         """Test convert with multiple PDF files."""
         mock_registry, mock_config, mock_converter = mock_converter_client
         
-        with patch("benchdocparser.registries.docker_config_registry"):
+        with patch("vlmparse.registries.docker_config_registry"):
             cli.convert(
                 input=[str(file_path), str(file_path)],
                 model="lightonocr",
@@ -172,7 +172,7 @@ class TestConvertCommand:
         # Use the parent directory with a glob pattern
         pattern = str(file_path.parent / "*.pdf")
         
-        with patch("benchdocparser.registries.docker_config_registry"):
+        with patch("vlmparse.registries.docker_config_registry"):
             cli.convert(input=[pattern], model="lightonocr", uri="http://localhost:8000/v1")
         
         # Verify at least one file was found
@@ -183,8 +183,8 @@ class TestConvertCommand:
         """Test convert with no matching files."""
         mock_registry = MagicMock()
         
-        with patch("benchdocparser.registries.converter_config_registry", mock_registry):
-            with patch("benchdocparser.registries.docker_config_registry"):
+        with patch("vlmparse.registries.converter_config_registry", mock_registry):
+            with patch("vlmparse.registries.docker_config_registry"):
                 # Should return early without calling batch
                 cli.convert(
                     input=["/nonexistent/*.pdf"],
@@ -201,7 +201,7 @@ class TestConvertCommand:
         
         custom_uri = "http://custom-server:9000/v1"
         
-        with patch("benchdocparser.registries.docker_config_registry"):
+        with patch("vlmparse.registries.docker_config_registry"):
             cli.convert(input=[str(file_path)], model="lightonocr", uri=custom_uri)
         
         # Verify registry was called with custom URI
@@ -211,8 +211,8 @@ class TestConvertCommand:
     
     def test_convert_without_uri_starts_server(self, cli, file_path):
         """Test convert without URI starts a Docker server."""
-        with patch("benchdocparser.registries.converter_config_registry") as mock_converter_registry:
-            with patch("benchdocparser.registries.docker_config_registry") as mock_docker_registry:
+        with patch("vlmparse.registries.converter_config_registry") as mock_converter_registry:
+            with patch("vlmparse.registries.docker_config_registry") as mock_docker_registry:
                 # Setup mocks
                 mock_docker_config = MagicMock()
                 mock_server = MagicMock()
@@ -233,8 +233,8 @@ class TestConvertCommand:
     
     def test_convert_with_gpus(self, cli, file_path):
         """Test convert with GPU configuration."""
-        with patch("benchdocparser.registries.converter_config_registry"):
-            with patch("benchdocparser.registries.docker_config_registry") as mock_docker_registry:
+        with patch("vlmparse.registries.converter_config_registry"):
+            with patch("vlmparse.registries.docker_config_registry") as mock_docker_registry:
                 mock_docker_config = MagicMock()
                 mock_server = MagicMock()
                 mock_converter = MagicMock()
@@ -254,7 +254,7 @@ class TestConvertCommand:
         mock_registry, mock_config, mock_converter = mock_converter_client
         
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("benchdocparser.registries.docker_config_registry"):
+            with patch("vlmparse.registries.docker_config_registry"):
                 cli.convert(
                     input=[str(file_path)],
                     out_folder=tmpdir,
@@ -269,7 +269,7 @@ class TestConvertCommand:
         """Test convert with string input (not list)."""
         mock_registry, mock_config, mock_converter = mock_converter_client
         
-        with patch("benchdocparser.registries.docker_config_registry"):
+        with patch("vlmparse.registries.docker_config_registry"):
             # Pass string instead of list
             cli.convert(input=str(file_path), model="lightonocr", uri="http://localhost:8000/v1")
         
@@ -286,7 +286,7 @@ class TestConvertCommand:
             txt_file = Path(tmpdir) / "test.txt"
             txt_file.write_text("test")
             
-            with patch("benchdocparser.registries.docker_config_registry"):
+            with patch("vlmparse.registries.docker_config_registry"):
                 cli.convert(
                     input=[str(txt_file)],
                     model="lightonocr",
@@ -308,8 +308,8 @@ class TestConvertWithDifferentModels:
     ])
     def test_convert_with_various_models(self, cli, file_path, model_name):
         """Test convert with different registered models."""
-        with patch("benchdocparser.registries.converter_config_registry") as mock_registry:
-            with patch("benchdocparser.registries.docker_config_registry"):
+        with patch("vlmparse.registries.converter_config_registry") as mock_registry:
+            with patch("vlmparse.registries.docker_config_registry"):
                 mock_config = MagicMock()
                 mock_converter = MagicMock()
                 mock_converter.batch.return_value = [Document(file_path=str(file_path))]
@@ -333,8 +333,8 @@ class TestCLIIntegration:
     
     def test_full_workflow_without_uri(self, cli, file_path):
         """Test full conversion workflow without providing URI."""
-        with patch("benchdocparser.registries.converter_config_registry"):
-            with patch("benchdocparser.registries.docker_config_registry") as mock_docker_registry:
+        with patch("vlmparse.registries.converter_config_registry"):
+            with patch("vlmparse.registries.docker_config_registry") as mock_docker_registry:
                 # Setup complete mock chain
                 mock_docker_config = MagicMock()
                 mock_server = MagicMock()
@@ -358,7 +358,7 @@ class TestCLIIntegration:
     
     def test_serve_then_convert_scenario(self, cli, file_path):
         """Test scenario where server is started first, then convert is called."""
-        with patch("benchdocparser.registries.docker_config_registry") as mock_docker_registry:
+        with patch("vlmparse.registries.docker_config_registry") as mock_docker_registry:
             # Mock for serve
             mock_docker_config = MagicMock()
             mock_server = MagicMock()
@@ -376,8 +376,8 @@ class TestCLIIntegration:
             mock_server.start.assert_called_once()
         
         # Then convert with URI pointing to the served model
-        with patch("benchdocparser.registries.converter_config_registry") as mock_converter_registry:
-            with patch("benchdocparser.registries.docker_config_registry"):
+        with patch("vlmparse.registries.converter_config_registry") as mock_converter_registry:
+            with patch("vlmparse.registries.docker_config_registry"):
                 mock_config = MagicMock()
                 mock_converter = MagicMock()
                 mock_converter.batch.return_value = [Document(file_path=str(file_path))]
@@ -421,14 +421,14 @@ class TestCLIConvertInDepth:
         # Create fake PIL images for the pages
         fake_images = [Image.new('RGB', (100, 100), color='white') for _ in range(2)]
         
-        with patch("benchdocparser.converter.convert_pdfium_to_images") as mock_convert:
+        with patch("vlmparse.converter.convert_pdfium_to_images") as mock_convert:
             mock_convert.return_value = fake_images
             yield mock_convert
     
     @pytest.fixture
     def mock_docker_server_operations(self):
         """Mock Docker server operations without mocking converter logic."""
-        with patch("benchdocparser.registries.docker_config_registry") as mock_docker_registry:
+        with patch("vlmparse.registries.docker_config_registry") as mock_docker_registry:
             mock_docker_config = MagicMock()
             mock_server = MagicMock()
             mock_container = MagicMock()
@@ -725,7 +725,7 @@ class TestCLIConvertInDepth:
     
     def test_convert_with_nanonet_postprompt(self, cli, file_path, mock_openai_api, mock_pdf_to_images):
         """Test that Nanonet model uses its postprompt correctly."""
-        from benchdocparser.registries import converter_config_registry
+        from vlmparse.registries import converter_config_registry
         
         messages_sent = []
         

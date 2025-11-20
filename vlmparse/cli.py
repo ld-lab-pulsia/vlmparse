@@ -17,7 +17,7 @@ class DParseCLI:
             port = 8056
 
         
-        from benchdocparser.registries import docker_config_registry
+        from vlmparse.registries import docker_config_registry
         
         # Parse GPU device IDs
         gpu_device_ids = None
@@ -55,7 +55,7 @@ class DParseCLI:
             uri: URI of the server, if not specified and the pipe is vllm, a local server will be deployed
             gpus: Comma-separated GPU device IDs (e.g., "0" or "0,1,2"). If not specified, all GPUs will be used.
         """
-        from benchdocparser.registries import converter_config_registry
+        from vlmparse.registries import converter_config_registry
 
         # Expand file paths from glob patterns
         file_paths = []
@@ -81,7 +81,7 @@ class DParseCLI:
             gpu_device_ids = [g.strip() for g in gpus.split(",")]
 
         if uri is None:
-            from benchdocparser.registries import docker_config_registry
+            from vlmparse.registries import docker_config_registry
             docker_config = docker_config_registry.get(model)
             docker_config.gpu_device_ids = gpu_device_ids
             server = docker_config.get_server(auto_stop=True)
@@ -99,7 +99,7 @@ class DParseCLI:
 
     def view(self, folder):
         from streamlit import runtime
-        from benchdocparser.st_viewer.st_viewer import run_streamlit, __file__ as st_viewer_file
+        from vlmparse.st_viewer.st_viewer import run_streamlit, __file__ as st_viewer_file
         import subprocess
         import sys
 

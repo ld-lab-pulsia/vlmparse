@@ -1,8 +1,8 @@
-from benchdocparser.clients.nanonetocr import NanonetOCR2ConverterConfig
-from benchdocparser.servers.docker_server import docker_config_registry
-from benchdocparser.clients.lightonocr import LightOnOCRConverterConfig, LightOnOCRDockerServerConfig
-from benchdocparser.clients.dotsocr import DotsOCRConverterConfig, DotsOCRDockerServerConfig
-from benchdocparser.clients.openai_converter import LLMParams, OpenAIConverterConfig
+from vlmparse.clients.nanonetocr import NanonetOCR2ConverterConfig
+from vlmparse.servers.docker_server import docker_config_registry
+from vlmparse.clients.lightonocr import LightOnOCRConverterConfig, LightOnOCRDockerServerConfig
+from vlmparse.clients.dotsocr import DotsOCRConverterConfig, DotsOCRDockerServerConfig
+from vlmparse.clients.openai_converter import LLMParams, OpenAIConverterConfig
 import os
 from collections.abc import Callable
 import os

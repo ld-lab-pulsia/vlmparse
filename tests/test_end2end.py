@@ -1,4 +1,4 @@
-from benchdocparser.registries import converter_config_registry
+from vlmparse.registries import converter_config_registry
 import pytest
 
 

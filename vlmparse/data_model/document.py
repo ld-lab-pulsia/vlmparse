@@ -9,13 +9,13 @@ from PIL import Image
 from PIL import Image as PILImage
 from pydantic import Field
 
-from benchdocparser.base_model import BenchDocParserBaseModel
-from benchdocparser.utils import from_base64, to_base64
+from vlmparse.base_model import VLMParseBaseModel
+from vlmparse.utils import from_base64, to_base64
 
 from .box import BoundingBox
 
 
-class ProcessingError(BenchDocParserBaseModel):
+class ProcessingError(VLMParseBaseModel):
     module_class: str
     traceback: str
 
@@ -27,13 +27,13 @@ class ProcessingError(BenchDocParserBaseModel):
         )
 
 
-class Item(BenchDocParserBaseModel):
+class Item(VLMParseBaseModel):
     category: str
     box: BoundingBox
     text: str
 
 
-class Page(BenchDocParserBaseModel):
+class Page(VLMParseBaseModel):
     text: str | None = None
     items: list[Item] | None = None
     error: ProcessingError | None = None
@@ -90,7 +90,7 @@ class Page(BenchDocParserBaseModel):
         return image
 
 
-class Document(BenchDocParserBaseModel):
+class Document(VLMParseBaseModel):
     file_path: str
     pages: list[Page] = []
     error: ProcessingError | None = None

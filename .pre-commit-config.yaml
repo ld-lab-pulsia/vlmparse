@@ -6,10 +6,10 @@ repos:
     hooks:
       # Run the linter.
       - id: ruff
-        args: ["benchdocparser","--fix"]
+        args: ["vlmparse","--fix"]
       # Run the formatter.
       - id: ruff-format
-        args: ["benchdocparser"]
+        args: ["vlmparse"]
   - repo: https://github.com/pycqa/isort
     rev: 5.12.0
     hooks:

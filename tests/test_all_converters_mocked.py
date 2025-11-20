@@ -7,8 +7,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from pathlib import Path
 
-from benchdocparser.registries import converter_config_registry
-from benchdocparser.data_model.document import Document, Page
+from vlmparse.registries import converter_config_registry
+from vlmparse.data_model.document import Document, Page
 
 
 # Mock response for different model types

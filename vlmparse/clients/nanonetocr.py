@@ -1,6 +1,6 @@
 
-from benchdocparser.servers.docker_server import DockerServerConfig
-from benchdocparser.clients.openai_converter import OpenAIConverterConfig
+from vlmparse.servers.docker_server import DockerServerConfig
+from vlmparse.clients.openai_converter import OpenAIConverterConfig
 
 class NanonetOCR2DockerServerConfig(DockerServerConfig):
 

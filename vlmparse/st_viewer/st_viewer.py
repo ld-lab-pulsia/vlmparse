@@ -5,10 +5,10 @@ import subprocess
 import sys
 import streamlit as st
 from streamlit import runtime
-from benchdocparser.data_model.document import Document
+from vlmparse.data_model.document import Document
 
 
-from benchdocparser.st_viewer.fs_nav import file_selector
+from vlmparse.st_viewer.fs_nav import file_selector
 
 st.set_page_config(layout="wide")
 

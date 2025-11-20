@@ -28,12 +28,12 @@ class DockerServerConfig(BaseModel):
 
     @property
     def llm_params(self):
-        from benchdocparser.clients.openai_converter import LLMParams
+        from vlmparse.clients.openai_converter import LLMParams
         return LLMParams(base_url=f"http://localhost:{self.docker_port}/v1", model_name=self.default_model_name)
 
     @property
     def client_config(self):
-        from benchdocparser.clients.openai_converter import OpenAIConverterConfig
+        from vlmparse.clients.openai_converter import OpenAIConverterConfig
         return OpenAIConverterConfig(llm_params=self.llm_params)
         
     def get_client(self):
