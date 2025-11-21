@@ -1,9 +1,15 @@
 
 from vlmparse.servers.docker_server import DockerServerConfig
 from vlmparse.clients.openai_converter import OpenAIConverterConfig
+from pydantic import Field
 
 class NanonetOCR2DockerServerConfig(DockerServerConfig):
+    """Configuration for NanonetOCR2 model."""
+    
+    model_name: str = "nanonets/Nanonets-OCR2-3B"
 
+
+    @property
     def client_config(self):
         return NanonetOCR2ConverterConfig(llm_params=self.llm_params)
 

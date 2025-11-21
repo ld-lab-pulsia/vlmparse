@@ -1,4 +1,4 @@
-from vlmparse.clients.nanonetocr import NanonetOCR2ConverterConfig
+from vlmparse.clients.nanonetocr import NanonetOCR2ConverterConfig, NanonetOCR2DockerServerConfig
 from vlmparse.servers.docker_server import docker_config_registry
 from vlmparse.clients.lightonocr import LightOnOCRConverterConfig, LightOnOCRDockerServerConfig
 from vlmparse.clients.dotsocr import DotsOCRConverterConfig, DotsOCRDockerServerConfig
@@ -12,6 +12,7 @@ import os
 
 docker_config_registry.register("lightonocr", lambda: LightOnOCRDockerServerConfig())
 docker_config_registry.register("dotsocr", lambda: DotsOCRDockerServerConfig())
+docker_config_registry.register("nanonets/Nanonets-OCR2-3B", lambda: NanonetOCR2DockerServerConfig())
 docker_config_registry.register("gemini-2.5-flash-lite", lambda: None)
 docker_config_registry.register("gemini-2.5-flash", lambda: None)
 docker_config_registry.register("gemini-2.5-pro", lambda: None)

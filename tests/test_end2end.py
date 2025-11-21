@@ -1,4 +1,5 @@
-from vlmparse.registries import converter_config_registry
+import os
+from vlmparse.registries import converter_config_registry, docker_config_registry
 import pytest
 
 
@@ -12,3 +13,30 @@ def test_convert(file_path, model):
     assert len(doc.pages) == 2
     assert doc.pages[0].text is not None
     assert doc.pages[1].text is not None
+
+@pytest.mark.skipif("RUN_DEPLOYMENT_VLLM" not in os.environ or os.environ["RUN_DEPLOYMENT_VLLM"] == "false", reason="Skipping because RUN_DEPLOYMENT_VLLM is not set or is false")
+@pytest.mark.parametrize("model", ["lightonocr", "dotsocr", "nanonets/Nanonets-OCR2-3B"])
+def test_convert_with_docker(file_path, model):
+    """Test conversion with automatic Docker deployment (requires GPU due to vllm limitations)."""
+    # Get docker config
+    docker_config = docker_config_registry.get(model)
+    assert docker_config is not None, f"No docker config found for {model}"
+    
+    # Start server with auto_stop=True for automatic cleanup
+    server = docker_config.get_server(auto_stop=True)
+    server.start()
+    
+    # Get client from docker config
+    client = docker_config.get_client()
+    
+    # Convert document
+    docs = client.batch([file_path])
+    
+    # Assertions
+    assert len(docs) == 1
+    doc = docs[0]
+    assert len(doc.pages) == 2
+    assert doc.pages[0].text is not None
+    assert doc.pages[1].text is not None
+    
+    # Server will be automatically stopped due to auto_stop=True
