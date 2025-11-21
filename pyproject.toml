@@ -26,6 +26,7 @@ dependencies = [
     "pydantic",
     "pypdfium2>=4.30.0",
     "fire>=0.7.1",
+    "lxml>=6.0.2",
 ]
 
 [project.optional-dependencies]
