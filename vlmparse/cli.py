@@ -97,6 +97,59 @@ class DParseCLI:
 
         logger.info(f"Successfully processed {len(documents)} documents to {out_folder}")
 
+    def list(self):
+        """List all currently running servers."""
+        import docker
+        
+        try:
+            client = docker.from_env()
+            containers = client.containers.list()
+            
+            if not containers:
+                logger.info("No running containers found")
+                return
+            
+            # Filter for containers that look like VLLM servers
+            vllm_containers = []
+            for container in containers:
+                # Check if it's a VLLM-related container by image name or ports
+                image_name = container.image.tags[0] if container.image.tags else str(container.image.id)
+                vllm_containers.append(container)
+            
+            if not vllm_containers:
+                logger.info("No running servers found")
+                return
+            
+            logger.info(f"Found {len(vllm_containers)} running container(s):")
+            logger.info("")
+            
+            for container in vllm_containers:
+                image_name = container.image.tags[0] if container.image.tags else str(container.image.id)[:12]
+                
+                # Extract port mappings
+                ports = []
+                if container.ports:
+                    for container_port, host_bindings in container.ports.items():
+                        if host_bindings:
+                            for binding in host_bindings:
+                                ports.append(f"{binding['HostPort']}")
+                
+                port_str = ", ".join(ports) if ports else "N/A"
+                
+                # Get container status and uptime
+                status = container.status
+                
+                logger.info(f"  Container: {container.name}")
+                logger.info(f"    ID: {container.short_id}")
+                logger.info(f"    Image: {image_name}")
+                logger.info(f"    Status: {status}")
+                logger.info(f"    Port(s): {port_str}")
+                logger.info("")
+                
+        except docker.errors.DockerException as e:
+            logger.error(f"Failed to connect to Docker: {e}")
+            logger.error("Make sure Docker is running and you have the necessary permissions")
+
     def view(self, folder):
         from streamlit import runtime
         from vlmparse.st_viewer.st_viewer import run_streamlit, __file__ as st_viewer_file
