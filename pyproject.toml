@@ -25,13 +25,7 @@ dependencies = [
     "pillow>=11.3.0",
     "pydantic",
     "pypdfium2>=4.30.0",
-    "rapidfuzz>=3.14.0",
-    "unidecode>=1.4.0",
-    "mlflow>=3.5.1",
     "fire>=0.7.1",
-    "lxml>=6.0.2",
-    "datasets>=4.4.1",
-    "openpyxl>=3.1.5",
 ]
 
 [project.optional-dependencies]
@@ -49,8 +43,6 @@ test = [
     "ruff",
     "isort",
     "pre-commit",
-    "yq",
-    "nbconvert>=7.16.6",
 ]
 
 [tool.setuptools.packages.find]
