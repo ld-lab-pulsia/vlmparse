@@ -44,12 +44,12 @@ class ConverterConfigRegistry:
 
 # Global registry instance
 converter_config_registry = ConverterConfigRegistry()
+GOOGLE_API_BASE_URL = os.getenv("GOOGLE_API_BASE_URL") or "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 
-
-converter_config_registry.register("gemini-2.5-flash-lite", lambda uri=None: OpenAIConverterConfig(llm_params=LLMParams(model_name="gemini-2.5-flash-lite", base_url=os.getenv("GOOGLE_API_BASE_URL") or "https://generativelanguage.googleapis.com/v1beta/openai/")))
-converter_config_registry.register("gemini-2.5-flash", lambda uri=None: OpenAIConverterConfig(llm_params=LLMParams(model_name="gemini-2.5-flash", base_url=os.getenv("GOOGLE_API_BASE_URL") or "https://generativelanguage.googleapis.com/v1beta/openai/")))
-converter_config_registry.register("gemini-2.5-pro", lambda uri=None: OpenAIConverterConfig(llm_params=LLMParams(model_name="gemini-2.5-pro", base_url=os.getenv("GOOGLE_API_BASE_URL") or "https://generativelanguage.googleapis.com/v1beta/openai/")))
+converter_config_registry.register("gemini-2.5-flash-lite", lambda uri=None: OpenAIConverterConfig(llm_params=LLMParams(model_name="gemini-2.5-flash-lite", base_url=GOOGLE_API_BASE_URL if uri is None else uri)))
+converter_config_registry.register("gemini-2.5-flash", lambda uri=None: OpenAIConverterConfig(llm_params=LLMParams(model_name="gemini-2.5-flash", base_url=GOOGLE_API_BASE_URL if uri is None else uri)))
+converter_config_registry.register("gemini-2.5-pro", lambda uri=None: OpenAIConverterConfig(llm_params=LLMParams(model_name="gemini-2.5-pro", base_url=GOOGLE_API_BASE_URL if uri is None else uri)))
 converter_config_registry.register("lightonocr", lambda uri=None: LightOnOCRConverterConfig(llm_params=LLMParams(base_url=uri or "http://localhost:8000/v1", model_name="lightonai/LightOnOCR-1B-1025", api_key="")))
 converter_config_registry.register("dotsocr", lambda uri=None: DotsOCRConverterConfig(llm_params=LLMParams(base_url=uri or "http://localhost:8000/v1", model_name="dotsocr-model", api_key="")))
 converter_config_registry.register("nanonets/Nanonets-OCR2-3B", lambda uri=None: NanonetOCR2ConverterConfig(llm_params=LLMParams(base_url=uri or "http://localhost:8000/v1", model_name="nanonets/Nanonets-OCR2-3B", api_key="")))
