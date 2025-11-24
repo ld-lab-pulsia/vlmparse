@@ -10,4 +10,3 @@ def clean_response(text):
         .removeprefix("html")
         .strip()
     )
-

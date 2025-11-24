@@ -1,33 +1,36 @@
 import asyncio
+import traceback
+from pathlib import Path
+from typing import Literal
 
 import nest_asyncio
 from loguru import logger
-from pathlib import Path
-import traceback
 
 from .base_model import VLMParseBaseModel
+from .build_doc import convert_pdfium_to_images
 from .data_model.document import Document, Page, ProcessingError
 
-from .build_doc import convert_pdfium_to_images
-from typing import Literal
-
 nest_asyncio.apply()
+
 
 class ConverterConfig(VLMParseBaseModel):
     dpi: int = 175
     max_image_size: int | None = None
 
-
-    def get_client(self, **kwargs) -> 'BaseConverter':
+    def get_client(self, **kwargs) -> "BaseConverter":
         return BaseConverter(config=self, **kwargs)
 
 
 class BaseConverter:
-    def __init__(self, config: ConverterConfig,     num_concurrent_files: int = 10,
-    num_concurrent_pages: int = 10,
-    save_folder: str|None=None,
-    save_mode: Literal["document", "md", "md_page"] = "document",
-    debug: bool = False):
+    def __init__(
+        self,
+        config: ConverterConfig,
+        num_concurrent_files: int = 10,
+        num_concurrent_pages: int = 10,
+        save_folder: str | None = None,
+        save_mode: Literal["document", "md", "md_page"] = "document",
+        debug: bool = False,
+    ):
         self.config = config
         self.num_concurrent_files = num_concurrent_files
         self.num_concurrent_pages = num_concurrent_pages
@@ -35,12 +38,10 @@ class BaseConverter:
         self.save_mode = save_mode
         self.debug = debug
 
-
     async def async_call_inside_page(self, page: Page) -> Page:
         raise NotImplementedError
 
-    async def async_call(self, file_path: str|Path) -> Document:
-
+    async def async_call(self, file_path: str | Path) -> Document:
         document = Document(file_path=str(file_path))
         try:
             images = convert_pdfium_to_images(file_path, dpi=self.config.dpi)
@@ -82,10 +83,10 @@ class BaseConverter:
                 logger.exception(traceback.format_exc())
                 document.error = ProcessingError.from_class(self)
                 return document
-        
+
         if self.save_folder is not None:
             self._save_document(document)
-        
+
         return document
 
     def _save_document(self, document: Document):
@@ -93,19 +94,19 @@ class BaseConverter:
         save_folder = Path(self.save_folder)
         save_folder.mkdir(parents=True, exist_ok=True)
         doc_name = Path(document.file_path).stem
-        
+
         if self.save_mode == "document":
             zip_path = save_folder / f"{doc_name}.zip"
             document.to_zip(zip_path)
             logger.info(f"Saved document to {zip_path}")
-        
+
         elif self.save_mode == "md":
             md_path = save_folder / f"{doc_name}.md"
             text_content = "\n\n".join([page.text or "" for page in document.pages])
             with open(md_path, "w", encoding="utf-8") as f:
                 f.write(text_content)
             logger.info(f"Saved markdown to {md_path}")
-        
+
         elif self.save_mode == "md_page":
             doc_folder = save_folder / doc_name
             doc_folder.mkdir(parents=True, exist_ok=True)
@@ -115,20 +116,18 @@ class BaseConverter:
                 with open(page_path, "w", encoding="utf-8") as f:
                     f.write(page_text)
             logger.info(f"Saved {len(document.pages)} pages to {doc_folder}")
-        
+
         else:
             logger.warning(f"Unknown save_mode: {self.save_mode}, skipping save")
 
-
-    def __call__(self, file_path: str|Path):
+    def __call__(self, file_path: str | Path):
         return asyncio.run(self.async_call(file_path))
 
-
-    async def async_batch(self, file_paths: list[str|Path]) -> list[Document]:
+    async def async_batch(self, file_paths: list[str | Path]) -> list[Document]:
         """Process multiple files concurrently with semaphore limit."""
         semaphore = asyncio.Semaphore(self.num_concurrent_files)
 
-        async def worker(file_path: str|Path) -> Document:
+        async def worker(file_path: str | Path) -> Document:
             async with semaphore:
                 return await self.async_call(file_path)
 
@@ -136,6 +135,6 @@ class BaseConverter:
         documents = await asyncio.gather(*tasks)
         return documents
 
-    def batch(self, file_paths: list[str|Path]) -> list[Document]:
+    def batch(self, file_paths: list[str | Path]) -> list[Document]:
         """Synchronous wrapper for async_batch."""
         return asyncio.run(self.async_batch(file_paths))

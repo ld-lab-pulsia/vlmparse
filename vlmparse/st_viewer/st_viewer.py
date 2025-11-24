@@ -1,20 +1,20 @@
-
-
 import argparse
 import subprocess
 import sys
+
 import streamlit as st
 from streamlit import runtime
+
 from vlmparse.data_model.document import Document
-
-
 from vlmparse.st_viewer.fs_nav import file_selector
 
 st.set_page_config(layout="wide")
 
+
 @st.cache_resource
 def get_doc(file_path):
     return Document.from_zip(file_path)
+
 
 def render_sidebar_controls(doc, file_path):
     """Render sidebar controls and return settings."""
@@ -24,9 +24,7 @@ def render_sidebar_controls(doc, file_path):
     }
 
 
-
 def run_streamlit(folder: str) -> None:
-
     with st.sidebar:
         file_path = file_selector(folder)
 
@@ -38,8 +36,6 @@ def run_streamlit(folder: str) -> None:
 
     with st.sidebar:
         settings = render_sidebar_controls(doc, file_path)
-
-
 
     col1, col2 = st.columns(2)
     with col1:
