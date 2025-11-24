@@ -51,13 +51,13 @@ documents = client.batch(["file1.pdf", "file2.pdf"])
 With a general VLM (requires setting your api key as an environment variable):
 
 ```bash
-vlmparse convert --input "*.pdf" --out_folder ./output --model gemini-2.5-flash-lite
+vlmparse convert --folders "*.pdf" --out_folder ./output --model gemini-2.5-flash-lite
 ```
 
 Convert with auto deployment of a small vlm (or any huggingface VLM model, requires a gpu + docker installation):
 
 ```bash
-vlmparse convert --input "*.pdf" --out_folder ./output --model nanonets/Nanonets-OCR2-3B
+vlmparse convert --folders "*.pdf" --out_folder ./output --model nanonets/Nanonets-OCR2-3B
 ```
 
 ### Deploy a local model server
@@ -71,7 +71,7 @@ vlmparse serve --model lightonocr --port 8000
 then convert:
 
 ```bash
-vlmparse convert --input "*.pdf" --out_folder ./output --model lightonocr --uri http://localhost:8000/v1
+vlmparse convert --folders "*.pdf" --out_folder ./output --model lightonocr --uri http://localhost:8000/v1
 ```
 
 You can also list all running servers:

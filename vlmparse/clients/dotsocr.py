@@ -1,35 +1,41 @@
-from pathlib import Path
-from pydantic import Field
 import json
 import math
-from PIL import Image
-from typing import Literal, ClassVar
+from pathlib import Path
+from typing import ClassVar, Literal
 
-from vlmparse.servers.docker_server import VLLMDockerServerConfig
-from vlmparse.clients.openai_converter import OpenAIConverterClient
+from loguru import logger
+from PIL import Image
+from pydantic import Field
+
+from vlmparse.clients.openai_converter import (
+    OpenAIConverterClient,
+    OpenAIConverterConfig,
+)
 from vlmparse.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_tables
 from vlmparse.clients.pipe_utils.utils import clean_response
-from vlmparse.data_model.document import Page, Item, BoundingBox
+from vlmparse.data_model.document import BoundingBox, Item, Page
+from vlmparse.servers.docker_server import VLLMDockerServerConfig
 from vlmparse.utils import to_base64
-from loguru import logger
-from vlmparse.clients.openai_converter import OpenAIConverterConfig
-
 
 DOCKERFILE_DIR = Path(__file__).parent.parent.parent / "docker_pipelines"
 
 
 class DotsOCRDockerServerConfig(VLLMDockerServerConfig):
     """Configuration for DotsOCR model."""
-    
+
     model_name: str = "/workspace/weights/DotsOCR"
     docker_image: str = "dotsocr:latest"
-    dockerfile_dir: str = str(DOCKERFILE_DIR/"dotsocr")
+    dockerfile_dir: str = str(DOCKERFILE_DIR / "dotsocr")
     command_args: list[str] = Field(
         default_factory=lambda: [
-            "--tensor-parallel-size", "1",
-            "--gpu-memory-utilization", "0.8",
-            "--chat-template-content-format", "string",
-            "--served-model-name", "dotsocr-model",
+            "--tensor-parallel-size",
+            "1",
+            "--gpu-memory-utilization",
+            "0.8",
+            "--chat-template-content-format",
+            "string",
+            "--served-model-name",
+            "dotsocr-model",
             "--trust-remote-code",
         ]
     )
@@ -39,26 +45,30 @@ class DotsOCRDockerServerConfig(VLLMDockerServerConfig):
     def client_config(self):
         return DotsOCRConverterConfig(llm_params=self.llm_params)
 
+
 class DotsOCRConverterConfig(OpenAIConverterConfig):
     preprompt: str | None = ""
     postprompt: str | None = None
-    completion_kwargs: dict | None = {"temperature": 0.1, "top_p": 1.0, "max_completion_tokens": 16384}
+    completion_kwargs: dict | None = {
+        "temperature": 0.1,
+        "top_p": 1.0,
+        "max_completion_tokens": 16384,
+    }
 
     dpi: int = 200
     prompt_mode: Literal["prompt_layout_all_en", "prompt_ocr"] = "prompt_ocr"
 
 
-
 class DotsOCRConverter(OpenAIConverterClient):
     """DotsOCR VLLM converter."""
-    
+
     # Constants
-    MIN_PIXELS : ClassVar[int] = 3136
-    MAX_PIXELS : ClassVar[int] = 11289600
-    IMAGE_FACTOR : ClassVar[int] = 28
-    
+    MIN_PIXELS: ClassVar[int] = 3136
+    MAX_PIXELS: ClassVar[int] = 11289600
+    IMAGE_FACTOR: ClassVar[int] = 28
+
     # Prompts
-    PROMPTS : ClassVar[dict] = {
+    PROMPTS: ClassVar[dict] = {
         "prompt_layout_all_en": """Please output the layout information from the PDF image, including each layout element's bbox, its category, and the corresponding text content within the bbox.
 
 1. Bbox format: [x1, y1, x2, y2]
@@ -79,10 +89,6 @@ class DotsOCRConverter(OpenAIConverterClient):
 """,
         "prompt_ocr": """Extract the text content from this image.""",
     }
-    
-
-
- 
 
     @staticmethod
     def round_by_factor(number: int, factor: int) -> int:
@@ -151,7 +157,7 @@ class DotsOCRConverter(OpenAIConverterClient):
             )
             assert resized_height > 0 and resized_width > 0
             image = image.resize((resized_width, resized_height))
-        
+
         return image
 
     def post_process_cells(
@@ -160,31 +166,29 @@ class DotsOCRConverter(OpenAIConverterClient):
         cells: list,
         input_width: int,
         input_height: int,
-
     ) -> list:
         """Post-process cell bounding boxes to original image dimensions."""
         if not cells or not isinstance(cells, list):
             return cells
-        
 
         original_width, original_height = origin_image.size
-        
+
         scale_x = input_width / original_width
         scale_y = input_height / original_height
-        
+
         cells_out = []
         for cell in cells:
-            bbox = cell['bbox']
+            bbox = cell["bbox"]
             bbox_resized = [
                 int(float(bbox[0]) / scale_x),
                 int(float(bbox[1]) / scale_y),
                 int(float(bbox[2]) / scale_x),
-                int(float(bbox[3]) / scale_y)
+                int(float(bbox[3]) / scale_y),
             ]
             cell_copy = cell.copy()
-            cell_copy['bbox'] = bbox_resized
+            cell_copy["bbox"] = bbox_resized
             cells_out.append(cell_copy)
-        
+
         return cells_out
 
     async def _async_inference_with_vllm(self, image, prompt):
@@ -195,30 +199,33 @@ class DotsOCRConverter(OpenAIConverterClient):
                 "content": [
                     {
                         "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{to_base64(image)}"},
+                        "image_url": {
+                            "url": f"data:image/png;base64,{to_base64(image)}"
+                        },
                     },
-                    {"type": "text", "text": f"<|img|><|imgpad|><|endofimg|>{prompt}"}
+                    {"type": "text", "text": f"<|img|><|imgpad|><|endofimg|>{prompt}"},
                 ],
             }
         ]
-        
+
         response = await self.model.chat.completions.create(
             messages=messages,
             model=self.vllm_config.default_model_name,
-            **self.completion_kwargs
+            **self.completion_kwargs,
         )
         return response.choices[0].message.content
 
     async def _parse_image_vllm(self, origin_image, prompt_mode="prompt_layout_all_en"):
         """Parse image using VLLM inference."""
 
-        
-        image = self.fetch_image(origin_image, min_pixels=self.MIN_PIXELS, max_pixels=self.MAX_PIXELS)
+        image = self.fetch_image(
+            origin_image, min_pixels=self.MIN_PIXELS, max_pixels=self.MAX_PIXELS
+        )
         prompt = self.PROMPTS[prompt_mode]
-        
+
         response = await self._async_inference_with_vllm(image, prompt)
-        
-        if prompt_mode in ['prompt_layout_all_en']:
+
+        if prompt_mode in ["prompt_layout_all_en"]:
             try:
                 cells = json.loads(response)
                 cells = self.post_process_cells(
@@ -260,6 +267,5 @@ class DotsOCRConverter(OpenAIConverterClient):
 
         text = clean_response(response)
         text = html_to_md_keep_tables(text)
-        page.text=text
+        page.text = text
         return page
-
