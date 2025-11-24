@@ -1,14 +1,14 @@
 import os
 from glob import glob
-from loguru import logger
 from typing import Literal
+
+from loguru import logger
 
 
 class DParseCLI:
-
     def serve(self, model: str, port: int | None = None, gpus: str | None = None):
         """Deploy a VLLM server in a Docker container.
-        
+
         Args:
             model: Model name
             port: VLLM server port (default: 8056)
@@ -17,38 +17,47 @@ class DParseCLI:
         if port is None:
             port = 8056
 
-        
         from vlmparse.registries import docker_config_registry
-        
+
         docker_config = docker_config_registry.get(model)
         if docker_config is None:
-            logger.warning(f"No Docker configuration found for model: {model}, using default configuration")
-            return 
-        
+            logger.warning(
+                f"No Docker configuration found for model: {model}, using default configuration"
+            )
+            return
+
         docker_config.docker_port = port
-        
+
         # Only override GPU configuration if explicitly specified
         # This preserves CPU-only settings from the config
         if gpus is not None:
             docker_config.gpu_device_ids = [g.strip() for g in gpus.split(",")]
         server = docker_config.get_server(auto_stop=False)
-        
+
         # Deploy server and leave it running (cleanup=False)
-        logger.info(f"Deploying VLLM server for {docker_config.model_name} on port {port}...")
-        
+        logger.info(
+            f"Deploying VLLM server for {docker_config.model_name} on port {port}..."
+        )
 
-        base_url, container  = server.start()
+        base_url, container = server.start()
 
-        
         logger.info(f"✓ VLLM server ready at {base_url}")
         logger.info(f"✓ Container ID: {container.id}")
         logger.info(f"✓ Container name: {container.name}")
 
-    def convert(self, input: list[str], out_folder: str=".", model: str ="lightonocr", uri: str | None = None, gpus: str | None = None, mode: Literal["document", "md", "md_page"] = "document"):
+    def convert(
+        self,
+        folders: str | list[str],
+        out_folder: str = ".",
+        model: str = "lightonocr",
+        uri: str | None = None,
+        gpus: str | None = None,
+        mode: Literal["document", "md", "md_page"] = "document",
+    ):
         """Parse PDF documents and save results.
-        
+
         Args:
-            input: List of file paths or glob patterns
+            folders: List of folders to process
             out_folder: Output folder for parsed documents
             pipe: Converter type ("vllm", "openai", or "lightonocr", default: "vllm")
             model: Model name (required for vllm, optional for others)
@@ -64,29 +73,30 @@ class DParseCLI:
 
         # Expand file paths from glob patterns
         file_paths = []
-        if isinstance(input, str):
-            input = [input]
-        for pattern in input:
+        if isinstance(folders, str):
+            folders = [folders]
+        for pattern in folders:
             if "*" in pattern or "?" in pattern:
                 file_paths.extend(glob(pattern, recursive=True))
             else:
                 file_paths.append(pattern)
-        
+
         # Filter to only existing PDF files
         file_paths = [f for f in file_paths if os.path.exists(f) and f.endswith(".pdf")]
-        
+
         if not file_paths:
-            logger.error("No PDF files found matching the input patterns")
+            logger.error("No PDF files found matching the folders patterns")
             return
-        
+
         logger.info(f"Processing {len(file_paths)} files with {model} converter")
-        
+
         gpu_device_ids = None
         if gpus is not None:
             gpu_device_ids = [g.strip() for g in gpus.split(",")]
 
         if uri is None:
             from vlmparse.registries import docker_config_registry
+
             docker_config = docker_config_registry.get(model)
             docker_config.gpu_device_ids = gpu_device_ids
             server = docker_config.get_server(auto_stop=True)
@@ -105,68 +115,89 @@ class DParseCLI:
     def list(self):
         """List all currently running servers."""
         import docker
-        
+
         try:
             client = docker.from_env()
             containers = client.containers.list()
-            
+
             if not containers:
                 logger.info("No running containers found")
                 return
-            
+
             # Filter for containers that look like VLLM servers
             vllm_containers = []
             for container in containers:
                 # Check if it's a VLLM-related container by image name or ports
-                image_name = container.image.tags[0] if container.image.tags else str(container.image.id)
+                image_name = (
+                    container.image.tags[0]
+                    if container.image.tags
+                    else str(container.image.id)
+                )
                 vllm_containers.append(container)
-            
+
             if not vllm_containers:
                 logger.info("No running servers found")
                 return
-            
+
             logger.info(f"Found {len(vllm_containers)} running container(s):")
             logger.info("")
-            
+
             for container in vllm_containers:
-                image_name = container.image.tags[0] if container.image.tags else str(container.image.id)[:12]
-                
+                image_name = (
+                    container.image.tags[0]
+                    if container.image.tags
+                    else str(container.image.id)[:12]
+                )
+
                 # Extract port mappings
                 ports = []
                 if container.ports:
-                    for container_port, host_bindings in container.ports.items():
+                    for _, host_bindings in container.ports.items():
                         if host_bindings:
                             for binding in host_bindings:
                                 ports.append(f"{binding['HostPort']}")
-                
+
                 port_str = ", ".join(ports) if ports else "N/A"
-                
+
                 # Get container status and uptime
                 status = container.status
-                
+
                 logger.info(f"  Container: {container.name}")
                 logger.info(f"    ID: {container.short_id}")
                 logger.info(f"    Image: {image_name}")
                 logger.info(f"    Status: {status}")
                 logger.info(f"    Port(s): {port_str}")
                 logger.info("")
-                
+
         except docker.errors.DockerException as e:
             logger.error(f"Failed to connect to Docker: {e}")
-            logger.error("Make sure Docker is running and you have the necessary permissions")
+            logger.error(
+                "Make sure Docker is running and you have the necessary permissions"
+            )
 
     def view(self, folder):
-        from streamlit import runtime
-        from vlmparse.st_viewer.st_viewer import run_streamlit, __file__ as st_viewer_file
         import subprocess
         import sys
+
+        from streamlit import runtime
+
+        from vlmparse.st_viewer.st_viewer import __file__ as st_viewer_file
+        from vlmparse.st_viewer.st_viewer import run_streamlit
 
         if runtime.exists():
             run_streamlit(folder)
         else:
             try:
                 subprocess.run(
-                    [sys.executable, "-m", "streamlit", "run", st_viewer_file, "--", folder],
+                    [
+                        sys.executable,
+                        "-m",
+                        "streamlit",
+                        "run",
+                        st_viewer_file,
+                        "--",
+                        folder,
+                    ],
                     check=True,
                 )
             except KeyboardInterrupt:
@@ -176,8 +207,10 @@ class DParseCLI:
 
 
 def main():
-    import fire 
+    import fire
+
     fire.Fire(DParseCLI)
+
 
 if __name__ == "__main__":
     main()
