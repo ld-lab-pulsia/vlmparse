@@ -9,6 +9,12 @@ Features:
 - 🔄 Unified interface across all VLM/OCR providers
 - 📊 Built-in result visualization with Streamlit
 
+Supported Converters:
+
+- **Open Source Small VLMs**: `lightonocr`, `dotsocr`, `nanonets/Nanonets-OCR2-3B`
+- **Pipelines**: `docling`
+- **Proprietary LLMs**: `gemini-2.5-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-pro`, `gpt-5.1`
+
 ## Installation
 
 ```bash
@@ -18,31 +24,8 @@ uv sync
 With optional dependencies:
 
 ```bash
-uv sync --extra test --extra st_app
+uv sync --all-extras
 ```
-
-## Quick Start
-
-```python
-from vlmparse.registries import converter_config_registry
-
-# Get a converter configuration
-config = converter_config_registry.get("gemini-2.5-flash-lite")
-client = config.get_client()
-
-# Convert a single PDF
-document = client("path/to/document.pdf")
-print(document.to_markdown())
-
-# Batch convert multiple PDFs
-documents = client.batch(["file1.pdf", "file2.pdf"])
-```
-
-## Supported Converters
-
-- **Open Source OCR**: `lightonocr`, `dotsocr`, `nanonets/Nanonets-OCR2-3B`
-- **Google Gemini**: `gemini-2.5-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-pro`
-- **OpenAI**: `gpt-4o`, `gpt-4o-mini`
 
 ## CLI Usage
 
@@ -93,4 +76,37 @@ Set API keys as environment variables:
 ```bash
 export GOOGLE_API_KEY="your-key"
 export OPENAI_API_KEY="your-key"
+```
+
+## Python API
+
+Client interface:
+
+```python
+from vlmparse.registries import converter_config_registry
+
+# Get a converter configuration
+config = converter_config_registry.get("gemini-2.5-flash-lite")
+client = config.get_client()
+
+# Convert a single PDF
+document = client("path/to/document.pdf")
+print(document.to_markdown())
+
+# Batch convert multiple PDFs
+documents = client.batch(["file1.pdf", "file2.pdf"])
+```
+
+Docker server interface:
+
+```python
+from vlmparse.registries import docker_config_registry
+
+config = docker_config_registry.get("lightonocr")
+server = config.get_server()
+server.start()
+
+# Client calls...
+
+server.stop()
 ```
