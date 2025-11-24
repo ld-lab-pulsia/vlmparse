@@ -4,10 +4,10 @@ A unified wrapper for Vision Language Models (VLM) and OCR solutions to parse PD
 
 Features:
 
-- Async/concurrent processing for high throughput
-- Automatic Docker server management for local models
-- Unified interface across all VLM/OCR providers
-- Built-in result visualization with Streamlit
+- ⚡ Async/concurrent processing for high throughput
+- 🐳 Automatic Docker server management for local models
+- 🔄 Unified interface across all VLM/OCR providers
+- 📊 Built-in result visualization with Streamlit
 
 ## Installation
 
@@ -48,7 +48,7 @@ documents = client.batch(["file1.pdf", "file2.pdf"])
 
 ### Convert PDFs
 
-With a general VLM (requires setting you api key as an environment variable):
+With a general VLM (requires setting your api key as an environment variable):
 
 ```bash
 vlmparse convert --input "*.pdf" --out_folder ./output --model gemini-2.5-flash-lite
@@ -72,6 +72,12 @@ then convert:
 
 ```bash
 vlmparse convert --input "*.pdf" --out_folder ./output --model lightonocr --uri http://localhost:8000/v1
+```
+
+You can also list all running servers:
+
+```bash
+vlmparse list
 ```
 
 ### View results with Streamlit

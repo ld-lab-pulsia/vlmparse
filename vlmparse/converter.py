@@ -9,6 +9,7 @@ from .base_model import VLMParseBaseModel
 from .data_model.document import Document, Page, ProcessingError
 
 from .build_doc import convert_pdfium_to_images
+from typing import Literal
 
 nest_asyncio.apply()
 
@@ -25,11 +26,13 @@ class BaseConverter:
     def __init__(self, config: ConverterConfig,     num_concurrent_files: int = 10,
     num_concurrent_pages: int = 10,
     save_folder: str|None=None,
+    save_mode: Literal["document", "md", "md_page"] = "document",
     debug: bool = False):
         self.config = config
         self.num_concurrent_files = num_concurrent_files
         self.num_concurrent_pages = num_concurrent_pages
         self.save_folder = save_folder
+        self.save_mode = save_mode
         self.debug = debug
 
 
@@ -81,11 +84,40 @@ class BaseConverter:
                 return document
         
         if self.save_folder is not None:
-            save_folder = Path(self.save_folder)
-            save_folder.mkdir(parents=True, exist_ok=True)
-            document.to_zip(save_folder / (Path(document.file_path).name + ".zip"))
+            self._save_document(document)
         
         return document
+
+    def _save_document(self, document: Document):
+        """Save document according to save_mode."""
+        save_folder = Path(self.save_folder)
+        save_folder.mkdir(parents=True, exist_ok=True)
+        doc_name = Path(document.file_path).stem
+        
+        if self.save_mode == "document":
+            zip_path = save_folder / f"{doc_name}.zip"
+            document.to_zip(zip_path)
+            logger.info(f"Saved document to {zip_path}")
+        
+        elif self.save_mode == "md":
+            md_path = save_folder / f"{doc_name}.md"
+            text_content = "\n\n".join([page.text or "" for page in document.pages])
+            with open(md_path, "w", encoding="utf-8") as f:
+                f.write(text_content)
+            logger.info(f"Saved markdown to {md_path}")
+        
+        elif self.save_mode == "md_page":
+            doc_folder = save_folder / doc_name
+            doc_folder.mkdir(parents=True, exist_ok=True)
+            for i, page in enumerate(document.pages, start=1):
+                page_text = page.text if page.text else ""
+                page_path = doc_folder / f"page_{i:04d}.md"
+                with open(page_path, "w", encoding="utf-8") as f:
+                    f.write(page_text)
+            logger.info(f"Saved {len(document.pages)} pages to {doc_folder}")
+        
+        else:
+            logger.warning(f"Unknown save_mode: {self.save_mode}, skipping save")
 
 
     def __call__(self, file_path: str|Path):

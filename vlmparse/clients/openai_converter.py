@@ -1,5 +1,6 @@
 from collections.abc import Callable
 import os
+from typing import Literal
 
 from loguru import logger
 from pydantic import Field
@@ -59,8 +60,9 @@ class OpenAIConverterClient(BaseConverter):
     def __init__(self, config: OpenAIConverterConfig, num_concurrent_files: int = 10,
     num_concurrent_pages: int = 10,
     save_folder: str|None=None,
+    save_mode: Literal["document", "md", "md_page"] = "document",
     debug: bool = False):
-        super().__init__(config=config, num_concurrent_files=num_concurrent_files, num_concurrent_pages=num_concurrent_pages, save_folder=save_folder, debug=debug)
+        super().__init__(config=config, num_concurrent_files=num_concurrent_files, num_concurrent_pages=num_concurrent_pages, save_folder=save_folder, save_mode=save_mode, debug=debug)
         from openai import AsyncOpenAI
         self.model = AsyncOpenAI(
             base_url=self.config.llm_params.base_url,

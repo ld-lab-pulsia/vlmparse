@@ -36,8 +36,8 @@ class DockerServerConfig(BaseModel):
         from vlmparse.clients.openai_converter import OpenAIConverterConfig
         return OpenAIConverterConfig(llm_params=self.llm_params)
         
-    def get_client(self):
-        return self.client_config.get_client()
+    def get_client(self, **kwargs):
+        return self.client_config.get_client(**kwargs)
 
     def get_server(self, auto_stop: bool = True):
         return ConverterServer(config=self, auto_stop=auto_stop)

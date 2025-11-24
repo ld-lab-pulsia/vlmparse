@@ -1,6 +1,7 @@
 import os
 from glob import glob
 from loguru import logger
+from typing import Literal
 
 
 class DParseCLI:
@@ -44,7 +45,7 @@ class DParseCLI:
         logger.info(f"✓ Container ID: {container.id}")
         logger.info(f"✓ Container name: {container.name}")
 
-    def convert(self, input: list[str], out_folder: str=".", model: str ="lightonocr", uri: str | None = None, gpus: str | None = None):
+    def convert(self, input: list[str], out_folder: str=".", model: str ="lightonocr", uri: str | None = None, gpus: str | None = None, mode: Literal["document", "md", "md_page"] = "document"):
         """Parse PDF documents and save results.
         
         Args:
@@ -54,8 +55,13 @@ class DParseCLI:
             model: Model name (required for vllm, optional for others)
             uri: URI of the server, if not specified and the pipe is vllm, a local server will be deployed
             gpus: Comma-separated GPU device IDs (e.g., "0" or "0,1,2"). If not specified, all GPUs will be used.
+            mode: Output mode - "document" (save as JSON zip), "md" (save as markdown file), "md_page" (save as folder of markdown pages)
         """
         from vlmparse.registries import converter_config_registry
+
+        if mode not in ["document", "md", "md_page"]:
+            logger.error(f"Invalid mode: {mode}. Must be one of: document, md, md_page")
+            return
 
         # Expand file paths from glob patterns
         file_paths = []
@@ -87,11 +93,11 @@ class DParseCLI:
             server = docker_config.get_server(auto_stop=True)
             server.start()
 
-            client = docker_config.get_client()
+            client = docker_config.get_client(save_folder=out_folder, save_mode=mode)
 
         else:
             client_config = converter_config_registry.get(model, uri=uri)
-            client = client_config.get_client()
+            client = client_config.get_client(save_folder=out_folder, save_mode=mode)
 
         documents = client.batch(file_paths)
 
