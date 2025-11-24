@@ -15,7 +15,7 @@ def test_convert(file_path, model):
     assert doc.pages[1].text is not None
 
 @pytest.mark.skipif("RUN_DEPLOYMENT_VLLM" not in os.environ or os.environ["RUN_DEPLOYMENT_VLLM"] == "false", reason="Skipping because RUN_DEPLOYMENT_VLLM is not set or is false")
-@pytest.mark.parametrize("model", ["lightonocr", "dotsocr", "nanonets/Nanonets-OCR2-3B"])
+@pytest.mark.parametrize("model", ["docling", "lightonocr", "dotsocr", "nanonets/Nanonets-OCR2-3B"])
 def test_convert_with_docker(file_path, model):
     """Test conversion with automatic Docker deployment (requires GPU due to vllm limitations)."""
     # Get docker config
