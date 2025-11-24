@@ -2,12 +2,12 @@
 from pathlib import Path
 from pydantic import Field
 
-from vlmparse.servers.docker_server import DockerServerConfig
+from vlmparse.servers.docker_server import VLLMDockerServerConfig
 from vlmparse.clients.openai_converter import OpenAIConverterConfig
 
 DOCKERFILE_DIR = Path(__file__).parent.parent.parent / "docker_pipelines"
 
-class LightOnOCRDockerServerConfig(DockerServerConfig):
+class LightOnOCRDockerServerConfig(VLLMDockerServerConfig):
     """Configuration for LightOnOCR model."""
     
     model_name: str = "lightonai/LightOnOCR-1B-1025"

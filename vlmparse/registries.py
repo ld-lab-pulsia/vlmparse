@@ -2,6 +2,7 @@ from vlmparse.clients.nanonetocr import NanonetOCR2ConverterConfig, NanonetOCR2D
 from vlmparse.servers.docker_server import docker_config_registry
 from vlmparse.clients.lightonocr import LightOnOCRConverterConfig, LightOnOCRDockerServerConfig
 from vlmparse.clients.dotsocr import DotsOCRConverterConfig, DotsOCRDockerServerConfig
+from vlmparse.clients.docling import DoclingConverterConfig, DoclingDockerServerConfig
 from vlmparse.clients.openai_converter import LLMParams, OpenAIConverterConfig
 import os
 from collections.abc import Callable
@@ -13,6 +14,7 @@ import os
 docker_config_registry.register("lightonocr", lambda: LightOnOCRDockerServerConfig())
 docker_config_registry.register("dotsocr", lambda: DotsOCRDockerServerConfig())
 docker_config_registry.register("nanonets/Nanonets-OCR2-3B", lambda: NanonetOCR2DockerServerConfig())
+docker_config_registry.register("docling", lambda: DoclingDockerServerConfig())
 docker_config_registry.register("gemini-2.5-flash-lite", lambda: None)
 docker_config_registry.register("gemini-2.5-flash", lambda: None)
 docker_config_registry.register("gemini-2.5-pro", lambda: None)
@@ -50,6 +52,7 @@ converter_config_registry.register("gemini-2.5-pro", lambda uri=None: OpenAIConv
 converter_config_registry.register("lightonocr", lambda uri=None: LightOnOCRConverterConfig(llm_params=LLMParams(base_url=uri or "http://localhost:8000/v1", model_name="lightonai/LightOnOCR-1B-1025", api_key="")))
 converter_config_registry.register("dotsocr", lambda uri=None: DotsOCRConverterConfig(llm_params=LLMParams(base_url=uri or "http://localhost:8000/v1", model_name="dotsocr-model", api_key="")))
 converter_config_registry.register("nanonets/Nanonets-OCR2-3B", lambda uri=None: NanonetOCR2ConverterConfig(llm_params=LLMParams(base_url=uri or "http://localhost:8000/v1", model_name="nanonets/Nanonets-OCR2-3B", api_key="")))
+converter_config_registry.register("docling", lambda uri=None: DoclingConverterConfig(base_url=uri or "http://localhost:5001"))
 
 
 

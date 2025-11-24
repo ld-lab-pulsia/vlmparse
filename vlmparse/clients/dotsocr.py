@@ -5,7 +5,7 @@ import math
 from PIL import Image
 from typing import Literal, ClassVar
 
-from vlmparse.servers.docker_server import DockerServerConfig
+from vlmparse.servers.docker_server import VLLMDockerServerConfig
 from vlmparse.clients.openai_converter import OpenAIConverterClient
 from vlmparse.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_tables
 from vlmparse.clients.pipe_utils.utils import clean_response
@@ -18,7 +18,7 @@ from vlmparse.clients.openai_converter import OpenAIConverterConfig
 DOCKERFILE_DIR = Path(__file__).parent.parent.parent / "docker_pipelines"
 
 
-class DotsOCRDockerServerConfig(DockerServerConfig):
+class DotsOCRDockerServerConfig(VLLMDockerServerConfig):
     """Configuration for DotsOCR model."""
     
     model_name: str = "/workspace/weights/DotsOCR"
@@ -33,7 +33,7 @@ class DotsOCRDockerServerConfig(DockerServerConfig):
             "--trust-remote-code",
         ]
     )
-    add_model_key_to_vllm_server: bool = False
+    add_model_key_to_server: bool = False
 
     @property
     def client_config(self):

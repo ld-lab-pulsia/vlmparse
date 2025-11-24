@@ -52,15 +52,15 @@ def _ensure_image_exists(
 
 
 @contextmanager
-def vllm_server(
+def docker_server(
     config: "DockerServerConfig",
     timeout: int = 500,
     cleanup: bool = True,
 ):
-    """Generic context manager for VLLM server deployment.
+    """Generic context manager for Docker server deployment.
 
     Args:
-        config: VLLMModelConfig with model-specific settings (includes port, gpu_device_ids, dockerfile_dir)
+        config: DockerServerConfig (can be VLLMDockerServerConfig or GenericDockerServerConfig)
         timeout: Timeout in seconds to wait for server to be ready
         cleanup: If True, stop and remove container on exit. If False, leave container running
     
@@ -71,16 +71,14 @@ def vllm_server(
     client = docker.from_env()
     container = None
 
-
     try:
         # Ensure image exists
         logger.info(f"Checking for Docker image {config.docker_image}...")
         
         if config.dockerfile_dir is not None:
-
             _ensure_image_exists(client, config.docker_image, Path(config.dockerfile_dir))
         else:
-            # Pull pre-built image (for standard VLLM images)
+            # Pull pre-built image
             try:
                 client.images.get(config.docker_image)
                 logger.info(f"Docker image {config.docker_image} found locally")
@@ -89,7 +87,7 @@ def vllm_server(
                 client.images.pull(config.docker_image)
                 logger.info(f"Successfully pulled {config.docker_image}")
         
-        logger.info(f"Starting VLLM container for {config.model_name} on port {config.docker_port}")
+        logger.info(f"Starting Docker container for {config.model_name} on port {config.docker_port}")
         
         # Configure GPU access
         device_requests = None
@@ -101,6 +99,7 @@ def vllm_server(
                 )
             ]
         else:
+            # Try to use all GPUs if available
             device_requests = [
                 docker.types.DeviceRequest(
                     count=-1,
@@ -108,37 +107,32 @@ def vllm_server(
                 )
             ]
         
-        # Build command
-        model_key = ["--model"] if config.add_model_key_to_vllm_server else []
-
-        command = model_key+[
-            config.model_name,
-            "--port", "8000",
-        ] + config.command_args+["--served-model-name", config.default_model_name]
+        # Use generic methods from config
+        command = config.get_command()
+        volumes = config.get_volumes()
+        environment = config.get_environment()
+        container_port = config.container_port
+        log_prefix = config.model_name
         
-        # Setup volumes for model caching
-        if config.hf_home_folder is not None:
-            volumes = {
-                str(Path(config.hf_home_folder).absolute()): {
-                    'bind': '/root/.cache/huggingface',
-                    'mode': 'rw'
-                }
-            }
-            env = {"HF_HOME": config.hf_home_folder, "TRITON_CACHE_DIR": config.hf_home_folder}
-        else:
-            volumes = None
-            env = None
         # Start container
-        container = client.containers.run(
-            config.docker_image,
-            command=command,
-            ports={"8000/tcp": config.docker_port},
-            device_requests=device_requests,
-            volumes=volumes,
-            detach=True,
-            remove=True,
-            environment=env,
-        )
+        container_kwargs = {
+            "image": config.docker_image,
+            "ports": {f"{container_port}/tcp": config.docker_port},
+            "device_requests": device_requests,
+            "detach": True,
+            "remove": True,
+        }
+        
+        if command:
+            container_kwargs["command"] = command
+        if environment:
+            container_kwargs["environment"] = environment
+        if volumes:
+            container_kwargs["volumes"] = volumes
+        if config.entrypoint:
+            container_kwargs["entrypoint"] = config.entrypoint
+        
+        container = client.containers.run(**container_kwargs)
         
         logger.info(f"Container {container.short_id} started, waiting for server to be ready...")
         
@@ -163,7 +157,7 @@ def vllm_server(
                     new_logs = all_logs[last_log_position:]
                     for line in new_logs.splitlines():
                         if line.strip():  # Only print non-empty lines
-                            logger.info(f"[VLLM] {line}")
+                            logger.info(f"[{log_prefix}] {line}")
                     last_log_position = len(all_logs)
                 
                 # Check if server is ready
@@ -179,8 +173,10 @@ def vllm_server(
         if not server_ready:
             raise TimeoutError(f"Server did not become ready within {timeout} seconds")
         
-        base_url = f"http://localhost:{config.docker_port}/v1"
-        logger.info(f"VLLM server ready at {base_url}\nConvert document with dparse convert --input /path/to/your/document.pdf --output /path/to/output/folder --model {config.model_name} --uri {base_url}")
+        # Build base URL using config's suffix method
+        base_url = f"http://localhost:{config.docker_port}{config.get_base_url_suffix()}"
+        
+        logger.info(f"{log_prefix} server ready at {base_url}")
         
         yield base_url, container
         
