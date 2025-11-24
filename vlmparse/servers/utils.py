@@ -91,7 +91,18 @@ def docker_server(
         
         # Configure GPU access
         device_requests = None
-        if config.gpu_device_ids:
+
+
+        if config.gpu_device_ids is None:
+            # Default: Try to use all GPUs if available
+            device_requests = [
+                docker.types.DeviceRequest(
+                    count=-1,
+                    capabilities=[["gpu"]]
+                )
+            ]
+        elif len(config.gpu_device_ids)>0 and config.gpu_device_ids[0] != "":
+            # Use specific GPU devices
             device_requests = [
                 docker.types.DeviceRequest(
                     device_ids=config.gpu_device_ids,
@@ -99,14 +110,9 @@ def docker_server(
                 )
             ]
         else:
-            # Try to use all GPUs if available
-            device_requests = [
-                docker.types.DeviceRequest(
-                    count=-1,
-                    capabilities=[["gpu"]]
-                )
-            ]
-        
+            # Empty list means CPU-only, no GPU
+            device_requests = None
+
         # Use generic methods from config
         command = config.get_command()
         volumes = config.get_volumes()
@@ -118,11 +124,12 @@ def docker_server(
         container_kwargs = {
             "image": config.docker_image,
             "ports": {f"{container_port}/tcp": config.docker_port},
-            "device_requests": device_requests,
             "detach": True,
             "remove": True,
         }
         
+        if device_requests is not None:
+            container_kwargs["device_requests"] = device_requests
         if command:
             container_kwargs["command"] = command
         if environment:
@@ -179,7 +186,7 @@ def docker_server(
         logger.info(f"{log_prefix} server ready at {base_url}")
         
         yield base_url, container
-        
+    
     finally:
         if cleanup and container:
             logger.info(f"Stopping container {container.short_id}")

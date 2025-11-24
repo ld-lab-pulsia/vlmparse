@@ -34,11 +34,12 @@ class ConverterConfigRegistry:
     
     def get(self, model_name: str, uri: str | None = None) -> OpenAIConverterConfig | None:
         """Get config for a model name. Returns default if not registered."""
+        if model_name in self._registry:
+            return self._registry[model_name](uri=uri)
+        # Fallback to OpenAIConverterConfig for unregistered models
         if uri is not None:
             return OpenAIConverterConfig(llm_params=LLMParams(base_url=uri, model_name=model_name))
-        if model_name not in self._registry:
-            return OpenAIConverterConfig(llm_params=LLMParams(model_name=model_name))
-        return self._registry[model_name](uri=uri)
+        return OpenAIConverterConfig(llm_params=LLMParams(model_name=model_name))
 
 
 # Global registry instance

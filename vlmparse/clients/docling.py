@@ -15,11 +15,13 @@ class DoclingDockerServerConfig(DockerServerConfig):
     """Configuration for Docling Serve using official image."""
     
     model_name: str = "docling"
-    docker_image: str = "quay.io/docling-project/docling-serve:latest"
+    docker_image: str = Field(default="")
+    cpu_only: bool = False
     command_args: list[str] = Field(default_factory=list)
     server_ready_indicators: list[str] = Field(
         default_factory=lambda: ["Application startup complete", "Uvicorn running"]
     )
+    enable_ui: bool = False
     docker_port: int = 5001
     container_port: int = 5001
     environment: dict[str, str] = Field(
@@ -28,6 +30,23 @@ class DoclingDockerServerConfig(DockerServerConfig):
             "DOCLING_SERVE_PORT": "5001"
         }
     )
+    
+    def model_post_init(self, __context):
+        """Set docker_image and gpu_device_ids based on cpu_only if not explicitly provided."""
+        if not self.docker_image:
+            if self.cpu_only:
+                self.docker_image = "quay.io/docling-project/docling-serve-cpu:latest"
+            else:
+                self.docker_image = "quay.io/docling-project/docling-serve:latest"
+        
+        # For CPU-only mode, explicitly disable GPU by setting empty list
+        if self.cpu_only and self.gpu_device_ids is None:
+            self.gpu_device_ids = []
+
+        
+        if self.enable_ui:
+            self.command_args.append("--enable-ui")
+
 
     @property
     def client_config(self):
@@ -38,7 +57,7 @@ class DoclingConverterConfig(ConverterConfig):
     """Configuration for Docling converter client."""
     base_url: str = "http://localhost:5001"
     timeout: int = 300
-    output_format: Literal["markdown", "json", "text"] = "markdown"
+    api_kwargs: dict = {"output_format": "markdown", "image_export_mode": "referenced"}
 
     def get_client(self, **kwargs) -> 'DoclingConverter':
         return DoclingConverter(config=self, **kwargs)
@@ -68,33 +87,33 @@ class DoclingConverter(BaseConverter):
     
     async def async_call_inside_page(self, page: Page) -> Page:
         """Process a single page using Docling Serve API."""
+        from io import BytesIO
+        
         image = page.image
         
-        # Convert image to base64
-        image_base64 = to_base64(image)
+        # Convert image to bytes for file upload
+        img_byte_arr = BytesIO()
+        image.save(img_byte_arr, format="PNG")
+        img_bytes = img_byte_arr.getvalue()
         
-        # Prepare the request according to Docling Serve API
-        # Using the data URL format for image input
-        request_data = {
-            "sources": [
-                {
-                    "kind": "data_url",
-                    "data_url": f"data:image/png;base64,{image_base64}"
-                }
-            ],
-            "options": {
-                "output_format": self.config.output_format
-            }
+
+        files = {
+            "files": ("image.png", img_bytes, "image/png")
+        }
+        data = {
+            "output_format": self.config.output_format,
+            "image_export_mode": self.config.image_export_mode
         }
         
-        # Make the API call
-        url = f"{self.config.base_url}/v1/convert/source"
+        url = f"{self.config.base_url}/v1/convert/file"
+        logger.debug(f"Calling Docling API at: {url}")
         
         try:
             response = await self.client.post(
                 url,
-                json=request_data,
-                headers={"Content-Type": "application/json", "Accept": "application/json"}
+                files=files,
+                data=data,
+                headers={"Accept": "application/json"}
             )
             response.raise_for_status()
             
@@ -104,20 +123,11 @@ class DoclingConverter(BaseConverter):
             # Extract text from the response
             # The response structure depends on the output format
             if self.config.output_format == "markdown":
-                # Extract markdown content from the response
-                if "results" in result and len(result["results"]) > 0:
-                    text = result["results"][0].get("markdown", "")
-                elif "markdown" in result:
-                    text = result["markdown"]
-                else:
-                    text = str(result)
+                text = result["document"]["md_content"]
+      
             elif self.config.output_format == "text":
-                if "results" in result and len(result["results"]) > 0:
-                    text = result["results"][0].get("text", "")
-                elif "text" in result:
-                    text = result["text"]
-                else:
-                    text = str(result)
+                text =result["document"]["md_content"]
+
             else:  # json or other formats
                 text = str(result)
             
@@ -128,9 +138,6 @@ class DoclingConverter(BaseConverter):
             text = html_to_md_keep_tables(text)
             page.text = text
             
-        except httpx.HTTPError as e:
-            logger.error(f"HTTP error occurred: {e}")
-            page.text = f"Error: {str(e)}"
         except Exception as e:
             logger.error(f"Error processing page with Docling: {e}")
             page.text = f"Error: {str(e)}"

@@ -20,18 +20,17 @@ class DParseCLI:
         
         from vlmparse.registries import docker_config_registry
         
-        # Parse GPU device IDs
-        gpu_device_ids = None
-        if gpus is not None:
-            gpu_device_ids = [g.strip() for g in gpus.split(",")]
-
         docker_config = docker_config_registry.get(model)
         if docker_config is None:
             logger.warning(f"No Docker configuration found for model: {model}, using default configuration")
             return 
         
         docker_config.docker_port = port
-        docker_config.gpu_device_ids = gpu_device_ids
+        
+        # Only override GPU configuration if explicitly specified
+        # This preserves CPU-only settings from the config
+        if gpus is not None:
+            docker_config.gpu_device_ids = [g.strip() for g in gpus.split(",")]
         server = docker_config.get_server(auto_stop=False)
         
         # Deploy server and leave it running (cleanup=False)
@@ -101,7 +100,7 @@ class DParseCLI:
 
         documents = client.batch(file_paths)
 
-        logger.info(f"Successfully processed {len(documents)} documents to {out_folder}")
+        logger.info(f"Processed {len(documents)} documents to {out_folder}")
 
     def list(self):
         """List all currently running servers."""
