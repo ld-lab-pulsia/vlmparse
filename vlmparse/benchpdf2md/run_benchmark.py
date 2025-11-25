@@ -4,7 +4,6 @@ from pathlib import Path
 
 import fire
 import pandas as pd
-from joblib import Parallel, delayed
 from loguru import logger
 from tqdm import tqdm
 
@@ -12,7 +11,6 @@ from vlmparse.benchpdf2md.bench_tests.benchmark_tsts import (
     BaselineTest,
     load_tests_from_ds,
 )
-from vlmparse.benchpdf2md.create_dataset import create_dataset
 from vlmparse.benchpdf2md.utils import bootstrap_and_format_results
 from vlmparse.data_model.document import Document
 from vlmparse.registries import converter_config_registry, docker_config_registry
@@ -29,24 +27,31 @@ def process_and_run_benchmark(
     model="gemini-2.5-flash-lite",
     uri: str | None = None,
     retry: str | None = None,
-    num_concurrent_pages: int = 100,
-    num_concurrent_files: int = 100,
+    num_concurrent_pages: int = 10,
+    num_concurrent_files: int = 10,
     debug: bool = False,
     gpu: int = 2,
     regenerate: bool = False,
-    in_folder: Path | str = IN_FOLDER,
-    save_folder: Path | str = OUT_FOLDER,
+    in_folder: Path | str = "pulseia/fr-bench-pdf2md",
+    save_folder: Path | str = ".",
     retrylast: bool = False,
 ):
-    in_folder = Path(in_folder)
+    # in_folder = Path(in_folder)
     save_folder = Path(save_folder)
 
-    if not in_folder.exists():
-        raise ValueError(f"Input folder does not exist: {in_folder}")
-    if not in_folder.is_dir():
-        raise ValueError(f"Input path is not a directory: {in_folder}")
+    # if not in_folder.exists():
+    #     raise ValueError(f"Input folder does not exist: {in_folder}")
+    # if not in_folder.is_dir():
+    #     raise ValueError(f"Input path is not a directory: {in_folder}")
 
-    ds = create_dataset(in_folder)
+    # ds = create_dataset(in_folder)
+    from datasets import DownloadConfig, load_dataset
+
+    download_config = DownloadConfig(num_proc=10)
+
+    ds = load_dataset(
+        in_folder, download_mode="force_redownload", download_config=download_config
+    )["test"]
 
     try:
         if retrylast:
@@ -60,7 +65,7 @@ def process_and_run_benchmark(
                 )
 
         if retry is None or regenerate:
-            files = [in_folder / path for path in sorted(set(ds["pdf_path"]))]
+            files = list(sorted(set(ds["pdf_path"])))
 
             if len(files) == 0:
                 raise ValueError(
@@ -86,7 +91,7 @@ def process_and_run_benchmark(
             client.num_concurrent_pages = num_concurrent_pages
             client.num_concurrent_files = num_concurrent_files
             client.debug = debug
-            client.save_folder = str(save_folder / "results")
+            client.save_folder = str(save_folder)
             client.batch(files)
 
         else:
@@ -127,8 +132,8 @@ def run_pb_benchmark(
 
         tests.append(
             BaselineTest(
-                pdf=str(doc.file_path),
-                page=int(tests_name.split("_")[-1].removeprefix("page")),
+                pdf=_ds["pdf_path"][0],
+                page=_ds["page"][0],
                 id=f"{tests_name}-baseline",
                 type="baseline",
             )
@@ -151,9 +156,13 @@ def run_pb_benchmark(
 
         return results
 
-    results = Parallel(n_jobs=num_workers)(
-        delayed(worker)(file_path) for file_path in tqdm(files)
-    )
+    results = []
+    for file_path in tqdm(files):
+        results.extend(worker(file_path))
+
+    # results = Parallel(n_jobs=num_workers)(
+    #     delayed(worker)(file_path) for file_path in tqdm(files)
+    # )
 
     df = pd.DataFrame([r for r in results for r in r])
 

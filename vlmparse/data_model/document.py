@@ -100,6 +100,12 @@ class Document(VLMParseBaseModel):
     def text(self):
         return "\n\n".join([page.text for page in self.pages])
 
+    @property
+    def is_error(self):
+        return self.error is not None or any(
+            page.error is not None for page in self.pages
+        )
+
     def to_zip(
         self,
         file_path,

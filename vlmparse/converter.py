@@ -15,7 +15,7 @@ nest_asyncio.apply()
 
 class ConverterConfig(VLMParseBaseModel):
     dpi: int = 175
-    max_image_size: int | None = None
+    max_image_size: int | None = 3500
 
     def get_client(self, **kwargs) -> "BaseConverter":
         return BaseConverter(config=self, **kwargs)
@@ -91,7 +91,12 @@ class BaseConverter:
 
     def _save_document(self, document: Document):
         """Save document according to save_mode."""
-        save_folder = Path(self.save_folder)
+        if document.is_error:
+            save_folder = Path(self.save_folder) / "errors"
+
+        else:
+            save_folder = Path(self.save_folder) / "results"
+
         save_folder.mkdir(parents=True, exist_ok=True)
         doc_name = Path(document.file_path).stem
 

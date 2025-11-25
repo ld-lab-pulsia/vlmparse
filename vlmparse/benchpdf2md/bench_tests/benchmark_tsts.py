@@ -1,6 +1,7 @@
 # Adapted from https://github.com/allenai/olmocr/blob/main/olmocr/bench/tests.py
 
 import json
+import math
 import re
 import unicodedata
 from typing import List, Optional, Set, Tuple
@@ -1236,6 +1237,7 @@ def load_tests(jsonl_file: str) -> List[BasePDFTest]:
                 data.pop("resources")
             if "tags" in data:
                 data.pop("tags")
+            data = {k: v for k, v in data.items() if v is not None and not np.isnan(v)}
             test_type = data.get("type")
 
             if test_type in {"present", "absent"}:
@@ -1297,7 +1299,12 @@ def load_tests_from_ds(ds) -> List[BasePDFTest]:
         """
 
         try:
-            data = {k: v for k, v in row.items() if v is not None}
+            _data = {}
+            for k, v in row.items():
+                if isinstance(v, float) and math.isnan(v) or v is None:
+                    continue
+                _data[k] = v
+            data = _data
             if "resources" in data:
                 data.pop("resources")
             if "tags" in data:
