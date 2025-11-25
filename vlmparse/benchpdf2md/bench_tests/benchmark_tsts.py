@@ -1419,7 +1419,13 @@ def load_tests(jsonl_file: str) -> List[BasePDFTest]:
                 data.pop("resources")
             if "tags" in data:
                 data.pop("tags")
-            data = {k: v for k, v in data.items() if v is not None and not np.isnan(v)}
+
+            _data = {}
+            for k, v in data.items():
+                if isinstance(v, float) and math.isnan(v) or v is None:
+                    continue
+                _data[k] = v
+            data = _data
             test_type = data.get("type")
 
             if test_type in {"present", "absent"}:

@@ -14,12 +14,13 @@ def test_data_dir(datadir):
     tmpdir = Path(tempfile.mkdtemp())
 
     # Create a subdirectory following the expected structure
-    test_subdir = tmpdir / "Fiche_Graines_A5_page1"
+    test_subdir = tmpdir /"pdfs"/ "random_test"/"Fiche_Graines_A5_page1"
     test_subdir.mkdir(parents=True)
 
     # Copy the PDF file
     pdf_source = datadir / "Fiche_Graines_A5.pdf"
-    pdf_dest = test_subdir / "Fiche_Graines_A5.pdf"
+    pdf_dest = test_subdir /"Fiche_Graines_A5.pdf"
+
     shutil.copy(pdf_source, pdf_dest)
 
     # Create metadata.json
