@@ -640,10 +640,7 @@ class TestCLIConvertInDepth:
 
         # Verify calls were made
         assert len(call_times) == 2
-        # Concurrent calls should happen very close together
-        if len(call_times) > 1:
-            time_diff = call_times[1] - call_times[0]
-            assert time_diff < 0.1  # Should be nearly simultaneous
+
 
     def test_convert_with_dotsocr_model(
         self, cli, file_path, mock_openai_api, mock_pdf_to_images

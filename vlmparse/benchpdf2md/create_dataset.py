@@ -10,7 +10,7 @@ from datasets import Dataset
 
 
 def load_data_from_folder(
-    base_folder: Path, dataset_base_folder: Path
+    base_folder: Path,
 ) -> List[Dict[str, Any]]:
     """Load all data from the folder structure.
     One row per test with relative PDF path.
@@ -44,8 +44,7 @@ def load_data_from_folder(
             for line in f:
                 tests.append(json.loads(line.strip()))
 
-        # Get relative path to PDF from base_folder
-        pdf_relative_path = str(pdf_path.relative_to(dataset_base_folder))
+
 
         # Create one row per test
         for test in tests:
@@ -54,7 +53,7 @@ def load_data_from_folder(
                 "page": metadata["page"],
                 "doc_type": metadata.get("doc_type"),
                 "original_doc_path": metadata.get("original_doc_path"),
-                "pdf_path": pdf_relative_path,
+                "pdf_path": str(pdf_path),
                 **test,  # Unpack all test fields
             }
             data.append(row)
@@ -78,7 +77,7 @@ def create_dataset(base_folder: str, output_path: str = None, push_to_hub: str =
     for subdir in base_path.iterdir():
         if not subdir.is_dir():
             continue
-        data.extend(load_data_from_folder(subdir, Path(base_folder)))
+        data.extend(load_data_from_folder(subdir))
 
     print(f"Loaded {len(data)} tests")
 

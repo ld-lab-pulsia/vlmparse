@@ -7,6 +7,7 @@ import pandas as pd
 from huggingface_hub import snapshot_download
 from loguru import logger
 from tqdm import tqdm
+from joblib import Parallel, delayed
 
 from vlmparse.benchpdf2md.bench_tests.benchmark_tsts import (
     BaselineTest,
@@ -20,9 +21,9 @@ from vlmparse.registries import converter_config_registry, docker_config_registr
 IN_FOLDER = Path(
     "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/validated_tests/tiny_test_tests_first_batch/tests/tiny_text_long_text/"
 )
-OUT_FOLDER = Path(
-    "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/validated_tests/tiny_test_tests_first_batch/preds2"
-)
+
+OUT_FOLDER = Path(os.getenv("OUT_FOLDER_FR_BENCHMARK", "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/validated_tests/preds"))
+
 
 
 def process_and_run_benchmark(
@@ -35,7 +36,7 @@ def process_and_run_benchmark(
     gpu: int = 2,
     regenerate: bool = False,
     in_folder: Path | str = "pulseia/fr-bench-pdf2md",
-    save_folder: Path | str = ".",
+    save_folder: Path | str =OUT_FOLDER,
     retrylast: bool = False,
 ):
     # in_folder = Path(in_folder)
@@ -86,14 +87,14 @@ def process_and_run_benchmark(
                 docker_config = docker_config_registry.get(model)
 
             if docker_config is not None:
-                docker_config.gpu_device_ids = [gpu]
+                docker_config.gpu_device_ids = [str(gpu)]
                 server = docker_config.get_server(auto_stop=True)
                 server.start()
                 client = docker_config.get_client()
             else:
                 client = converter_config_registry.get(model, uri=uri).get_client()
-            client.num_concurrent_pages = num_concurrent_pages
-            client.num_concurrent_files = num_concurrent_files
+            client.num_concurrent_pages = num_concurrent_pages if not debug else 1
+            client.num_concurrent_files = num_concurrent_files if not debug else 1
             client.debug = debug
             client.save_folder = str(save_folder)
             client.batch(files)
@@ -160,13 +161,9 @@ def run_pb_benchmark(
 
         return results
 
-    results = []
-    for file_path in tqdm(files):
-        results.extend(worker(file_path))
-
-    # results = Parallel(n_jobs=num_workers)(
-    #     delayed(worker)(file_path) for file_path in tqdm(files)
-    # )
+    results = Parallel(n_jobs=num_workers)(
+        delayed(worker)(file_path) for file_path in tqdm(files)
+    )
 
     df = pd.DataFrame([r for r in results for r in r])
 
