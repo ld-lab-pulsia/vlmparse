@@ -837,6 +837,188 @@ class TextOrderTest(BasePDFTest):
 
 
 class TableTest(BasePDFTest):
+    cell: str
+    up: str = ""
+    down: str = ""
+    left: str = ""
+    right: str = ""
+    type: Literal["table"] = Field(default="table")
+    top_heading: str = ""
+    left_heading: str = ""
+
+    def run(self, content: str) -> Tuple[bool, str]:
+        from .utils import md_tables_to_html
+        content = md_tables_to_html(content)
+        print(content)
+
+        cell = self.normalise(self.cell)
+        up = self.normalise(self.up)
+        down = self.normalise(self.down)
+        left = self.normalise(self.left)
+        right = self.normalise(self.right)
+        top_heading = self.normalise(self.top_heading)
+        left_heading = self.normalise(self.left_heading)
+
+        threshold = max(0.5, 1.0 - (self.max_diffs / (len(cell) if len(cell) > 0 else 1)))
+
+        soup = BeautifulSoup(content, "html.parser")
+        tables = soup.find_all("table")
+
+        if not tables:
+            return False, "No HTML tables found in the content"
+
+        best_match_score = -1
+        best_match_reasons = []
+
+        for table in tables:
+            rows = table.find_all("tr")
+            cells_info = []
+            occupied = {}
+            
+            for row_idx, row in enumerate(rows):
+                cells = row.find_all(["th", "td"])
+                col_idx = 0
+                
+                for html_cell in cells:
+                    while (row_idx, col_idx) in occupied:
+                        col_idx += 1
+                    
+                    cell_text_orig = html_cell.get_text().strip()
+                    cell_text = self.normalise(cell_text_orig)
+                    rowspan = int(html_cell.get("rowspan", 1))
+                    colspan = int(html_cell.get("colspan", 1))
+                    is_header = html_cell.name == "th"
+                    
+                    cells_info.append({
+                        'row': row_idx,
+                        'col': col_idx,
+                        'rowspan': rowspan,
+                        'colspan': colspan,
+                        'text': cell_text,
+                        'text_orig': cell_text_orig,
+                        'is_header': is_header
+                    })
+                    
+                    for i in range(rowspan):
+                        for j in range(colspan):
+                            occupied[(row_idx + i, col_idx + j)] = True
+                    
+                    col_idx += colspan
+
+            if not cells_info:
+                continue
+
+            for cell_info in cells_info:
+                cell_content = cell_info['text']
+                similarity = fuzz.ratio(cell, cell_content) / 100.0
+
+                if similarity < threshold:
+                    continue
+
+                all_satisfied = True
+                reasons = []
+                total_score = similarity
+
+                row_start = cell_info['row']
+                row_end = row_start + cell_info['rowspan']
+                col_start = cell_info['col']
+                col_end = col_start + cell_info['colspan']
+
+                if up:
+                    up_neighbors = [c for c in cells_info if c != cell_info and 
+                                   c['row'] + c['rowspan'] == row_start and 
+                                   not (c['col'] >= col_end or c['col'] + c['colspan'] <= col_start)]
+                    if up_neighbors:
+                        best_up_sim = max(fuzz.ratio(up, n['text']) / 100.0 for n in up_neighbors)
+                        total_score += best_up_sim
+                        if best_up_sim < max(0.5, 1.0 - (self.max_diffs / (len(up) if len(up) > 0 else 1))):
+                            all_satisfied = False
+                            reasons.append(f"Up cell not found (sim: {best_up_sim:.2f})")
+                    else:
+                        all_satisfied = False
+                        reasons.append("Up cell not found (sim: 0.00)")
+
+                if down:
+                    down_neighbors = [c for c in cells_info if c != cell_info and 
+                                     c['row'] == row_end and 
+                                     not (c['col'] >= col_end or c['col'] + c['colspan'] <= col_start)]
+                    if down_neighbors:
+                        best_down_sim = max(fuzz.ratio(down, n['text']) / 100.0 for n in down_neighbors)
+                        total_score += best_down_sim
+                        if best_down_sim < max(0.5, 1.0 - (self.max_diffs / (len(down) if len(down) > 0 else 1))):
+                            all_satisfied = False
+                            reasons.append(f"Down cell not found (sim: {best_down_sim:.2f})")
+                    else:
+                        all_satisfied = False
+                        reasons.append("Down cell not found (sim: 0.00)")
+
+                if left:
+                    left_neighbors = [c for c in cells_info if c != cell_info and 
+                                     c['col'] + c['colspan'] == col_start and 
+                                     not (c['row'] >= row_end or c['row'] + c['rowspan'] <= row_start)]
+                    if left_neighbors:
+                        best_left_sim = max(fuzz.ratio(left, n['text']) / 100.0 for n in left_neighbors)
+                        total_score += best_left_sim
+                        if best_left_sim < max(0.5, 1.0 - (self.max_diffs / (len(left) if len(left) > 0 else 1))):
+                            all_satisfied = False
+                            reasons.append(f"Left cell not found (sim: {best_left_sim:.2f})")
+                    else:
+                        all_satisfied = False
+                        reasons.append("Left cell not found (sim: 0.00)")
+
+                if right:
+                    right_neighbors = [c for c in cells_info if c != cell_info and 
+                                      c['col'] == col_end and 
+                                      not (c['row'] >= row_end or c['row'] + c['rowspan'] <= row_start)]
+                    if right_neighbors:
+                        best_right_sim = max(fuzz.ratio(right, n['text']) / 100.0 for n in right_neighbors)
+                        total_score += best_right_sim
+                        if best_right_sim < max(0.5, 1.0 - (self.max_diffs / (len(right) if len(right) > 0 else 1))):
+                            all_satisfied = False
+                            reasons.append(f"Right cell not found (sim: {best_right_sim:.2f})")
+                    else:
+                        all_satisfied = False
+                        reasons.append("Right cell not found (sim: 0.00)")
+
+                if top_heading:
+                    header_cells = [c for c in cells_info if c['is_header'] and 
+                                   not (c['col'] >= col_end or c['col'] + c['colspan'] <= col_start)]
+                    if header_cells:
+                        best_header_sim = max(fuzz.ratio(top_heading, n['text']) / 100.0 for n in header_cells)
+                        total_score += best_header_sim
+                        if best_header_sim < max(0.5, 1.0 - (self.max_diffs / (len(top_heading) if len(top_heading) > 0 else 1))):
+                            all_satisfied = False
+                            reasons.append(f"Top heading not found (sim: {best_header_sim:.2f})")
+                    else:
+                        all_satisfied = False
+                        reasons.append("Top heading not found (sim: 0.00)")
+
+                if left_heading:
+                    header_cells = [c for c in cells_info if c['col'] == 0 and 
+                                   not (c['row'] >= row_end or c['row'] + c['rowspan'] <= row_start)]
+                    if header_cells:
+                        best_header_sim = max(fuzz.ratio(left_heading, n['text']) / 100.0 for n in header_cells)
+                        total_score += best_header_sim
+                        if best_header_sim < max(0.5, 1.0 - (self.max_diffs / (len(left_heading) if len(left_heading) > 0 else 1))):
+                            all_satisfied = False
+                            reasons.append(f"Left heading not found (sim: {best_header_sim:.2f})")
+                    else:
+                        all_satisfied = False
+                        reasons.append("Left heading not found (sim: 0.00)")
+
+                if all_satisfied:
+                    return True, ""
+                
+                if total_score > best_match_score:
+                    best_match_score = total_score
+                    best_match_reasons = reasons
+
+        if best_match_score < 0:
+            return False, f"No cell matching '{cell}' found with threshold {threshold}"
+        else:
+            return False, f"Found cells matching '{cell}' but relationships not satisfied: {'\n\n'.join(best_match_reasons)}"
+
+class TableTestOld(BasePDFTest):
     """
     Test to verify certain properties of a table are held, namely that some cells appear relative to other cells correctly
     """
