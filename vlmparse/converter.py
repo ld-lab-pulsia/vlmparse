@@ -67,6 +67,8 @@ class BaseConverter:
                     logger.info("Image size: " + str(page.image.size))
                     try:
                         await self.async_call_inside_page(page)
+                    except KeyboardInterrupt:
+                        raise
                     except Exception:
                         if self.debug:
                             raise
@@ -76,6 +78,8 @@ class BaseConverter:
 
             tasks = [asyncio.create_task(worker(page)) for page in document.pages]
             await asyncio.gather(*tasks)
+        except KeyboardInterrupt:
+            raise
         except Exception:
             if self.debug:
                 raise
