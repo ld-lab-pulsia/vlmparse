@@ -4,6 +4,7 @@ from pathlib import Path
 
 import fire
 import pandas as pd
+from huggingface_hub import snapshot_download
 from loguru import logger
 from tqdm import tqdm
 
@@ -11,6 +12,7 @@ from vlmparse.benchpdf2md.bench_tests.benchmark_tsts import (
     BaselineTest,
     load_tests_from_ds,
 )
+from vlmparse.benchpdf2md.create_dataset import create_dataset
 from vlmparse.benchpdf2md.utils import bootstrap_and_format_results
 from vlmparse.data_model.document import Document
 from vlmparse.registries import converter_config_registry, docker_config_registry
@@ -45,13 +47,15 @@ def process_and_run_benchmark(
     #     raise ValueError(f"Input path is not a directory: {in_folder}")
 
     # ds = create_dataset(in_folder)
-    from datasets import DownloadConfig, load_dataset
 
-    download_config = DownloadConfig(num_proc=10)
+    if in_folder == "pulseia/fr-bench-pdf2md":
+        local_folder_path = snapshot_download(
+            repo_id="pulseia/fr-bench-pdf2md",
+            repo_type="dataset",  # Use "model" or "space" for other types
+        )
+        in_folder = local_folder_path
 
-    ds = load_dataset(
-        in_folder, download_mode="force_redownload", download_config=download_config
-    )["test"]
+    ds = create_dataset(in_folder)
 
     try:
         if retrylast:

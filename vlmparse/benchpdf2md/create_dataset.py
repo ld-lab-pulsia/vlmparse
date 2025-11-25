@@ -5,10 +5,13 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
+import pandas as pd
 from datasets import Dataset
 
 
-def load_data_from_folder(base_folder: Path) -> List[Dict[str, Any]]:
+def load_data_from_folder(
+    base_folder: Path, dataset_base_folder: Path
+) -> List[Dict[str, Any]]:
     """Load all data from the folder structure.
     One row per test with relative PDF path.
 
@@ -42,7 +45,7 @@ def load_data_from_folder(base_folder: Path) -> List[Dict[str, Any]]:
                 tests.append(json.loads(line.strip()))
 
         # Get relative path to PDF from base_folder
-        pdf_relative_path = str(pdf_path.relative_to(base_folder))
+        pdf_relative_path = str(pdf_path.relative_to(dataset_base_folder))
 
         # Create one row per test
         for test in tests:
@@ -68,15 +71,19 @@ def create_dataset(base_folder: str, output_path: str = None, push_to_hub: str =
         output_path: Local path to save dataset (optional)
         push_to_hub: HuggingFace Hub repository name to push to (optional)
     """
-    base_path = Path(base_folder)
+    base_path = Path(base_folder) / "pdfs"
 
     print(f"Loading data from {base_path}...")
-    data = load_data_from_folder(base_path)
+    data = []
+    for subdir in base_path.iterdir():
+        if not subdir.is_dir():
+            continue
+        data.extend(load_data_from_folder(subdir, Path(base_folder)))
 
     print(f"Loaded {len(data)} tests")
 
     # Create dataset - let it infer features automatically
-    dataset = Dataset.from_list(data)
+    dataset = Dataset.from_pandas(pd.DataFrame(data))
 
     print(f"\nDataset created with {len(dataset)} examples")
     print(f"Dataset features: {dataset.features}")
@@ -94,48 +101,11 @@ def create_dataset(base_folder: str, output_path: str = None, push_to_hub: str =
     return dataset
 
 
-# ds = create_dataset(Path("/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/validated_tests/tiny_test_tests_first_batch/tests/tiny_text_long_text/"))
+# from argparse import ArgumentParser
 
-# # %%
-# ds
-# # ds.to_parquet("ds.pq")
-# from datasets.arrow_dataset import Dataset
+# parser = ArgumentParser()
+# parser.add_argument("--folder_path", type=str, default="/home/brigal/data/fr-bench-pdf2md/")
+# args = parser.parse_args()
 
-# if __name__ == "__main__":
-#     import argparse
-
-#     parser = argparse.ArgumentParser(description="Create HuggingFace dataset from benchmark folder")
-#     parser.add_argument(
-#         "folder",
-#         type=str,
-#         help="Path to the folder containing the benchmark data"
-#     )
-#     parser.add_argument(
-#         "--output",
-#         type=str,
-#         default=None,
-#         help="Output path to save the dataset locally (optional)"
-#     )
-#     parser.add_argument(
-#         "--push-to-hub",
-#         type=str,
-#         default=None,
-#         help="HuggingFace Hub repository name to push to (optional)"
-#     )
-
-#     args = parser.parse_args()
-
-#     dataset = create_dataset(args.folder, args.output, args.push_to_hub)
-
-#     # Print some examples
-#     print("\n" + "="*80)
-#     print("Example from dataset:")
-#     print("="*80)
-#     example = dataset[0]
-#     print(f"PDF: {example['pdf_name']}")
-#     print(f"Page: {example['page']}")
-#     print(f"Doc type: {example['doc_type']}")
-#     print(f"PDF path: {example['pdf_path']}")
-#     print(f"Test type: {example['type']}")
-#     print(f"\nFull test:")
-#     print(json.dumps(example, indent=2, ensure_ascii=False))
+# dataset = create_dataset(args.folder_path)
+# dataset.to_parquet("dataset.parquet")
