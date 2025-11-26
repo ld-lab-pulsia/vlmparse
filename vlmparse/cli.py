@@ -53,6 +53,7 @@ class DParseCLI:
         uri: str | None = None,
         gpus: str | None = None,
         mode: Literal["document", "md", "md_page"] = "document",
+        with_vllm_server: bool = False,
     ):
         """Parse PDF documents and save results.
 
@@ -64,6 +65,7 @@ class DParseCLI:
             uri: URI of the server, if not specified and the pipe is vllm, a local server will be deployed
             gpus: Comma-separated GPU device IDs (e.g., "0" or "0,1,2"). If not specified, all GPUs will be used.
             mode: Output mode - "document" (save as JSON zip), "md" (save as markdown file), "md_page" (save as folder of markdown pages)
+            with_vllm_server: If True, a local VLLM server will be deployed if the model is not found in the registry. Note that if the model is in the registry and the uri is None, the server will be anyway deployed.
         """
         from vlmparse.registries import converter_config_registry
 
@@ -97,7 +99,8 @@ class DParseCLI:
         if uri is None:
             from vlmparse.registries import docker_config_registry
 
-            docker_config = docker_config_registry.get(model)
+            docker_config = docker_config_registry.get(model, default=with_vllm_server)
+
             if docker_config is not None:
                 docker_config.gpu_device_ids = gpu_device_ids
                 server = docker_config.get_server(auto_stop=True)
