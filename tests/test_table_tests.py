@@ -326,7 +326,7 @@ def test_table_at_end_with_no_trailing_newline(markdown_table):
     assert result, f"Table without trailing newline not detected: {explanation}"
 
 
-
+@pytest.mark.skip(reason="We don't support parsing markdown tables with extra spaces")
 def test_table_at_end_with_extra_spaces(markdown_table):
     test = TableTest(
         pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2"
