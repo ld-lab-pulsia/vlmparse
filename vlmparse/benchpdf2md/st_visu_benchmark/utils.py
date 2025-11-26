@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pypdfium2 as pdfium
 import streamlit as st
+
 from vlmparse.data_model.document import Document
 
 
@@ -39,6 +40,7 @@ def get_doc(doc_path: Path):
 
 def save_new_test(tests, test_obj_edited, test_path):
     from vlmparse.benchpdf2md.bench_tests.benchmark_tsts import save_tests
+
     for test in tests:
         if test.id == test_obj_edited.id:
             test = test_obj_edited

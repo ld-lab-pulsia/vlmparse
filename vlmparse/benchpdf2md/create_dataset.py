@@ -44,8 +44,6 @@ def load_data_from_folder(
             for line in f:
                 tests.append(json.loads(line.strip()))
 
-
-
         # Create one row per test
         for test in tests:
             row = {

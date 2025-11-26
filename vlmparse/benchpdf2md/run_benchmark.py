@@ -5,9 +5,9 @@ from pathlib import Path
 import fire
 import pandas as pd
 from huggingface_hub import snapshot_download
+from joblib import Parallel, delayed
 from loguru import logger
 from tqdm import tqdm
-from joblib import Parallel, delayed
 
 from vlmparse.benchpdf2md.bench_tests.benchmark_tsts import (
     BaselineTest,
@@ -22,8 +22,12 @@ IN_FOLDER = Path(
     "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/validated_tests/tiny_test_tests_first_batch/tests/tiny_text_long_text/"
 )
 
-OUT_FOLDER = Path(os.getenv("OUT_FOLDER_FR_BENCHMARK", "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/validated_tests/preds"))
-
+OUT_FOLDER = Path(
+    os.getenv(
+        "OUT_FOLDER_FR_BENCHMARK",
+        "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/validated_tests/preds",
+    )
+)
 
 
 def process_and_run_benchmark(
@@ -36,7 +40,7 @@ def process_and_run_benchmark(
     gpu: int = 2,
     regenerate: bool = False,
     in_folder: Path | str = "pulseia/fr-bench-pdf2md",
-    save_folder: Path | str =OUT_FOLDER,
+    save_folder: Path | str = OUT_FOLDER,
     retrylast: bool = False,
 ):
     # in_folder = Path(in_folder)
