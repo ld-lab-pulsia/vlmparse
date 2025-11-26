@@ -847,7 +847,7 @@ class TableTest(BasePDFTest):
     left_heading: str = ""
 
     def run(self, content: str) -> Tuple[bool, str]:
-        from .utils import md_tables_to_html
+        from vlmparse.clients.pipe_utils.html_to_md_conversion import md_tables_to_html
         content = md_tables_to_html(content)
         print(content)
 
