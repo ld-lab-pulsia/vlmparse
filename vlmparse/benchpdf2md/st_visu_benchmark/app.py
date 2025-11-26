@@ -6,15 +6,15 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+from huggingface_hub import snapshot_download
 from streamlit import runtime
 
 from vlmparse.benchpdf2md.bench_tests.benchmark_tsts import load_tests, save_tests
-from vlmparse.benchpdf2md.create_dataset import create_dataset
 from vlmparse.benchpdf2md.st_visu_benchmark.highligh_text import highlight_text
 from vlmparse.benchpdf2md.st_visu_benchmark.test_form import edit_test_form
 from vlmparse.benchpdf2md.st_visu_benchmark.ui_elements import download_pdf_page
 from vlmparse.benchpdf2md.st_visu_benchmark.utils import get_doc, save_new_test
-from huggingface_hub import snapshot_download
+
 
 @st.cache_data
 def load_df(results_file):
@@ -24,7 +24,7 @@ def load_df(results_file):
 def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
     st.set_page_config(layout="wide")
     # tests_folder = Path(folder) / "tests"
-    preds_folder = Path(folder) 
+    preds_folder = Path(folder)
 
     # tests = glob(str(tests_folder / "**/**/tests.jsonl"))
     files = glob(str(preds_folder / "**/**/test_results.parquet"))
@@ -94,8 +94,6 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
         st.markdown("Reason: " + row.explanation)
 
     tests_path = map_tests[row.tests_name]
-
-
 
     if (
         "tests" not in st.session_state

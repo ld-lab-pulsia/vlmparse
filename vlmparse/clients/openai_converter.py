@@ -18,7 +18,7 @@ GOOGLE_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 class LLMParams(VLMParseBaseModel):
     api_key: str = os.getenv("GOOGLE_API_KEY")
-    base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    base_url: str | None = "https://generativelanguage.googleapis.com/v1beta/openai/"
     model_name: str = (
         "gemini-2.5-flash-lite"  # "gemini-2.5-flash-lite" #"gemini-2.5-flash"
     )

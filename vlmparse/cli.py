@@ -98,11 +98,18 @@ class DParseCLI:
             from vlmparse.registries import docker_config_registry
 
             docker_config = docker_config_registry.get(model)
-            docker_config.gpu_device_ids = gpu_device_ids
-            server = docker_config.get_server(auto_stop=True)
-            server.start()
+            if docker_config is not None:
+                docker_config.gpu_device_ids = gpu_device_ids
+                server = docker_config.get_server(auto_stop=True)
+                server.start()
 
-            client = docker_config.get_client(save_folder=out_folder, save_mode=mode)
+                client = docker_config.get_client(
+                    save_folder=out_folder, save_mode=mode
+                )
+            else:
+                client = converter_config_registry.get(model).get_client(
+                    save_folder=out_folder, save_mode=mode
+                )
 
         else:
             client_config = converter_config_registry.get(model, uri=uri)

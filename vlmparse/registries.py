@@ -25,6 +25,8 @@ docker_config_registry.register("gemini-2.5-flash", lambda: None)
 docker_config_registry.register("gemini-2.5-pro", lambda: None)
 docker_config_registry.register("gemini-3-pro-preview", lambda: None)
 
+docker_config_registry.register("gpt-5.1", lambda: None)
+
 
 class ConverterConfigRegistry:
     """Registry for mapping model names to their Docker configurations."""
@@ -86,6 +88,17 @@ converter_config_registry.register(
         llm_params=LLMParams(
             model_name="gemini-2.5-pro",
             base_url=GOOGLE_API_BASE_URL if uri is None else uri,
+        )
+    ),
+)
+
+converter_config_registry.register(
+    "gpt-5.1",
+    lambda uri=None: OpenAIConverterConfig(
+        llm_params=LLMParams(
+            model_name="gpt-5.1",
+            base_url=None,
+            api_key=os.getenv("OPENAI_API_KEY"),
         )
     ),
 )
