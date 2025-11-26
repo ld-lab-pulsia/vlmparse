@@ -23,6 +23,7 @@ docker_config_registry.register("docling", lambda: DoclingDockerServerConfig())
 docker_config_registry.register("gemini-2.5-flash-lite", lambda: None)
 docker_config_registry.register("gemini-2.5-flash", lambda: None)
 docker_config_registry.register("gemini-2.5-pro", lambda: None)
+docker_config_registry.register("gemini-3-pro-preview", lambda: None)
 
 
 class ConverterConfigRegistry:
