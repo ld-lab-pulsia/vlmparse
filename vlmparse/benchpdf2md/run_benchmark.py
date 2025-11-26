@@ -4,9 +4,10 @@ from pathlib import Path
 
 import fire
 import pandas as pd
-from joblib import Parallel, delayed
+from huggingface_hub import snapshot_download
 from loguru import logger
 from tqdm import tqdm
+from joblib import Parallel, delayed
 
 from vlmparse.benchpdf2md.bench_tests.benchmark_tsts import (
     BaselineTest,
@@ -20,31 +21,40 @@ from vlmparse.registries import converter_config_registry, docker_config_registr
 IN_FOLDER = Path(
     "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/validated_tests/tiny_test_tests_first_batch/tests/tiny_text_long_text/"
 )
-OUT_FOLDER = Path(
-    "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/validated_tests/tiny_test_tests_first_batch/preds2"
-)
+
+OUT_FOLDER = Path(os.getenv("OUT_FOLDER_FR_BENCHMARK", "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/validated_tests/preds"))
+
 
 
 def process_and_run_benchmark(
     model="gemini-2.5-flash-lite",
     uri: str | None = None,
     retry: str | None = None,
-    num_concurrent_pages: int = 100,
-    num_concurrent_files: int = 100,
+    num_concurrent_pages: int = 10,
+    num_concurrent_files: int = 10,
     debug: bool = False,
     gpu: int = 2,
     regenerate: bool = False,
-    in_folder: Path | str = IN_FOLDER,
-    save_folder: Path | str = OUT_FOLDER,
+    in_folder: Path | str = "pulseia/fr-bench-pdf2md",
+    save_folder: Path | str =OUT_FOLDER,
     retrylast: bool = False,
 ):
-    in_folder = Path(in_folder)
+    # in_folder = Path(in_folder)
     save_folder = Path(save_folder)
 
-    if not in_folder.exists():
-        raise ValueError(f"Input folder does not exist: {in_folder}")
-    if not in_folder.is_dir():
-        raise ValueError(f"Input path is not a directory: {in_folder}")
+    # if not in_folder.exists():
+    #     raise ValueError(f"Input folder does not exist: {in_folder}")
+    # if not in_folder.is_dir():
+    #     raise ValueError(f"Input path is not a directory: {in_folder}")
+
+    # ds = create_dataset(in_folder)
+
+    if in_folder == "pulseia/fr-bench-pdf2md":
+        local_folder_path = snapshot_download(
+            repo_id="pulseia/fr-bench-pdf2md",
+            repo_type="dataset",  # Use "model" or "space" for other types
+        )
+        in_folder = local_folder_path
 
     ds = create_dataset(in_folder)
 
@@ -60,7 +70,7 @@ def process_and_run_benchmark(
                 )
 
         if retry is None or regenerate:
-            files = [in_folder / path for path in sorted(set(ds["pdf_path"]))]
+            files = list(sorted(set(ds["pdf_path"])))
 
             if len(files) == 0:
                 raise ValueError(
@@ -77,16 +87,16 @@ def process_and_run_benchmark(
                 docker_config = docker_config_registry.get(model)
 
             if docker_config is not None:
-                docker_config.gpu_device_ids = [gpu]
+                docker_config.gpu_device_ids = [str(gpu)]
                 server = docker_config.get_server(auto_stop=True)
                 server.start()
                 client = docker_config.get_client()
             else:
                 client = converter_config_registry.get(model, uri=uri).get_client()
-            client.num_concurrent_pages = num_concurrent_pages
-            client.num_concurrent_files = num_concurrent_files
+            client.num_concurrent_pages = num_concurrent_pages if not debug else 1
+            client.num_concurrent_files = num_concurrent_files if not debug else 1
             client.debug = debug
-            client.save_folder = str(save_folder / "results")
+            client.save_folder = str(save_folder)
             client.batch(files)
 
         else:
@@ -127,8 +137,8 @@ def run_pb_benchmark(
 
         tests.append(
             BaselineTest(
-                pdf=str(doc.file_path),
-                page=int(tests_name.split("_")[-1].removeprefix("page")),
+                pdf=_ds["pdf_path"][0],
+                page=_ds["page"][0],
                 id=f"{tests_name}-baseline",
                 type="baseline",
             )

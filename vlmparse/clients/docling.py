@@ -96,10 +96,7 @@ class DoclingConverter(BaseConverter):
         img_bytes = img_byte_arr.getvalue()
 
         files = {"files": ("image.png", img_bytes, "image/png")}
-        data = {
-            "output_format": self.config.output_format,
-            "image_export_mode": self.config.image_export_mode,
-        }
+        data = self.config.api_kwargs
 
         url = f"{self.config.base_url}/v1/convert/file"
         logger.debug(f"Calling Docling API at: {url}")
@@ -115,10 +112,10 @@ class DoclingConverter(BaseConverter):
 
             # Extract text from the response
             # The response structure depends on the output format
-            if self.config.output_format == "markdown":
+            if self.config.api_kwargs["output_format"] == "markdown":
                 text = result["document"]["md_content"]
 
-            elif self.config.output_format == "text":
+            elif self.config.api_kwargs["output_format"] == "text":
                 text = result["document"]["md_content"]
 
             else:  # json or other formats

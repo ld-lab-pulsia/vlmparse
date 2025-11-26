@@ -9,29 +9,42 @@ import streamlit as st
 from streamlit import runtime
 
 from vlmparse.benchpdf2md.bench_tests.benchmark_tsts import load_tests, save_tests
+from vlmparse.benchpdf2md.create_dataset import create_dataset
 from vlmparse.benchpdf2md.st_visu_benchmark.highligh_text import highlight_text
 from vlmparse.benchpdf2md.st_visu_benchmark.test_form import edit_test_form
 from vlmparse.benchpdf2md.st_visu_benchmark.ui_elements import download_pdf_page
 from vlmparse.benchpdf2md.st_visu_benchmark.utils import get_doc, save_new_test
-
+from huggingface_hub import snapshot_download
 
 @st.cache_data
 def load_df(results_file):
     return pd.read_parquet(results_file).set_index("test_id")
 
 
-def run_streamlit(folder: str) -> None:
+def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
     st.set_page_config(layout="wide")
-    tests_folder = Path(folder) / "tests"
-    preds_folder = Path(folder) / "preds"
+    # tests_folder = Path(folder) / "tests"
+    preds_folder = Path(folder) 
 
-    tests = glob(str(tests_folder / "**/**/tests.jsonl"))
+    # tests = glob(str(tests_folder / "**/**/tests.jsonl"))
     files = glob(str(preds_folder / "**/**/test_results.parquet"))
 
-    map_tests = {Path(t).parent.name: t for t in tests}
+    # map_tests = {Path(t).parent.name: t for t in tests}
+    if dataset_path == "pulseia/fr-bench-pdf2md":
+        local_folder_path = snapshot_download(
+            repo_id="pulseia/fr-bench-pdf2md",
+            repo_type="dataset",  # Use "model" or "space" for other types
+        )
+        dataset_path = local_folder_path
 
+    tests = glob(str(Path(dataset_path) / "**/tests.jsonl"), recursive=True)
+    map_tests = {Path(t).parent.name: t for t in tests}
     with st.sidebar:
         sel_folders = [(Path(f).parent.parent.name, Path(f).parent.name) for f in files]
+
+        if len(sel_folders) == 0:
+            st.error(f"No results found in folder {preds_folder}")
+            return
         pipe_folder, date = st.selectbox("Dir", sel_folders, index=0)
         df = load_df(preds_folder / pipe_folder / date / "test_results.parquet")
 
@@ -40,7 +53,7 @@ def run_streamlit(folder: str) -> None:
         only_failed = st.checkbox("Only failed", value=False)
         only_not_checked = st.checkbox("Only not checked", value=False)
 
-        display_image = st.checkbox("Display image", value=True)
+        display_image = st.checkbox("Display image", value=False)
 
         preds_folder = preds_folder / pipe_folder / date / "results"
 
@@ -82,6 +95,8 @@ def run_streamlit(folder: str) -> None:
 
     tests_path = map_tests[row.tests_name]
 
+
+
     if (
         "tests" not in st.session_state
         or st.session_state.get("current_tests_path") != tests_path
@@ -98,7 +113,7 @@ def run_streamlit(folder: str) -> None:
 
         @st.cache_data
         def get_doc_page_md(doc_path):
-            return doc.pages[0].to_markdown(table_mode="html", image_mode="text")
+            return doc.pages[0].text
 
         res = get_doc_page_md(row.doc_path)
 
@@ -167,7 +182,7 @@ def run_streamlit(folder: str) -> None:
 
             @st.cache_data
             def get_image(pipe_folder, date, test_id, show_layout):
-                return doc.pages[0].show(plot_layouts=show_layout)
+                return doc.pages[0].image
 
             st.image(get_image(pipe_folder, date, row.id, show_layout))
     else:
