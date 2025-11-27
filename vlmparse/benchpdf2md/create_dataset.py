@@ -20,8 +20,8 @@ def load_data_from_folder(
     """
     data = []
 
-    for subdir in sorted(base_folder.iterdir()):
-        if not subdir.is_dir():
+    for subdir in sorted(Path(base_folder).rglob('**/')):
+        if not subdir.is_dir() or not (subdir / "tests.jsonl").exists():
             continue
 
         metadata_path = subdir / "metadata.json"
@@ -68,14 +68,11 @@ def create_dataset(base_folder: str, output_path: str = None, push_to_hub: str =
         output_path: Local path to save dataset (optional)
         push_to_hub: HuggingFace Hub repository name to push to (optional)
     """
-    base_path = Path(base_folder) / "pdfs"
 
-    print(f"Loading data from {base_path}...")
-    data = []
-    for subdir in base_path.iterdir():
-        if not subdir.is_dir():
-            continue
-        data.extend(load_data_from_folder(subdir))
+
+    print(f"Loading data from {base_folder}...")
+    data = load_data_from_folder(base_folder)
+
 
     print(f"Loaded {len(data)} tests")
 
