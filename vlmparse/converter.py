@@ -15,7 +15,7 @@ nest_asyncio.apply()
 
 class ConverterConfig(VLMParseBaseModel):
     dpi: int = 175
-    max_image_size: int | None = 3500
+    max_image_size: int | None = 4000
 
     def get_client(self, **kwargs) -> "BaseConverter":
         return BaseConverter(config=self, **kwargs)

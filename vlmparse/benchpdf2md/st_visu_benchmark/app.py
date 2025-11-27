@@ -193,15 +193,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "folder", type=str, nargs="?", default=".", help="Root folder path"
     )
+    parser.add_argument(
+        "--ds", type=str, default="pulseia/fr-bench-pdf2md", help="Dataset path"
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     """Main entry point."""
-    folder = parse_args().folder
+    args = parse_args()
+    folder = args.folder
 
     if runtime.exists():
-        run_streamlit(folder)
+        run_streamlit(folder, dataset_path=args.ds)
     else:
         try:
             subprocess.run(
