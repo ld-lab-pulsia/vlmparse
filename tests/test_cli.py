@@ -241,7 +241,9 @@ class TestConvertCommand:
                 cli.convert(folders=[str(file_path)], model="lightonocr")
 
                 # Verify Docker server was started
-                mock_docker_registry.get.assert_called_once_with("lightonocr")
+                mock_docker_registry.get.assert_called_once_with(
+                    "lightonocr", default=False
+                )
                 mock_docker_config.get_server.assert_called_once_with(auto_stop=True)
                 mock_server.start.assert_called_once()
                 mock_converter.batch.assert_called_once()
@@ -479,7 +481,7 @@ class TestCLIConvertInDepth:
             mock_docker_config.get_server.return_value = mock_server
 
             # Return None for models that shouldn't start a server
-            def get_docker_config(model_name):
+            def get_docker_config(model_name, default=False):
                 if model_name.startswith("gemini"):
                     return None
                 return mock_docker_config
@@ -640,7 +642,6 @@ class TestCLIConvertInDepth:
 
         # Verify calls were made
         assert len(call_times) == 2
-
 
     def test_convert_with_dotsocr_model(
         self, cli, file_path, mock_openai_api, mock_pdf_to_images
