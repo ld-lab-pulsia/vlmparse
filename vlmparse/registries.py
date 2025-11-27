@@ -20,12 +20,6 @@ docker_config_registry.register(
     "nanonets/Nanonets-OCR2-3B", lambda: NanonetOCR2DockerServerConfig()
 )
 docker_config_registry.register("docling", lambda: DoclingDockerServerConfig())
-docker_config_registry.register("gemini-2.5-flash-lite", lambda: None)
-docker_config_registry.register("gemini-2.5-flash", lambda: None)
-docker_config_registry.register("gemini-2.5-pro", lambda: None)
-docker_config_registry.register("gemini-3-pro-preview", lambda: None)
-
-docker_config_registry.register("gpt-5.1", lambda: None)
 
 
 class ConverterConfigRegistry:
@@ -64,44 +58,40 @@ GOOGLE_API_BASE_URL = (
 )
 
 
-converter_config_registry.register(
-    "gemini-2.5-flash-lite",
-    lambda uri=None: OpenAIConverterConfig(
-        llm_params=LLMParams(
-            model_name="gemini-2.5-flash-lite",
-            base_url=GOOGLE_API_BASE_URL if uri is None else uri,
-        )
-    ),
-)
-converter_config_registry.register(
-    "gemini-2.5-flash",
-    lambda uri=None: OpenAIConverterConfig(
-        llm_params=LLMParams(
-            model_name="gemini-2.5-flash",
-            base_url=GOOGLE_API_BASE_URL if uri is None else uri,
-        )
-    ),
-)
-converter_config_registry.register(
+for gemini_model in [
     "gemini-2.5-pro",
-    lambda uri=None: OpenAIConverterConfig(
-        llm_params=LLMParams(
-            model_name="gemini-2.5-pro",
-            base_url=GOOGLE_API_BASE_URL if uri is None else uri,
-        )
-    ),
-)
-
-converter_config_registry.register(
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-3-pro-preview",
+]:
+    converter_config_registry.register(
+        gemini_model,
+        lambda uri=None, model=gemini_model: OpenAIConverterConfig(
+            llm_params=LLMParams(
+                model_name=model,
+                base_url=GOOGLE_API_BASE_URL if uri is None else uri,
+                api_key=os.getenv("GOOGLE_API_KEY"),
+            )
+        ),
+    )
+for openai_model in [
     "gpt-5.1",
-    lambda uri=None: OpenAIConverterConfig(
-        llm_params=LLMParams(
-            model_name="gpt-5.1",
-            base_url=None,
-            api_key=os.getenv("OPENAI_API_KEY"),
-        )
-    ),
-)
+    "gpt-5.1-mini",
+    "gpt-5.1-nano",
+    "gpt-5",
+    "gpt-5-mini",
+    "gpt-5-nano",
+]:
+    converter_config_registry.register(
+        openai_model,
+        lambda uri=None, model=openai_model: OpenAIConverterConfig(
+            llm_params=LLMParams(
+                model_name=model,
+                base_url=None,
+                api_key=os.getenv("OPENAI_API_KEY"),
+            )
+        ),
+    )
 converter_config_registry.register(
     "lightonocr",
     lambda uri=None: LightOnOCRConverterConfig(
