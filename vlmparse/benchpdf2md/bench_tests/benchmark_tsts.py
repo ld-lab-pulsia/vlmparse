@@ -213,6 +213,7 @@ def normalize_text(md_content: str) -> str:
 
     # Remove markdown bold formatting (** or __ for bold)
     md_content = re.sub(r"\*\*(.*?)\*\*", r"\1", md_content)
+    md_content = re.sub(r"\\\*(.*?)\\\*", r"\1", md_content)
     md_content = re.sub(r"__(.*?)__", r"\1", md_content)
     md_content = re.sub(r"</?b>", "", md_content)  # Remove <b> tags if they exist
     md_content = re.sub(r"</?i>", "", md_content)  # Remove <i> tags if they exist
@@ -241,7 +242,16 @@ def normalize_text(md_content: str) -> str:
         "\u00b5": "\u03bc",
         "º": "°",
         "œ": "oe",
+        r"\*": "",
+        r"\*\*": "",
+        "’": "'", 
+        "« ": "«", 
+        " »": "»", 
+        "É": "E", 
+        "’": "'",
+
     }
+
 
     # Apply all replacements from the dictionary
     for fancy_char, ascii_char in replacements.items():
@@ -652,10 +662,16 @@ class BasePDFTest(BaseModel):
     """Filter only on alphanumeric characters + dots and commas"""
     unidecode: bool = False
     """Convert text to ASCII using unidecode"""
-    ignore_space_and_newlines: bool = True
-    """Ignore space and newlines in the text"""
+    ignore_space_and_newlines: bool = False
+    """Ignore space and newlines in the text deprecated, use ignore_space and ignore_newlines instead"""
+    ignore_space: bool = False
+    """Ignore space in the text"""
+    ignore_newlines: bool = True
+    """Ignore newlines in the text"""
     ignore_chars: str = ""
     """Characters to ignore in the text"""
+    ignore_str: list[str] = []
+    """Strings to ignore in the text"""
     checked: Optional[TestChecked] | bool = None
     url: Optional[str] = None
     category: Optional[str] = None
@@ -669,8 +685,13 @@ class BasePDFTest(BaseModel):
         if self.alphanum:
             text = re.sub(r"[^a-zA-Z0-9\.,:;\+\(\)\'\"]", "", text).lower()
 
-        if self.ignore_space_and_newlines:
-            text = re.sub(r"\s+", "", text)
+        # if self.ignore_space_and_newlines:
+        #     text = re.sub(r"\s+", "", text)
+        
+        if self.ignore_space:
+            text = re.sub(r"[^\S\r\n]+", "", text)
+        if self.ignore_newlines:
+            text = re.sub(r"\n+", "", text)
 
         if self.ignore_chars:
             text = re.sub(f"[{self.ignore_chars}]", "", text)
@@ -738,7 +759,6 @@ class TextPresenceTest(BasePDFTest):
         best_ratio = fuzz.partial_ratio(reference_query, md_content_n) / 100.0
 
         if self.type == "present":
-            reference = normalize_text(self.text)
             if best_ratio >= threshold:
                 return True, ""
             else:
@@ -746,14 +766,14 @@ class TextPresenceTest(BasePDFTest):
                 diff_display = "No match found"
                 if md_content:
                     matches = find_near_matches(
-                        reference, md_content, max_l_dist=len(reference) // 2
+                        reference_query, md_content_n, max_l_dist=len(reference_query) // 2
                     )
                     if matches:
                         best_match = min(matches, key=lambda m: m.dist)
-                        best_match_text = md_content[best_match.start : best_match.end]
-                        diff_display = format_diff_text(reference, best_match_text)
+                        best_match_text = md_content_n[best_match.start : best_match.end]
+                        diff_display = format_diff_text(reference_query, best_match_text)
                 msg = (
-                    f"Expected '{reference[:40]}' with threshold {threshold} "
+                    f"Expected '{reference_query[:40]}' with threshold {threshold} "
                     f"but best match ratio was {best_ratio:.3f}\n"
                     f"Diff:\n\n{diff_display}"
                 )
@@ -762,7 +782,8 @@ class TextPresenceTest(BasePDFTest):
             if best_ratio < threshold:
                 return True, ""
             else:
-                reference = normalize_text(self.text)
+                reference = reference_query#normalize_text(self.text)
+
                 best_match_text = ""
                 diff_display = "No match found"
                 if md_content:
