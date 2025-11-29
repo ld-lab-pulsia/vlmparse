@@ -119,7 +119,8 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
         _tests = [test for test in st.session_state["tests"] if test.id == row.id]
 
         if len(_tests) < 1:
-            st.stop("No test found")
+            st.error("No test found")
+            st.stop()
         elif len(_tests) > 1:
             st.error("Multiple tests found")
         test_obj = _tests[0]
