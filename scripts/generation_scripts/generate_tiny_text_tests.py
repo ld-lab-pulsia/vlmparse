@@ -8,6 +8,7 @@ from vlmparse.utils import to_base64
 from vlmparse.build_doc import convert_pdfium_to_images
 from vlmparse.benchpdf2md.bench_tests.benchmark_tsts import save_tests, TextPresenceTest
 import random
+from tqdm import tqdm
 from openai import AsyncOpenAI
 
 DATA_PROJECT = Path("/data_project")
@@ -81,23 +82,29 @@ async def main(gt_folder: Path, save_folder: Path, start_idx: int = 300, end_idx
     random.seed(42)
     random.shuffle(files)
     
-    for file in files[start_idx:end_idx]:
+    
+    for file in tqdm(files[start_idx:end_idx]):
         images = convert_pdfium_to_images(file, dpi=250)
         for page_num, image in enumerate(images):
             if no_inverse_aspect_ratio and image.width > image.height:
+                continue
+            page_folder = save_folder / f"{file.stem}_page{page_num}"
+            old_tests = os.listdir("/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/tests/tiny_text_long_text2")
+
+            if page_folder.exists() or f"{file.stem}_page{page_num}" in old_tests:
                 continue
 
             print(f"Generating tests for {file.name} page {page_num}")
             tests = await generate_tests_for_page(async_client, image, file.name, page_num)
             if tests is None:
                 continue
-            page_folder = save_folder / f"{file.stem}_page{page_num}"
+
             page_folder.mkdir(parents=True, exist_ok=True)
             
             output_file = page_folder / "tests.jsonl"
             save_tests(tests, str(output_file))
             
-            pdf_page_path = page_folder / "page.pdf"
+            pdf_page_path = page_folder / (page_folder.name + ".pdf")
             save_pdf_page(file, page_num, pdf_page_path)
             
             metadata = {
@@ -116,8 +123,8 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--gt_folder", type=str, default="/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/long_text/")
-    parser.add_argument("--save_folder", type=str, default="/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/tests/tiny_text_long_text2")
-    parser.add_argument("--start_idx", type=int, default=500)
+    parser.add_argument("--save_folder", type=str, default="/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/tests/tiny_text_long_text3")
+    parser.add_argument("--start_idx", type=int, default=200)
     parser.add_argument("--end_idx", type=int, default=10000)
     args = parser.parse_args()
     asyncio.run(main(Path(args.gt_folder), Path(args.save_folder), start_idx=args.start_idx, end_idx=args.end_idx))

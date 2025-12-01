@@ -694,7 +694,12 @@ class BasePDFTest(BaseModel):
             text = re.sub(r"\n+", "", text)
 
         if self.ignore_chars:
+
             text = re.sub(f"[{self.ignore_chars}]", "", text)
+
+        if self.ignore_str:
+            for str in [self.ignore_str]:
+                text = text.replace(str)
 
         return text
 

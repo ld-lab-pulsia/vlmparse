@@ -126,8 +126,9 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
         test_obj = _tests[0]
 
         if st.button("Run test"):
-            st.markdown(test_obj.run(res))
-
+            res, message = test_obj.run(res)
+            st.markdown(f"Success: {res}")
+            st.markdown(message)
         test_obj_edited = edit_test_form(
             test_obj,
             test_type,
@@ -142,7 +143,7 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
                 st.session_state["current_tests_path"],
             )
 
-    col1_button, col2_button = pos_buttons.columns(2)
+    col1_button, col2_button, col3_button = pos_buttons.columns(3)
 
     with col1_button:
         if st.button("✅ Validate"):
@@ -162,7 +163,10 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
                 save_tests(
                     st.session_state["tests"], st.session_state["current_tests_path"]
                 )
-
+    with col3_button:
+        if st.button("Supress page"):
+            import shutil
+            shutil.rmtree(Path(row.pdf_path).parent)
     def show_text(res):
         if test_obj:
             res = highlight_text(test_obj, res)

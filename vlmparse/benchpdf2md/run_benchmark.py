@@ -34,8 +34,8 @@ def process_and_run_benchmark(
     model="gemini-2.5-flash-lite",
     uri: str | None = None,
     retry: str | None = None,
-    num_concurrent_pages: int = 10,
-    num_concurrent_files: int = 10,
+    num_concurrent_pages: int = 1,
+    num_concurrent_files: int = 1,
     debug: bool = False,
     gpu: int = 2,
     regenerate: bool = False,
@@ -75,6 +75,12 @@ def process_and_run_benchmark(
 
         if retry is None or regenerate:
             files = list(sorted(set(ds["pdf_path"])))
+            logger.info(f"Number of files to convert: {len(files)}")
+            already_processed = [f.removesuffix(".zip") for f in os.listdir(retry/"results")]
+            files = [f for f in files if Path(f).name.removesuffix(".pdf") not in already_processed]
+
+            logger.info(f"Number of files after filtering: {len(files)}")
+
 
             if len(files) == 0:
                 raise ValueError(
