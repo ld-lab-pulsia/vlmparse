@@ -25,7 +25,7 @@ IN_FOLDER = Path(
 OUT_FOLDER = Path(
     os.getenv(
         "OUT_FOLDER_FR_BENCHMARK",
-        "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/validated_tests/preds",
+        "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/fr-bench-pdf2md-preds",
     )
 )
 
@@ -105,7 +105,6 @@ def process_and_run_benchmark(
             if uri is None:
                 docker_config = docker_config_registry.get(model)
 
-            if docker_config is not None:
                 docker_config.gpu_device_ids = [str(gpu)]
                 server = docker_config.get_server(auto_stop=True)
                 server.start()
@@ -170,6 +169,7 @@ def run_pb_benchmark(
                     page=_ds["page"][0],
                     id=f"{tests_name}-baseline",
                     type="baseline",
+                    category="baseline",
                 )
             )
         except Exception as e:
