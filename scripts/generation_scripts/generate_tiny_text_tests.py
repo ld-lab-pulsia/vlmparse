@@ -47,7 +47,7 @@ Focus exclusively on Handwritten text:
     "headers_footers": """Analyze this page and identify page headers and footer text: texts that are not part of the linear text flow of the document and that bring metadata or other information.
 
 Focus on:
-- Page Headers: WARNING: do not include section headers, document or page titles: they are part of the main content flow.
+- Page Headers: WARNING: do not include section headers, document titles or page titles: they are part of the main content flow.
 - Footers: text at the bottom of the page (page numbers, copyright notices): WARNING: do not include footnotes.
 - Extract the exact text as it appears
 - Do not include text that is part of the main body content
@@ -91,6 +91,9 @@ async def generate_tests_for_page(
         messages=messages,
         response_format=TinyTextTestsResponse,
     )
+    import pdb
+
+    pdb.set_trace()
 
     tests_response = response.choices[0].message.parsed
     if tests_response is None:

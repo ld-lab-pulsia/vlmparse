@@ -699,6 +699,16 @@ class BasePDFTest(BaseModel):
 
         return text
 
+    def get_diff(self, reference: str, candidate: str) -> str:
+        matches = find_near_matches(
+            reference, candidate, max_l_dist=len(reference) // 2
+        )
+        if matches:
+            best_match = min(matches, key=lambda m: m.dist)
+            best_match_text = candidate[best_match.start : best_match.end]
+            diff_display = format_diff_text(reference, best_match_text)
+            return diff_display
+
     def run(self, md_content: str) -> Tuple[bool, str]:
         """
         Run the test on the provided markdown content.
@@ -766,19 +776,7 @@ class TextPresenceTest(BasePDFTest):
                 best_match_text = ""
                 diff_display = "No match found"
                 if md_content:
-                    matches = find_near_matches(
-                        reference_query,
-                        md_content_n,
-                        max_l_dist=len(reference_query) // 2,
-                    )
-                    if matches:
-                        best_match = min(matches, key=lambda m: m.dist)
-                        best_match_text = md_content_n[
-                            best_match.start : best_match.end
-                        ]
-                        diff_display = format_diff_text(
-                            reference_query, best_match_text
-                        )
+                    diff_display = self.get_diff(reference_query, md_content_n)
                 msg = (
                     f"Expected '{reference_query[:40]}' with threshold {threshold} "
                     f"but best match ratio was {best_ratio:.3f}\n"
@@ -913,9 +911,11 @@ class TableTest(BasePDFTest):
                 for html_cell in cells:
                     while (row_idx, col_idx) in occupied:
                         col_idx += 1
-
+                    for br in html_cell.find_all("br"):
+                        br.replace_with("\n")
                     cell_text_orig = html_cell.get_text().strip()
                     cell_text = self.normalise(cell_text_orig)
+
                     rowspan = int(html_cell.get("rowspan", 1))
                     colspan = int(html_cell.get("colspan", 1))
                     is_header = html_cell.name == "th"
@@ -968,17 +968,20 @@ class TableTest(BasePDFTest):
                         )
                     ]
                     if up_neighbors:
-                        best_up_sim = max(
+                        up_sim = [
                             fuzz.ratio(up, n["text"]) / 100.0 for n in up_neighbors
-                        )
+                        ]
+                        best_up_sim = max(up_sim)
+                        best_up_neighbors = up_neighbors[np.argmax(up_sim)]
                         total_score += best_up_sim
                         if best_up_sim < max(
                             0.5,
                             1.0 - (self.max_diffs / (len(up) if len(up) > 0 else 1)),
                         ):
                             all_satisfied = False
+                            diff_display = self.get_diff(up, best_up_neighbors["text"])
                             reasons.append(
-                                f"Up cell not found (sim: {best_up_sim:.2f})"
+                                f"Up cell not found (sim: {best_up_sim:.2f})\nDiff:\n\n{diff_display}"
                             )
                     else:
                         all_satisfied = False
@@ -995,9 +998,12 @@ class TableTest(BasePDFTest):
                         )
                     ]
                     if down_neighbors:
-                        best_down_sim = max(
+                        down_sim = [
                             fuzz.ratio(down, n["text"]) / 100.0 for n in down_neighbors
-                        )
+                        ]
+                        best_down_sim = max(down_sim)
+                        best_down_neighbors = down_neighbors[np.argmax(down_sim)]
+
                         total_score += best_down_sim
                         if best_down_sim < max(
                             0.5,
@@ -1005,8 +1011,11 @@ class TableTest(BasePDFTest):
                             - (self.max_diffs / (len(down) if len(down) > 0 else 1)),
                         ):
                             all_satisfied = False
+                            diff_display = self.get_diff(
+                                down, best_down_neighbors["text"]
+                            )
                             reasons.append(
-                                f"Down cell not found (sim: {best_down_sim:.2f})"
+                                f"Down cell not found (sim: {best_down_sim:.2f})\nDiff:\n\n{diff_display}"
                             )
                     else:
                         all_satisfied = False
@@ -1023,18 +1032,22 @@ class TableTest(BasePDFTest):
                         )
                     ]
                     if left_neighbors:
-                        best_left_sim = max(
+                        left_sim = [
                             fuzz.ratio(left, n["text"]) / 100.0 for n in left_neighbors
-                        )
-                        total_score += best_left_sim
-                        if best_left_sim < max(
+                        ]
+
+                        best_left_cell_sim = max(left_sim)
+                        best_left_cell = left_neighbors[np.argmax(left_sim)]
+                        total_score += best_left_cell_sim
+                        if best_left_cell_sim < max(
                             0.5,
                             1.0
                             - (self.max_diffs / (len(left) if len(left) > 0 else 1)),
                         ):
                             all_satisfied = False
+                            diff_display = self.get_diff(left, best_left_cell["text"])
                             reasons.append(
-                                f"Left cell not found (sim: {best_left_sim:.2f})"
+                                f"Left cell not found (sim: {best_left_cell_sim:.2f})\nDiff:\n\n{diff_display}"
                             )
                     else:
                         all_satisfied = False
@@ -1051,19 +1064,22 @@ class TableTest(BasePDFTest):
                         )
                     ]
                     if right_neighbors:
-                        best_right_sim = max(
+                        right_sim = [
                             fuzz.ratio(right, n["text"]) / 100.0
                             for n in right_neighbors
-                        )
-                        total_score += best_right_sim
-                        if best_right_sim < max(
+                        ]
+                        best_right_cell_sim = max(right_sim)
+                        best_right_cell = right_neighbors[np.argmax(right_sim)]
+                        total_score += best_right_cell_sim
+                        if best_right_cell_sim < max(
                             0.5,
                             1.0
                             - (self.max_diffs / (len(right) if len(right) > 0 else 1)),
                         ):
                             all_satisfied = False
+                            diff_display = self.get_diff(right, best_right_cell["text"])
                             reasons.append(
-                                f"Right cell not found (sim: {best_right_sim:.2f})"
+                                f"Right cell not found (sim: {best_right_cell_sim:.2f})\nDiff:\n\n{diff_display}"
                             )
                     else:
                         all_satisfied = False
@@ -1079,12 +1095,14 @@ class TableTest(BasePDFTest):
                         )
                     ]
                     if header_cells:
-                        best_header_sim = max(
+                        headers_sim = [
                             fuzz.ratio(top_heading, n["text"]) / 100.0
                             for n in header_cells
-                        )
-                        total_score += best_header_sim
-                        if best_header_sim < max(
+                        ]
+                        best_header_cell_sim = max(headers_sim)
+                        best_header_cell = header_cells[np.argmax(headers_sim)]
+                        total_score += best_header_cell_sim
+                        if best_header_cell_sim < max(
                             0.5,
                             1.0
                             - (
@@ -1093,8 +1111,11 @@ class TableTest(BasePDFTest):
                             ),
                         ):
                             all_satisfied = False
+                            diff_display = self.get_diff(
+                                top_heading, best_header_cell["text"]
+                            )
                             reasons.append(
-                                f"Top heading not found (sim: {best_header_sim:.2f})"
+                                f"Top heading not found (sim: {best_header_cell_sim:.2f})\nDiff:\n\n{diff_display}"
                             )
                     else:
                         all_satisfied = False
@@ -1110,12 +1131,14 @@ class TableTest(BasePDFTest):
                         )
                     ]
                     if header_cells:
-                        best_header_sim = max(
+                        headers_sim = [
                             fuzz.ratio(left_heading, n["text"]) / 100.0
                             for n in header_cells
-                        )
-                        total_score += best_header_sim
-                        if best_header_sim < max(
+                        ]
+                        best_header_cell_sim = max(headers_sim)
+                        best_header_cell = header_cells[np.argmax(headers_sim)]
+                        total_score += best_header_cell_sim
+                        if best_header_cell_sim < max(
                             0.5,
                             1.0
                             - (
@@ -1124,8 +1147,11 @@ class TableTest(BasePDFTest):
                             ),
                         ):
                             all_satisfied = False
+                            diff_display = self.get_diff(
+                                left_heading, best_header_cell["text"]
+                            )
                             reasons.append(
-                                f"Left heading not found (sim: {best_header_sim:.2f})"
+                                f"Left heading not found (sim: {best_header_cell_sim:.2f})\nDiff:\n\n{diff_display}"
                             )
                     else:
                         all_satisfied = False
