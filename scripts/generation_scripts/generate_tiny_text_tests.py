@@ -1,23 +1,31 @@
 import asyncio
 import json
 import os
-from pathlib import Path
-import pypdfium2 as pdfium
-from pydantic import BaseModel, Field
-from vlmparse.utils import to_base64
-from vlmparse.build_doc import convert_pdfium_to_images
-from vlmparse.benchpdf2md.bench_tests.benchmark_tsts import save_tests, TextPresenceTest
 import random
-from tqdm import tqdm
+from pathlib import Path
+
+import pypdfium2 as pdfium
 from openai import AsyncOpenAI
+from pydantic import BaseModel, Field
+from tqdm import tqdm
+
+from vlmparse.benchpdf2md.bench_tests.benchmark_tsts import TextPresenceTest, save_tests
+from vlmparse.build_doc import convert_pdfium_to_images
+from vlmparse.utils import to_base64
 
 DATA_PROJECT = Path("/data_project")
 
 
 class TinyTextTestsResponse(BaseModel):
-    tests: list[str] = Field(description="List of exactly 3 tiny texts: minimum of 3 words, can be several paragraphs that is visually small or hard to read", min_length=3, max_length=3)
+    texts: list[str] = Field(
+        description="List of exactly 3 tiny texts: minimum of 3 words, can be several paragraphs that is visually small or hard to read",
+        min_length=3,
+        max_length=3,
+    )
 
-PROMPT = """Analyze this page and identify exactly 3 of the TINIEST, most difficult to read text extracts.
+
+PROMPTS = {
+    "tiny_text": """Analyze this page and identify exactly 3 of the TINIEST, most difficult to read text extracts.
 
 Focus on:
 - Very small font size text (fine print, subscripts, small annotations)
@@ -29,40 +37,79 @@ Focus on:
 
 For each fragment, extract the exact text as it appears.
 
-Return exactly 3 distinct tiny text extracts."""
+Return exactly 3 distinct tiny text extracts.""",
+    "handwritten_text": """Analyze this page and identify from 1 to 10 handwritten text extracts. Return the extracts as a list of strings that should be the exact unmodified OCR of the handwritten text.
 
-async def generate_tests_for_page(client, image, pdf_name: str, page_num: int):
+Focus exclusively on Handwritten text:
+- Minimum of 3 words each, can be several paragraphs
+- Do not include footnotes, headers, footers, page numbers, watermarks, etc...
+- Do not include text that appear in images, plots, charts, etc...""",
+    "headers_footers": """Analyze this page and identify header and footer text: texts that are not part of the linear text flow of the document and that bring metadata or other information that is not part of the main content.
+
+Focus on:
+- Headers: text at the top of the page (page titles, section headers, document headers)
+- Footers: text at the bottom of the page (page numbers, copyright notices)
+- Extract the exact text as it appears
+- Minimum of 3 words each
+- Do not include text that is part of the main body content
+- Do not include text that appears in images, plots, charts, etc.""",
+    "graphics": """Analyze this page and identify graphics, ie plots, curve, charts, diagrams, schemas, histograms, etc... Return a list of strings that should be the exact unmodified OCR of single text elements in the graphics (a number, a label, a title, a legend, a paragraph, etc...). The goal is to test the presence of this text single element in a pdf to markdown OCR conversion.
+
+Focus on:
+- Graphics: plots, curve, charts, diagrams, schemas, histograms, maps.
+- Single text elements: a number, a label, a title, a legend, a paragraph.
+- Extract the exact text as it appears
+- If there is none of the graphics mentioned above, return an empty list.
+- Do not include text that is in footers or headers.
+""",
+}
+
+
+async def generate_tests_for_page(
+    client,
+    image,
+    pdf_name: str,
+    page_num: int,
+    test_type: str = "tiny_text",
+    model: str = "gemini-2.5-pro",
+):
     img_b64 = to_base64(image)
-    messages = [{
-        "role": "user",
-        "content": [
-            {"type": "text", "text": PROMPT},
-            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_b64}"}}
-        ]
-    }]
-    
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": PROMPTS[test_type]},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{img_b64}"},
+                },
+            ],
+        }
+    ]
+
     response = await client.chat.completions.parse(
-        model="gemini-2.5-pro",
+        model=model,
         messages=messages,
         response_format=TinyTextTestsResponse,
     )
-    
+
     tests_response = response.choices[0].message.parsed
     if tests_response is None:
         return None
     tests = []
-    for idx, text in enumerate(tests_response.tests):
+    for idx, text in enumerate(tests_response.texts):
         test = TextPresenceTest(
-            category="tiny_text",
+            category=test_type,
             pdf=pdf_name,
             page=page_num,
             id=f"{pdf_name}_p{page_num}_tiny{idx}",
-            type="present",
+            type="absent" if test_type == "headers_footers" else "present",
             text=text,
             max_diffs=0,
         )
         tests.append(test)
     return tests
+
 
 def save_pdf_page(pdf_path: Path, page_num: int, output_path: Path):
     pdf = pdfium.PdfDocument(pdf_path)
@@ -72,60 +119,107 @@ def save_pdf_page(pdf_path: Path, page_num: int, output_path: Path):
     new_pdf.close()
     pdf.close()
 
-async def main(gt_folder: Path, save_folder: Path, start_idx: int = 300, end_idx: int = 400, no_inverse_aspect_ratio: bool = True):
+
+async def main(
+    gt_folder: Path,
+    save_folder: Path,
+    start_idx: int = 300,
+    end_idx: int = 400,
+    no_inverse_aspect_ratio: bool = False,
+    test_type: str = "tiny_text",
+    model: str = "gemini-2.5-pro",
+    add_page_num: bool = False,
+):
+    # save_folder = save_folder / test_type
     async_client = AsyncOpenAI(
         base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
         api_key=os.getenv("GOOGLE_API_KEY"),
         timeout=500,
     )
-    files = [f for f in gt_folder.iterdir() if f.is_file() and f.name.endswith(".pdf")]
+    files = list(gt_folder.rglob("*.pdf"))
     random.seed(42)
     random.shuffle(files)
-    
-    
+
     for file in tqdm(files[start_idx:end_idx]):
         images = convert_pdfium_to_images(file, dpi=250)
         for page_num, image in enumerate(images):
             if no_inverse_aspect_ratio and image.width > image.height:
                 continue
-            page_folder = save_folder / f"{file.stem}_page{page_num}"
-            old_tests = os.listdir("/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/tests/tiny_text_long_text2")
+            if add_page_num:
+                page_folder = save_folder / f"{file.stem}_page{page_num}"
+            else:
+                page_folder = save_folder / f"{file.stem}"
 
-            if page_folder.exists() or f"{file.stem}_page{page_num}" in old_tests:
+            pdf_page_path = page_folder / (page_folder.name + ".pdf")
+            # old_tests = os.listdir("/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/tests/tiny_text_long_text2")
+
+            test_name = f"tests_{test_type}.jsonl"
+
+            output_file = page_folder / test_name
+            if output_file.exists():  # or f"{file.stem}_page{page_num}" in old_tests:
+                # import pdb;pdb.set_trace()
                 continue
 
             print(f"Generating tests for {file.name} page {page_num}")
-            tests = await generate_tests_for_page(async_client, image, file.name, page_num)
-            if tests is None:
+            tests = await generate_tests_for_page(
+                async_client,
+                image,
+                file.name,
+                page_num,
+                test_type=test_type,
+                model=model,
+            )
+            if tests is None or len(tests) == 0:
                 continue
 
             page_folder.mkdir(parents=True, exist_ok=True)
-            
-            output_file = page_folder / "tests.jsonl"
+
             save_tests(tests, str(output_file))
-            
-            pdf_page_path = page_folder / (page_folder.name + ".pdf")
-            save_pdf_page(file, page_num, pdf_page_path)
-            
-            metadata = {
-                "original_doc_path": str(file.absolute()),
-                "pdf": file.name,
-                "page": page_num,
-                "doc_type": "long_text",
-            }
+
+            if not pdf_page_path.exists():
+                save_pdf_page(file, page_num, pdf_page_path)
             metadata_path = page_folder / "metadata.json"
-            with open(metadata_path, "w") as f:
-                json.dump(metadata, f, indent=2)
-            
+
+            if not metadata_path.exists():
+                metadata = {
+                    "original_doc_path": str(file.absolute()),
+                    "pdf": file.name,
+                    "page": page_num,
+                    "doc_type": "long_text",
+                }
+
+                with open(metadata_path, "w") as f:
+                    json.dump(metadata, f, indent=2)
+
             print(f"Saved {len(tests)} tests to {output_file}")
+
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--gt_folder", type=str, default="/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/long_text/")
-    parser.add_argument("--save_folder", type=str, default="/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/tests/tiny_text_long_text3")
-    parser.add_argument("--start_idx", type=int, default=200)
-    parser.add_argument("--end_idx", type=int, default=10000)
-    args = parser.parse_args()
-    asyncio.run(main(Path(args.gt_folder), Path(args.save_folder), start_idx=args.start_idx, end_idx=args.end_idx))
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--gt_folder",
+        type=str,
+        default=os.path.expanduser("~/data/bench_data/difficult_pdfs/handwritten3/"),
+    )
+    parser.add_argument(
+        "--save_folder",
+        type=str,
+        default=os.path.expanduser("~/data/bench_data/tests/"),
+    )
+    parser.add_argument("--start_idx", type=int, default=0)
+    parser.add_argument("--end_idx", type=int, default=10000)
+    parser.add_argument("--test_type", type=str, default="handwritten_text")
+    parser.add_argument("--model", type=str, default="gemini-2.5-pro")
+    args = parser.parse_args()
+    asyncio.run(
+        main(
+            Path(args.gt_folder),
+            Path(args.save_folder),
+            start_idx=args.start_idx,
+            end_idx=args.end_idx,
+            test_type=args.test_type,
+            model=args.model,
+        )
+    )

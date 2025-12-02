@@ -20,8 +20,8 @@ def load_data_from_folder(
     """
     data = []
 
-    for subdir in sorted(Path(base_folder).rglob('**/')):
-        if not subdir.is_dir() or not (subdir / "tests.jsonl").exists():
+    for subdir in sorted(Path(base_folder).rglob("**/")):
+        if not subdir.is_dir() or not len(list(subdir.glob("*.jsonl"))) >= 1:
             continue
 
         metadata_path = subdir / "metadata.json"
@@ -40,9 +40,10 @@ def load_data_from_folder(
 
         # Load tests
         tests = []
-        with open(tests_path, "r") as f:
-            for line in f:
-                tests.append(json.loads(line.strip()))
+        for tests_path in subdir.glob("*.jsonl"):
+            with open(tests_path, "r") as f:
+                for line in f:
+                    tests.append(json.loads(line.strip()))
 
         # Create one row per test
         for test in tests:
@@ -69,10 +70,8 @@ def create_dataset(base_folder: str, output_path: str = None, push_to_hub: str =
         push_to_hub: HuggingFace Hub repository name to push to (optional)
     """
 
-
     print(f"Loading data from {base_folder}...")
     data = load_data_from_folder(base_folder)
-
 
     print(f"Loaded {len(data)} tests")
 

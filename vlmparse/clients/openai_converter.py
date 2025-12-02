@@ -130,8 +130,9 @@ class OpenAIConverterClient(BaseConverter):
 
         response = response_obj.choices[0].message.content
         logger.info("Response: " + str(response))
-
+        page.raw_response = response
         text = clean_response(response)
+
         text = html_to_md_keep_tables(text)
         page.text = text
 

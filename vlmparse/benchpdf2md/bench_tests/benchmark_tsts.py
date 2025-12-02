@@ -244,14 +244,11 @@ def normalize_text(md_content: str) -> str:
         "œ": "oe",
         r"\*": "",
         r"\*\*": "",
-        "’": "'", 
-        "« ": "«", 
-        " »": "»", 
-        "É": "E", 
-        "’": "'",
-
+        "’": "'",  # noqa
+        "« ": "«",
+        " »": "»",
+        "É": "E",
     }
-
 
     # Apply all replacements from the dictionary
     for fancy_char, ascii_char in replacements.items():
@@ -687,19 +684,18 @@ class BasePDFTest(BaseModel):
 
         # if self.ignore_space_and_newlines:
         #     text = re.sub(r"\s+", "", text)
-        
+
         if self.ignore_space:
             text = re.sub(r"[^\S\r\n]+", "", text)
         if self.ignore_newlines:
             text = re.sub(r"\n+", "", text)
 
         if self.ignore_chars:
-
             text = re.sub(f"[{self.ignore_chars}]", "", text)
 
         if self.ignore_str:
-            for str in [self.ignore_str]:
-                text = text.replace(str)
+            for _str in [self.ignore_str]:
+                text = text.replace(_str)
 
         return text
 
@@ -771,12 +767,18 @@ class TextPresenceTest(BasePDFTest):
                 diff_display = "No match found"
                 if md_content:
                     matches = find_near_matches(
-                        reference_query, md_content_n, max_l_dist=len(reference_query) // 2
+                        reference_query,
+                        md_content_n,
+                        max_l_dist=len(reference_query) // 2,
                     )
                     if matches:
                         best_match = min(matches, key=lambda m: m.dist)
-                        best_match_text = md_content_n[best_match.start : best_match.end]
-                        diff_display = format_diff_text(reference_query, best_match_text)
+                        best_match_text = md_content_n[
+                            best_match.start : best_match.end
+                        ]
+                        diff_display = format_diff_text(
+                            reference_query, best_match_text
+                        )
                 msg = (
                     f"Expected '{reference_query[:40]}' with threshold {threshold} "
                     f"but best match ratio was {best_ratio:.3f}\n"
@@ -787,7 +789,7 @@ class TextPresenceTest(BasePDFTest):
             if best_ratio < threshold:
                 return True, ""
             else:
-                reference = reference_query#normalize_text(self.text)
+                reference = reference_query  # normalize_text(self.text)
 
                 best_match_text = ""
                 diff_display = "No match found"
@@ -876,7 +878,7 @@ class TableTest(BasePDFTest):
         from vlmparse.clients.pipe_utils.html_to_md_conversion import md_tables_to_html
 
         content = md_tables_to_html(content)
-        print(content)
+        # print(content)
 
         cell = self.normalise(self.cell)
         up = self.normalise(self.up)

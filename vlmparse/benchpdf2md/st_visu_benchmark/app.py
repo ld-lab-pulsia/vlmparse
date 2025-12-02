@@ -46,7 +46,8 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
             st.error(f"No results found in folder {preds_folder}")
             return
         pipe_folder, date = st.selectbox("Dir", sel_folders, index=0)
-        df = load_df(preds_folder / pipe_folder / date / "test_results.parquet")
+        res_folder = preds_folder / pipe_folder / date
+        df = load_df(res_folder / "test_results.parquet")
 
         test_type = st.selectbox("Test type", ["present", "absent", "order", "table"])
 
@@ -79,12 +80,14 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
         display_markdown = st.checkbox("Display markdown", value=True)
         show_layout = st.checkbox("Show layout", value=False)
         display_original_text = st.checkbox("Display original text", value=False)
+        pdf_path = Path(row.pdf_path)
 
-        download_pdf_page(
-            Path(row.pdf_path), page_no=0, file_name=f"{row.tests_name}.pdf"
-        )
+        pdf_path = Path(dataset_path) / pdf_path.stem / pdf_path.name
 
-    doc = get_doc(row.doc_path)
+        download_pdf_page(pdf_path, page_no=0, file_name=f"{row.tests_name}.pdf")
+
+    doc_path = Path(res_folder) / "results" / Path(row.doc_path).name
+    doc = get_doc(doc_path)
 
     col1_head, col2_head = st.columns(2)
     with col1_head:
@@ -166,7 +169,9 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
     with col3_button:
         if st.button("Supress page"):
             import shutil
+
             shutil.rmtree(Path(row.pdf_path).parent)
+
     def show_text(res):
         if test_obj:
             res = highlight_text(test_obj, res)
