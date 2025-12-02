@@ -62,7 +62,7 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
 
         preds_folder = preds_folder / pipe_folder / date / "results"
 
-        df_sel = df.loc[df.type == test_type ]#& df.category == test_category]
+        df_sel = df.loc[df.type == test_type]  # & df.category == test_category]
         if only_failed:
             df_sel = df_sel[~df_sel.result]
         if only_not_checked:
