@@ -86,9 +86,7 @@ def test_parse_html_tables(html_table):
 
 
 def test_match_cell(markdown_table):
-    test = TableTest(
-        pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2"
-    )
+    test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
     result, _ = test.run(markdown_table)
     assert result
 
@@ -277,9 +275,7 @@ def test_multiple_relationships(markdown_table):
 
 
 def test_no_tables_found():
-    test = TableTest(
-        pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2"
-    )
+    test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
     result, explanation = test.run("This is plain text with no tables")
     assert not result
     assert explanation == "No HTML tables found in the content"
@@ -300,27 +296,21 @@ def test_fuzzy_matching(markdown_table):
 
 
 def test_with_stripped_content(markdown_table):
-    test = TableTest(
-        pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2"
-    )
+    test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
     stripped_table = markdown_table.strip()
     result, explanation = test.run(stripped_table)
     assert result, f"Table test failed with stripped content: {explanation}"
 
 
 def test_table_at_end_of_file(markdown_table):
-    test = TableTest(
-        pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2"
-    )
+    test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
     content_with_table_at_end = "Some text before the table.\n" + markdown_table.strip()
     result, explanation = test.run(content_with_table_at_end)
     assert result, f"Table at end of file not detected: {explanation}"
 
 
 def test_table_at_end_with_no_trailing_newline(markdown_table):
-    test = TableTest(
-        pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2"
-    )
+    test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
     content_without_newline = markdown_table.rstrip()
     result, explanation = test.run(content_without_newline)
     assert result, f"Table without trailing newline not detected: {explanation}"
@@ -328,9 +318,7 @@ def test_table_at_end_with_no_trailing_newline(markdown_table):
 
 @pytest.mark.skip(reason="We don't support parsing markdown tables with extra spaces")
 def test_table_at_end_with_extra_spaces(markdown_table):
-    test = TableTest(
-        pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2"
-    )
+    test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
     lines = markdown_table.split("\n")
     content_with_extra_spaces = "\n".join([line + "   " for line in lines])
     result, explanation = test.run(content_with_extra_spaces)
@@ -338,9 +326,7 @@ def test_table_at_end_with_extra_spaces(markdown_table):
 
 
 def test_table_at_end_with_mixed_whitespace(markdown_table):
-    test = TableTest(
-        pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2"
-    )
+    test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
     content_with_mixed_whitespace = (
         "Some text before the table.\n" + markdown_table.strip() + "  \t  "
     )
@@ -376,18 +362,14 @@ def test_table_at_end_with_mixed_whitespace(markdown_table):
 
 
 def test_table_with_excessive_blank_lines_at_end(markdown_table):
-    test = TableTest(
-        pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2"
-    )
+    test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
     table_with_blanks = markdown_table + "\n\n\n\n\n\n\n\n\n\n"
     result, explanation = test.run(table_with_blanks)
     assert result, f"Table with blank lines at end not detected: {explanation}"
 
 
 def test_table_at_end_after_long_text(markdown_table):
-    test = TableTest(
-        pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2"
-    )
+    test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
     long_text = "Lorem ipsum dolor sit amet, " * 100
     content_with_long_text = long_text + "\n" + markdown_table.strip()
     result, explanation = test.run(content_with_long_text)
@@ -395,9 +377,7 @@ def test_table_at_end_after_long_text(markdown_table):
 
 
 def test_valid_table_at_eof_without_newline():
-    test = TableTest(
-        pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2"
-    )
+    test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
     valid_table_eof = """
 | Header 1 | Header 2 | Header 3 |
 | -------- | -------- | -------- |
@@ -1534,4 +1514,3 @@ def test_real_complicated_table():
     )
     result, explanation = test.run(table)
     assert result, explanation
-
