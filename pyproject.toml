@@ -28,6 +28,7 @@ dependencies = [
     "pypdfium2>=4.30.0",
     "fire>=0.7.1",
     "lxml>=6.0.2",
+    "tabulate>=0.9.0",
 ]
 
 [project.optional-dependencies]

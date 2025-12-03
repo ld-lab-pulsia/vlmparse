@@ -123,7 +123,7 @@ class DParseCLI:
         logger.info(f"Processed {len(documents)} documents to {out_folder}")
 
     def list(self):
-        """List all currently running servers."""
+        """List all containers whose name begins with vlmparse."""
         import docker
 
         try:
@@ -134,25 +134,19 @@ class DParseCLI:
                 logger.info("No running containers found")
                 return
 
-            # Filter for containers that look like VLLM servers
-            vllm_containers = []
-            for container in containers:
-                # Check if it's a VLLM-related container by image name or ports
-                image_name = (
-                    container.image.tags[0]
-                    if container.image.tags
-                    else str(container.image.id)
-                )
-                vllm_containers.append(container)
+            # Filter for containers whose name begins with "vlmparse"
+            vlmparse_containers = [
+                container for container in containers 
+                if container.name.startswith("vlmparse")
+            ]
 
-            if not vllm_containers:
-                logger.info("No running servers found")
+            if not vlmparse_containers:
+                logger.info("No vlmparse containers found")
                 return
 
-            logger.info(f"Found {len(vllm_containers)} running container(s):")
-            logger.info("")
-
-            for container in vllm_containers:
+            # Prepare table data
+            table_data = []
+            for container in vlmparse_containers:
                 image_name = (
                     container.image.tags[0]
                     if container.image.tags
@@ -169,15 +163,22 @@ class DParseCLI:
 
                 port_str = ", ".join(ports) if ports else "N/A"
 
-                # Get container status and uptime
-                status = container.status
+                table_data.append([
+                    container.name,
+                    container.short_id,
+                    image_name,
+                    container.status,
+                    port_str
+                ])
 
-                logger.info(f"  Container: {container.name}")
-                logger.info(f"    ID: {container.short_id}")
-                logger.info(f"    Image: {image_name}")
-                logger.info(f"    Status: {status}")
-                logger.info(f"    Port(s): {port_str}")
-                logger.info("")
+            # Display as table
+            from tabulate import tabulate
+            
+            headers = ["Name", "ID", "Image", "Status", "Port(s)"]
+            table = tabulate(table_data, headers=headers, tablefmt="grid")
+            
+            logger.info(f"\nFound {len(vlmparse_containers)} vlmparse container(s):\n")
+            print(table)
 
         except docker.errors.DockerException as e:
             logger.error(f"Failed to connect to Docker: {e}")
