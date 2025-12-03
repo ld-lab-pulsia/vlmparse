@@ -108,7 +108,7 @@ async def generate_tests_for_page(
             type="absent" if test_type == "headers_footers" else "present",
             text=text,
             max_diffs=0,
-            unidecode=True
+            unidecode=True,
         )
         tests.append(test)
     return tests

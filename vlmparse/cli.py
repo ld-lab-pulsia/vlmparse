@@ -136,7 +136,8 @@ class DParseCLI:
 
             # Filter for containers whose name begins with "vlmparse"
             vlmparse_containers = [
-                container for container in containers 
+                container
+                for container in containers
                 if container.name.startswith("vlmparse")
             ]
 
@@ -163,20 +164,22 @@ class DParseCLI:
 
                 port_str = ", ".join(ports) if ports else "N/A"
 
-                table_data.append([
-                    container.name,
-                    container.short_id,
-                    image_name,
-                    container.status,
-                    port_str
-                ])
+                table_data.append(
+                    [
+                        container.name,
+                        container.short_id,
+                        image_name,
+                        container.status,
+                        port_str,
+                    ]
+                )
 
             # Display as table
             from tabulate import tabulate
-            
+
             headers = ["Name", "ID", "Image", "Status", "Port(s)"]
             table = tabulate(table_data, headers=headers, tablefmt="grid")
-            
+
             logger.info(f"\nFound {len(vlmparse_containers)} vlmparse container(s):\n")
             print(table)
 
