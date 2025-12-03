@@ -948,7 +948,7 @@ class TableTest(BasePDFTest):
                 continue
 
             best_cell = None
-            best_similarity = 0.0
+            best_similarity = -1
 
             for cell_info in cells_info:
                 cell_content = cell_info["text"]
@@ -1178,7 +1178,10 @@ class TableTest(BasePDFTest):
                     best_match_reasons = reasons
 
         if best_match_score < 0:
-            diff_display = self.get_diff(left_heading, best_cell["text"])
+            if best_cell:
+                diff_display = self.get_diff(left_heading, best_cell["text"])
+            else:
+                diff_display = ""
             return (
                 False,
                 f"No cell matching '{cell}' found with threshold {threshold}\nDiff:\n\n{diff_display}",
