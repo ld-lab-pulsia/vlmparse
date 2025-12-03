@@ -106,6 +106,7 @@ async def generate_tests_for_page(
             type="absent" if test_type == "headers_footers" else "present",
             text=text,
             max_diffs=0,
+            unidecode=True
         )
         tests.append(test)
     return tests
@@ -128,7 +129,7 @@ async def main(
     no_inverse_aspect_ratio: bool = False,
     test_type: str = "tiny_text",
     model: str = "gemini-2.5-pro",
-    add_page_num: bool = False,
+    add_page_num: bool = True,
 ):
     # save_folder = save_folder / test_type
     async_client = AsyncOpenAI(
