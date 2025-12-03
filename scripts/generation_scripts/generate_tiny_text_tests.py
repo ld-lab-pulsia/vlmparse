@@ -44,13 +44,12 @@ Focus exclusively on Handwritten text:
 - Minimum of 3 words each, can be several paragraphs
 - Do not include footnotes, headers, footers, page numbers, watermarks, etc...
 - Do not include text that appear in images, plots, charts, etc...""",
-    "headers_footers": """Analyze this page and identify header and footer text: texts that are not part of the linear text flow of the document and that bring metadata or other information that is not part of the main content.
+    "headers_footers": """Analyze this page and identify page headers and footer text: texts that are not part of the linear text flow of the document and that bring metadata or other information.
 
 Focus on:
-- Headers: text at the top of the page (page titles, section headers, document headers)
-- Footers: text at the bottom of the page (page numbers, copyright notices)
+- Page Headers: WARNING: do not include section headers, document titles or page titles: they are part of the main content flow.
+- Footers: text at the bottom of the page (page numbers, copyright notices): WARNING: do not include footnotes.
 - Extract the exact text as it appears
-- Minimum of 3 words each
 - Do not include text that is part of the main body content
 - Do not include text that appears in images, plots, charts, etc.""",
     "graphics": """Analyze this page and identify graphics, ie plots, curve, charts, diagrams, schemas, histograms, etc... Return a list of strings that should be the exact unmodified OCR of single text elements in the graphics (a number, a label, a title, a legend, a paragraph, etc...). The goal is to test the presence of this text single element in a pdf to markdown OCR conversion.
@@ -92,6 +91,9 @@ async def generate_tests_for_page(
         messages=messages,
         response_format=TinyTextTestsResponse,
     )
+    import pdb
+
+    pdb.set_trace()
 
     tests_response = response.choices[0].message.parsed
     if tests_response is None:

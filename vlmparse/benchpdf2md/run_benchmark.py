@@ -104,11 +104,13 @@ def process_and_run_benchmark(
 
             if uri is None:
                 docker_config = docker_config_registry.get(model)
-
-                docker_config.gpu_device_ids = [str(gpu)]
-                server = docker_config.get_server(auto_stop=True)
-                server.start()
-                client = docker_config.get_client()
+                if docker_config is not None:
+                    docker_config.gpu_device_ids = [str(gpu)]
+                    server = docker_config.get_server(auto_stop=True)
+                    server.start()
+                    client = docker_config.get_client()
+                else:
+                    client = converter_config_registry.get(model).get_client()
             else:
                 client = converter_config_registry.get(model, uri=uri).get_client()
             client.num_concurrent_pages = concurrency if not debug else 1
