@@ -676,6 +676,8 @@ class BasePDFTest(BaseModel):
     url: Optional[str] = None
     category: Optional[str] = None
     """subcategory of the test to identify what the test is supposed to measure"""
+    display_diffs: bool = True
+    """Whether to display diffs in the explanation"""
 
     def normalise(self, text: str) -> str:
         text = normalize_text(text)
@@ -703,14 +705,15 @@ class BasePDFTest(BaseModel):
         return text
 
     def get_diff(self, reference: str, candidate: str) -> str:
-        matches = find_near_matches(
-            reference, candidate, max_l_dist=len(reference) // 2
-        )
-        if matches:
-            best_match = min(matches, key=lambda m: m.dist)
-            best_match_text = candidate[best_match.start : best_match.end]
-            diff_display = format_diff_text(reference, best_match_text)
-            return diff_display
+        if self.display_diffs:
+            matches = find_near_matches(
+                reference, candidate, max_l_dist=len(reference) // 2
+            )
+            if matches:
+                best_match = min(matches, key=lambda m: m.dist)
+                best_match_text = candidate[best_match.start : best_match.end]
+                diff_display = format_diff_text(reference, best_match_text)
+                return diff_display
 
     def run(self, md_content: str) -> Tuple[bool, str]:
         """
@@ -944,9 +947,16 @@ class TableTest(BasePDFTest):
             if not cells_info:
                 continue
 
+            best_cell = None
+            best_similarity = 0.0
+
             for cell_info in cells_info:
                 cell_content = cell_info["text"]
                 similarity = fuzz.ratio(cell, cell_content) / 100.0
+
+                if similarity > best_similarity:
+                    best_similarity = similarity
+                    best_cell = cell_info
 
                 if similarity < threshold:
                     continue
@@ -1168,7 +1178,11 @@ class TableTest(BasePDFTest):
                     best_match_reasons = reasons
 
         if best_match_score < 0:
-            return False, f"No cell matching '{cell}' found with threshold {threshold}"
+            diff_display = self.get_diff(left_heading, best_cell["text"])
+            return (
+                False,
+                f"No cell matching '{cell}' found with threshold {threshold}\nDiff:\n\n{diff_display}",
+            )
         else:
             return (
                 False,
