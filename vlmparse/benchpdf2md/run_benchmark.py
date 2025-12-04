@@ -122,8 +122,8 @@ def process_and_run_benchmark(
 
             if dry_run:
                 client.save_folder = None
-                logger.info("Dry run, converting first 5 files")
-                client.batch(files[:5])
+                logger.info("Dry run, converting first 3 files")
+                client.batch(files[:3])
 
             client.save_folder = str(save_folder)
             tic = time.perf_counter()
