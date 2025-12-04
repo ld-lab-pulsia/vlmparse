@@ -25,7 +25,7 @@ def load_data_from_folder(
             continue
 
         metadata_path = subdir / "metadata.json"
-        tests_paths = subdir.glob("tests*.jsonl")
+        tests_paths = list(subdir.glob("tests*.jsonl"))
         pdf_path = [p for p in subdir.glob("*.pdf")]
         assert len(pdf_path) == 1, f"Expected 1 PDF file, got {len(pdf_path)}"
         pdf_path = pdf_path[0]
