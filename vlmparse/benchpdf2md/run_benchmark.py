@@ -1,5 +1,7 @@
 import datetime
+import json
 import os
+import time
 from pathlib import Path
 
 import fire
@@ -41,6 +43,7 @@ def process_and_run_benchmark(
     in_folder: Path | str = "pulseia/fr-bench-pdf2md",
     save_folder: Path | str = OUT_FOLDER,
     retrylast: bool = False,
+    dry_run: bool = True,
 ):
     # in_folder = Path(in_folder)
     save_folder = Path(save_folder)
@@ -116,8 +119,19 @@ def process_and_run_benchmark(
             client.num_concurrent_pages = concurrency if not debug else 1
             client.num_concurrent_files = concurrency if not debug else 1
             client.debug = debug
+
+            if dry_run:
+                client.save_folder = None
+                logger.info("Dry run, converting first 5 files")
+                client.batch(files[:5])
+
             client.save_folder = str(save_folder)
+            tic = time.perf_counter()
             client.batch(files)
+            total_time = time.perf_counter() - tic
+            logger.info(
+                f"Time taken to convert {len(files)} files: {total_time:.2f} seconds"
+            )
 
         else:
             save_folder = Path(retry)
@@ -142,6 +156,20 @@ def process_and_run_benchmark(
         if not debug:
             df.to_parquet(save_folder / "test_results.parquet")
             by_type_df.to_excel(save_folder / "by_type.xlsx")
+
+            with open(save_folder / "metrics.json", "w") as f:
+                json.dump(
+                    {
+                        "total_time": total_time,
+                        "num_pages": len(files),
+                        "num_tests": len(df),
+                        "avg_result": avg,
+                        "avg_doc_latency": df["doc_latency"].mean(),
+                        "avg_page_latency": df["page_latency"].mean(),
+                        "avg_time_per_page": total_time / len(files),
+                    },
+                    f,
+                )
 
     except Exception:
         raise
@@ -191,6 +219,8 @@ def run_pb_benchmark(
                 "tests_name": tests_name,
                 "pdf_path": str(doc.file_path),
                 "doc_path": str(file_path),
+                "doc_latency": doc.latency,
+                "page_latency": doc.pages[0].latency,
             } | test.model_dump()
 
             results.append(_dict)

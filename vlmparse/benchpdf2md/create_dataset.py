@@ -25,12 +25,12 @@ def load_data_from_folder(
             continue
 
         metadata_path = subdir / "metadata.json"
-        tests_path = subdir / "tests.jsonl"
+        tests_paths = subdir.glob("tests*.jsonl")
         pdf_path = [p for p in subdir.glob("*.pdf")]
         assert len(pdf_path) == 1, f"Expected 1 PDF file, got {len(pdf_path)}"
         pdf_path = pdf_path[0]
 
-        if not all([metadata_path.exists(), tests_path.exists(), pdf_path.exists()]):
+        if not all([metadata_path.exists(), pdf_path.exists(), len(tests_paths) > 0]):
             print(f"Skipping {subdir.name}: missing files")
             continue
 
