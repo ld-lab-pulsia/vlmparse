@@ -1686,19 +1686,19 @@ def load_tests_from_ds(ds) -> List[BasePDFTest]:
                 raise ValidationError(f"Unknown test type: {test_type}")
             return test
         except json.JSONDecodeError as e:
-            print(f"Error parsing ds on {row['id']}: {e}")
+            print(f"Error parsing ds on {row.id}: {e}")
             raise
         except (ValidationError, KeyError) as e:
-            print(f"Error on line {row['id']}: {e}")
+            print(f"Error on line {row.id}: {e}")
             raise
         except Exception as e:
-            print(f"Unexpected error on {row['id']}: {e}")
+            print(f"Unexpected error on {row.id}: {e}")
             raise
 
     tests = []
 
     # Read all lines along with their line numbers.
-    for row in ds:
+    for row in ds.to_dict(orient="records"):
         tests.append(process_line(row))
 
     # Check for duplicate test IDs after parallel processing.

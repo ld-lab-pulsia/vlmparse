@@ -3,15 +3,13 @@
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List
 
 import pandas as pd
-from datasets import Dataset
 
 
-def load_data_from_folder(
+def create_dataset(
     base_folder: Path,
-) -> List[Dict[str, Any]]:
+) -> pd.DataFrame:
     """Load all data from the folder structure.
     One row per test with relative PDF path.
 
@@ -43,6 +41,8 @@ def load_data_from_folder(
         for tests_path in subdir.glob("*.jsonl"):
             with open(tests_path, "r") as f:
                 for line in f:
+                    if not line.strip():
+                        continue
                     tests.append(json.loads(line.strip()))
 
         # Create one row per test
@@ -57,48 +57,4 @@ def load_data_from_folder(
             }
             data.append(row)
 
-    return data
-
-
-def create_dataset(base_folder: str, output_path: str = None, push_to_hub: str = None):
-    """Create HuggingFace dataset from folder structure.
-    One row per test with relative PDF path.
-
-    Args:
-        base_folder: Path to folder containing benchmark data
-        output_path: Local path to save dataset (optional)
-        push_to_hub: HuggingFace Hub repository name to push to (optional)
-    """
-
-    print(f"Loading data from {base_folder}...")
-    data = load_data_from_folder(base_folder)
-
-    print(f"Loaded {len(data)} tests")
-
-    # Create dataset - let it infer features automatically
-    dataset = Dataset.from_pandas(pd.DataFrame(data))
-
-    print(f"\nDataset created with {len(dataset)} examples")
-    print(f"Dataset features: {dataset.features}")
-
-    if output_path:
-        print(f"\nSaving dataset to {output_path}...")
-        dataset.save_to_disk(output_path)
-        print("Dataset saved!")
-
-    if push_to_hub:
-        print(f"\nPushing dataset to HuggingFace Hub: {push_to_hub}...")
-        dataset.push_to_hub(push_to_hub)
-        print("Dataset pushed to Hub!")
-
-    return dataset
-
-
-# from argparse import ArgumentParser
-
-# parser = ArgumentParser()
-# parser.add_argument("--folder_path", type=str, default="/home/brigal/data/fr-bench-pdf2md/")
-# args = parser.parse_args()
-
-# dataset = create_dataset(args.folder_path)
-# dataset.to_parquet("dataset.parquet")
+    return pd.DataFrame(data)
