@@ -91,9 +91,6 @@ async def generate_tests_for_page(
         messages=messages,
         response_format=TinyTextTestsResponse,
     )
-    import pdb
-
-    pdb.set_trace()
 
     tests_response = response.choices[0].message.parsed
     if tests_response is None:
