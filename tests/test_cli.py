@@ -147,7 +147,7 @@ class TestConvertCommand:
 
         with patch("vlmparse.registries.docker_config_registry"):
             cli.convert(
-                folders=[str(file_path)],
+                inputs=[str(file_path)],
                 model="lightonocr",
                 uri="http://localhost:8000/v1",
             )
@@ -167,7 +167,7 @@ class TestConvertCommand:
 
         with patch("vlmparse.registries.docker_config_registry"):
             cli.convert(
-                folders=[str(file_path), str(file_path)],
+                inputs=[str(file_path), str(file_path)],
                 model="lightonocr",
                 uri="http://localhost:8000/v1",
             )
@@ -185,7 +185,7 @@ class TestConvertCommand:
 
         with patch("vlmparse.registries.docker_config_registry"):
             cli.convert(
-                folders=[pattern], model="lightonocr", uri="http://localhost:8000/v1"
+                inputs=[pattern], model="lightonocr", uri="http://localhost:8000/v1"
             )
 
         # Verify at least one file was found
@@ -200,7 +200,7 @@ class TestConvertCommand:
             with patch("vlmparse.registries.docker_config_registry"):
                 # Should return early without calling batch
                 cli.convert(
-                    folders=["/nonexistent/*.pdf"],
+                    inputs=["/nonexistent/*.pdf"],
                     model="lightonocr",
                     uri="http://localhost:8000/v1",
                 )
@@ -215,7 +215,7 @@ class TestConvertCommand:
         custom_uri = "http://custom-server:9000/v1"
 
         with patch("vlmparse.registries.docker_config_registry"):
-            cli.convert(folders=[str(file_path)], model="lightonocr", uri=custom_uri)
+            cli.convert(inputs=[str(file_path)], model="lightonocr", uri=custom_uri)
 
         # Verify registry was called with custom URI
         mock_registry.get.assert_called_once()
@@ -238,7 +238,7 @@ class TestConvertCommand:
                 mock_docker_config.get_client.return_value = mock_converter
                 mock_docker_registry.get.return_value = mock_docker_config
 
-                cli.convert(folders=[str(file_path)], model="lightonocr")
+                cli.convert(inputs=[str(file_path)], model="lightonocr")
 
                 # Verify Docker server was started
                 mock_docker_registry.get.assert_called_once_with(
@@ -263,7 +263,7 @@ class TestConvertCommand:
                 mock_docker_config.get_client.return_value = mock_converter
                 mock_docker_registry.get.return_value = mock_docker_config
 
-                cli.convert(folders=[str(file_path)], model="lightonocr", gpus="0,1")
+                cli.convert(inputs=[str(file_path)], model="lightonocr", gpus="0,1")
 
                 # Verify GPU device IDs were set
                 assert mock_docker_config.gpu_device_ids == ["0", "1"]
@@ -275,7 +275,7 @@ class TestConvertCommand:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("vlmparse.registries.docker_config_registry"):
                 cli.convert(
-                    folders=[str(file_path)],
+                    inputs=[str(file_path)],
                     out_folder=tmpdir,
                     model="lightonocr",
                     uri="http://localhost:8000/v1",
@@ -284,14 +284,14 @@ class TestConvertCommand:
             # Just verify the command completes successfully
             mock_converter.batch.assert_called_once()
 
-    def test_convert_string_folders(self, cli, file_path, mock_converter_client):
-        """Test convert with string folders (not list)."""
+    def test_convert_string_inputs(self, cli, file_path, mock_converter_client):
+        """Test convert with string inputs (not list)."""
         mock_registry, mock_config, mock_converter = mock_converter_client
 
         with patch("vlmparse.registries.docker_config_registry"):
             # Pass string instead of list
             cli.convert(
-                folders=str(file_path),
+                inputs=str(file_path),
                 model="lightonocr",
                 uri="http://localhost:8000/v1",
             )
@@ -311,7 +311,7 @@ class TestConvertCommand:
 
             with patch("vlmparse.registries.docker_config_registry"):
                 cli.convert(
-                    folders=[str(txt_file)],
+                    inputs=[str(txt_file)],
                     model="lightonocr",
                     uri="http://localhost:8000/v1",
                 )
@@ -343,7 +343,7 @@ class TestConvertWithDifferentModels:
                 mock_registry.get.return_value = mock_config
 
                 cli.convert(
-                    folders=[str(file_path)],
+                    inputs=[str(file_path)],
                     model=model_name,
                     uri="http://localhost:8000/v1",
                 )
@@ -377,7 +377,7 @@ class TestCLIIntegration:
                 mock_docker_registry.get.return_value = mock_docker_config
 
                 # Run conversion
-                cli.convert(folders=[str(file_path)], model="lightonocr")
+                cli.convert(inputs=[str(file_path)], model="lightonocr")
 
                 # Verify full workflow
                 mock_docker_registry.get.assert_called_once()
@@ -417,7 +417,7 @@ class TestCLIIntegration:
                 mock_converter_registry.get.return_value = mock_config
 
                 cli.convert(
-                    folders=[str(file_path)],
+                    inputs=[str(file_path)],
                     model="lightonocr",
                     uri="http://localhost:8056/v1",
                 )
@@ -495,7 +495,7 @@ class TestCLIConvertInDepth:
     ):
         """Test convert with real Gemini converter and mocked OpenAI API."""
         cli.convert(
-            folders=[str(file_path)],
+            inputs=[str(file_path)],
             model="gemini-2.5-flash-lite",
             uri="http://mocked-api/v1",
         )
@@ -522,7 +522,7 @@ class TestCLIConvertInDepth:
         mock_client.batch.return_value = [mock_doc]
         mock_docker_config.get_client.return_value = mock_client
 
-        cli.convert(folders=[str(file_path)], model="lightonocr")
+        cli.convert(inputs=[str(file_path)], model="lightonocr")
 
         # Verify server was started
         mock_server.start.assert_called_once()
@@ -535,7 +535,7 @@ class TestCLIConvertInDepth:
     ):
         """Test batch conversion of multiple files with real converter."""
         cli.convert(
-            folders=[str(file_path), str(file_path)],
+            inputs=[str(file_path), str(file_path)],
             model="gemini-2.5-flash-lite",
             uri="http://mocked-api/v1",
         )
@@ -559,7 +559,7 @@ class TestCLIConvertInDepth:
         mock_openai_api.chat.completions.create = AsyncMock(return_value=mock_response)
 
         cli.convert(
-            folders=[str(file_path)],
+            inputs=[str(file_path)],
             out_folder=str(output_dir),
             model="gemini-2.5-flash-lite",
             uri="http://mocked-api/v1",
@@ -582,7 +582,7 @@ class TestCLIConvertInDepth:
 
             # Should not raise, but handle gracefully
             cli.convert(
-                folders=[str(file_path)],
+                inputs=[str(file_path)],
                 model="gemini-2.5-flash-lite",
                 uri="http://mocked-api/v1",
             )
@@ -603,7 +603,7 @@ class TestCLIConvertInDepth:
     ):
         """Test that each converter uses the correct model name in API calls."""
         cli.convert(
-            folders=[str(file_path)], model=model_name, uri="http://mocked-api/v1"
+            inputs=[str(file_path)], model=model_name, uri="http://mocked-api/v1"
         )
 
         # Check that model parameter is passed
@@ -635,7 +635,7 @@ class TestCLIConvertInDepth:
         mock_openai_api.chat.completions.create = AsyncMock(side_effect=track_call)
 
         cli.convert(
-            folders=[str(file_path)],
+            inputs=[str(file_path)],
             model="gemini-2.5-flash-lite",
             uri="http://mocked-api/v1",
         )
@@ -648,7 +648,7 @@ class TestCLIConvertInDepth:
     ):
         """Test convert with DotsOCR which has different prompt modes."""
         cli.convert(
-            folders=[str(file_path)], model="dotsocr", uri="http://mocked-api/v1"
+            inputs=[str(file_path)], model="dotsocr", uri="http://mocked-api/v1"
         )
 
         # Verify API was called (2 pages)
@@ -676,7 +676,7 @@ class TestCLIConvertInDepth:
         )
 
         cli.convert(
-            folders=[str(file_path)],
+            inputs=[str(file_path)],
             model="gemini-2.5-flash-lite",
             uri="http://mocked-api/v1",
         )
@@ -694,7 +694,7 @@ class TestCLIConvertInDepth:
         """Test that different models use their configured DPI settings."""
         # LightOnOCR uses DPI=200
         cli.convert(
-            folders=[str(file_path)], model="lightonocr", uri="http://mocked-api/v1"
+            inputs=[str(file_path)], model="lightonocr", uri="http://mocked-api/v1"
         )
 
         lightonocr_calls = mock_openai_api.chat.completions.create.call_count
@@ -704,7 +704,7 @@ class TestCLIConvertInDepth:
 
         # Gemini uses DPI=175 (default)
         cli.convert(
-            folders=[str(file_path)],
+            inputs=[str(file_path)],
             model="gemini-2.5-flash-lite",
             uri="http://mocked-api/v1",
         )
@@ -718,7 +718,7 @@ class TestCLIConvertInDepth:
         """Test that max_image_size limit is respected for models that have it."""
         # LightOnOCR has max_image_size=1540
         cli.convert(
-            folders=[str(file_path)], model="lightonocr", uri="http://mocked-api/v1"
+            inputs=[str(file_path)], model="lightonocr", uri="http://mocked-api/v1"
         )
 
         assert mock_openai_api.chat.completions.create.call_count == 2
@@ -727,7 +727,7 @@ class TestCLIConvertInDepth:
 
         # Nanonets has no max_image_size limit
         cli.convert(
-            folders=[str(file_path)],
+            inputs=[str(file_path)],
             model="nanonets/Nanonets-OCR2-3B",
             uri="http://mocked-api/v1",
         )
@@ -741,7 +741,7 @@ class TestCLIConvertInDepth:
         pattern = str(file_path.parent / "*.pdf")
 
         cli.convert(
-            folders=[pattern], model="gemini-2.5-flash-lite", uri="http://mocked-api/v1"
+            inputs=[pattern], model="gemini-2.5-flash-lite", uri="http://mocked-api/v1"
         )
 
         # At least one file should be found and processed
@@ -752,7 +752,7 @@ class TestCLIConvertInDepth:
     ):
         """Test that converter processes pages correctly."""
         cli.convert(
-            folders=[str(file_path)], model="lightonocr", uri="http://mocked-api/v1"
+            inputs=[str(file_path)], model="lightonocr", uri="http://mocked-api/v1"
         )
 
         # Check that API was called (2 pages)
@@ -779,7 +779,7 @@ class TestCLIConvertInDepth:
         mock_openai_api.chat.completions.create = AsyncMock(side_effect=capture_page)
 
         cli.convert(
-            folders=[str(file_path)],
+            inputs=[str(file_path)],
             model="gemini-2.5-flash-lite",
             uri="http://mocked-api/v1",
         )
@@ -809,7 +809,7 @@ class TestCLIConvertInDepth:
         )
 
         cli.convert(
-            folders=[str(file_path)],
+            inputs=[str(file_path)],
             model="nanonets/Nanonets-OCR2-3B",
             uri="http://mocked-api/v1",
         )

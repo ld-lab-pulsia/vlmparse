@@ -47,7 +47,7 @@ class DParseCLI:
 
     def convert(
         self,
-        folders: str | list[str],
+        inputs: str | list[str],
         out_folder: str = ".",
         model: str = "lightonocr",
         uri: str | None = None,
@@ -58,7 +58,7 @@ class DParseCLI:
         """Parse PDF documents and save results.
 
         Args:
-            folders: List of folders to process
+            inputs: List of folders to process
             out_folder: Output folder for parsed documents
             pipe: Converter type ("vllm", "openai", or "lightonocr", default: "vllm")
             model: Model name (required for vllm, optional for others)
@@ -75,19 +75,23 @@ class DParseCLI:
 
         # Expand file paths from glob patterns
         file_paths = []
-        if isinstance(folders, str):
-            folders = [folders]
-        for pattern in folders:
+        if isinstance(inputs, str):
+            inputs = [inputs]
+        for pattern in inputs:
             if "*" in pattern or "?" in pattern:
                 file_paths.extend(glob(pattern, recursive=True))
-            else:
+            elif os.path.isdir(pattern):
+                file_paths.extend(glob(os.path.join(pattern, "*.pdf"), recursive=True))
+            elif os.path.isfile(pattern):
                 file_paths.append(pattern)
+            else:
+                logger.error(f"Invalid input: {pattern}")
 
         # Filter to only existing PDF files
         file_paths = [f for f in file_paths if os.path.exists(f) and f.endswith(".pdf")]
 
         if not file_paths:
-            logger.error("No PDF files found matching the folders patterns")
+            logger.error("No PDF files found matching the inputs patterns")
             return
 
         logger.info(f"Processing {len(file_paths)} files with {model} converter")
