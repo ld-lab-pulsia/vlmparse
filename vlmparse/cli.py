@@ -31,7 +31,7 @@ class DParseCLI:
         # Only override GPU configuration if explicitly specified
         # This preserves CPU-only settings from the config
         if gpus is not None:
-            docker_config.gpu_device_ids = [g.strip() for g in gpus.split(",")]
+            docker_config.gpu_device_ids = [g.strip() for g in str(gpus).split(",")]
         server = docker_config.get_server(auto_stop=False)
 
         # Deploy server and leave it running (cleanup=False)
