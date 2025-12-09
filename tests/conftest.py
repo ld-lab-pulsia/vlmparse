@@ -11,6 +11,7 @@ def datadir():
 
 os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
 
+
 @pytest.fixture(scope="session", autouse=True)
 def file_path():
     return Path(__file__).parent / "data" / "Fiche_Graines_A5.pdf"

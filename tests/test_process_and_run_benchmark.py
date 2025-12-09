@@ -86,8 +86,7 @@ def test_process_and_run_benchmark_end2end(test_data_dir, output_dir):
     process_and_run_benchmark(
         model="gemini-2.5-flash-lite",
         uri=None,
-        num_concurrent_pages=10,
-        num_concurrent_files=1,
+        concurrency=1,
         debug=False,
         in_folder=test_data_dir,
         save_folder=output_dir,

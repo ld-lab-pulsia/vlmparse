@@ -37,7 +37,7 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
         )
         dataset_path = local_folder_path
 
-    tests = glob(str(Path(dataset_path) / "**/tests.jsonl"), recursive=True)
+    tests = glob(str(Path(dataset_path) / "**/tests*.jsonl"), recursive=True)
     map_tests = {Path(t).parent.name: t for t in tests}
     with st.sidebar:
         sel_folders = [(Path(f).parent.parent.name, Path(f).parent.name) for f in files]
@@ -46,9 +46,14 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
             st.error(f"No results found in folder {preds_folder}")
             return
         pipe_folder, date = st.selectbox("Dir", sel_folders, index=0)
-        df = load_df(preds_folder / pipe_folder / date / "test_results.parquet")
+        res_folder = preds_folder / pipe_folder / date
+        df = load_df(res_folder / "test_results.parquet")
+        # df.loc[df.category.isna(), "category"]=="baseline"
+        # print(df.loc[df.category.isna()])
+        # import pdb;pdb.set_trace()
 
         test_type = st.selectbox("Test type", ["present", "absent", "order", "table"])
+        # test_category = st.selectbox("Test category", sorted(df.category.unique()))
 
         only_failed = st.checkbox("Only failed", value=False)
         only_not_checked = st.checkbox("Only not checked", value=False)
@@ -57,7 +62,7 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
 
         preds_folder = preds_folder / pipe_folder / date / "results"
 
-        df_sel = df.loc[df.type == test_type]
+        df_sel = df.loc[df.type == test_type]  # & df.category == test_category]
         if only_failed:
             df_sel = df_sel[~df_sel.result]
         if only_not_checked:
@@ -79,12 +84,15 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
         display_markdown = st.checkbox("Display markdown", value=True)
         show_layout = st.checkbox("Show layout", value=False)
         display_original_text = st.checkbox("Display original text", value=False)
+        pdf_path = Path(row.pdf_path)
 
-        download_pdf_page(
-            Path(row.pdf_path), page_no=0, file_name=f"{row.tests_name}.pdf"
-        )
+        # pdf_path = Path(dataset_path) / pdf_path.stem / pdf_path.name
 
-    doc = get_doc(row.doc_path)
+        download_pdf_page(pdf_path, page_no=0, file_name=f"{row.tests_name}.pdf")
+
+    # doc_path = Path(res_folder) / "results" / Path(row.doc_path).name
+    doc_path = row.doc_path
+    doc = get_doc(doc_path)
 
     col1_head, col2_head = st.columns(2)
     with col1_head:
@@ -119,14 +127,17 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
         _tests = [test for test in st.session_state["tests"] if test.id == row.id]
 
         if len(_tests) < 1:
-            st.stop("No test found")
+            st.error("No test found")
+            st.stop()
         elif len(_tests) > 1:
             st.error("Multiple tests found")
         test_obj = _tests[0]
+        print(test_obj)
 
         if st.button("Run test"):
-            st.markdown(test_obj.run(res))
-
+            res, message = test_obj.run(res)
+            st.markdown(f"Success: {res}")
+            st.markdown(message)
         test_obj_edited = edit_test_form(
             test_obj,
             test_type,
@@ -141,7 +152,7 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
                 st.session_state["current_tests_path"],
             )
 
-    col1_button, col2_button = pos_buttons.columns(2)
+    col1_button, col2_button, col3_button = pos_buttons.columns(3)
 
     with col1_button:
         if st.button("✅ Validate"):
@@ -161,6 +172,11 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
                 save_tests(
                     st.session_state["tests"], st.session_state["current_tests_path"]
                 )
+    with col3_button:
+        if st.button("Supress page"):
+            import shutil
+
+            shutil.rmtree(Path(row.pdf_path).parent)
 
     def show_text(res):
         if test_obj:

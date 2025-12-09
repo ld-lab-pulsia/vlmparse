@@ -45,7 +45,7 @@ def html_to_md_keep_tables(html: str, remove_head: bool = False) -> str:
     # --- restore tables -----------------------------------------------------
     for k, raw in markers.items():
         md_txt = md_txt.replace(k, raw)
-        print(md_txt)
+        # print(md_txt)
 
     return md_txt
 

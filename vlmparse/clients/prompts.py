@@ -41,7 +41,7 @@ PDF2HTML_PROMPT = r"""You are an AI assistant specialized in converting PDF imag
 - Accurately recognize all text content in the PDF image without guessing or inferring. Strictly adhere to the text of the PDF image without reformulating.
 - Convert the recognized text into HTML format.
 - For footnotes references with uppercase letters, use the <sup> tag. For example: <sup>1</sup>
-- Do not add a header or footer if you don't see headers or footers on the image.
+- Do not add a headers or footers .
 - Return only the part of the html page between <body> and </body> tags, the html string returned should therefore be: "<body>html content</body>".
 - Pay attention to the titles, sections and sub-sections, they should be with <h1>, <h2>, <h3> etc...
 
@@ -54,13 +54,11 @@ PDF2HTML_PROMPT = r"""You are an AI assistant specialized in converting PDF imag
 3. Lists:
 - Use `<ul>` and `<li>` for unordered lists, and `<ol>` and `<li>` for ordered lists.
 
-4. Headers and Footers:
-- Use `<header>` and `<footer>` tags for headers and footers.
-
 5. Output Format:
 - Ensure the output HTML document has a simple linear structure without complex hierarchy such as <div> tags.
 - Do not translate formatting such as color, bold, italic, etc.
 - Do not surround your output with triple backticks.
 - If there is nothing on the image, just return the tag <blank> without anything else.
+- Ignore headers or footers, do not add them to the transcription.
 
 Please strictly follow these guidelines to ensure accuracy and consistency in the conversion. Your task is to accurately convert the content of the PDF image into HTML format without adding any extra explanations or comments."""

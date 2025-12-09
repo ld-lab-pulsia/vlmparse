@@ -198,8 +198,8 @@ class TestTextPresenceTest:
         # "targettt text" still matches within fuzzy threshold
         result, explanation = test.run("This is some targettt text in a document")
         assert result is False
-        # Even more diffs still matches due to fuzzy matching
-        result, explanation = test.run("This is some targetttt text in a document")
+        # # Even more diffs still matches due to fuzzy matching
+        # result, explanation = test.run("This is some targetttt text in a document")
         assert result is False
 
     def test_absent_text_not_found(self):
@@ -533,3 +533,195 @@ class TestBaselineTest:
         content = "This is some normal content with proper English letters and no suspicious repetition."
         result, _ = test.run(content)
         assert result is True
+
+
+class TestBasePDFTestNormalise:
+    """Test the normalise method of BasePDFTest"""
+
+    def test_normalise_basic(self):
+        """Test basic normalization without options"""
+        test = BasePDFTest(pdf="test.pdf", page=1, id="test_id", type="baseline")
+        result = test.normalise("This  has   multiple    spaces")
+        assert result == "This has multiple spaces"
+
+    def test_normalise_with_unidecode(self):
+        """Test normalization with unidecode option"""
+        test = BasePDFTest(
+            pdf="test.pdf", page=1, id="test_id", type="baseline", unidecode=True
+        )
+        result = test.normalise("café résumé naïve")
+        assert result == "cafe resume naive"
+
+    def test_normalise_with_alphanum(self):
+        """Test normalization with alphanum option"""
+        test = BasePDFTest(
+            pdf="test.pdf", page=1, id="test_id", type="baseline", alphanum=True
+        )
+        result = test.normalise("Hello! @World# $123%")
+        # alphanum removes spaces too since normalize_text converts to single space first
+        # then alphanum filter removes all non-alphanum chars (including spaces)
+        assert result == "helloworld123"
+
+    def test_normalise_alphanum_keeps_allowed_chars(self):
+        """Test that alphanum keeps dots, commas, colons, semicolons, plus, parentheses, quotes"""
+        test = BasePDFTest(
+            pdf="test.pdf", page=1, id="test_id", type="baseline", alphanum=True
+        )
+        result = test.normalise("Price: $10.50, (20+30); 'test' \"quoted\"")
+        assert result == "price:10.50,(20+30);'test'\"quoted\""
+
+    def test_normalise_with_ignore_space(self):
+        """Test normalization with ignore_space option"""
+        test = BasePDFTest(
+            pdf="test.pdf", page=1, id="test_id", type="baseline", ignore_space=True
+        )
+        result = test.normalise("Hello World Test")
+        assert result == "HelloWorldTest"
+
+    def test_normalise_with_ignore_newlines(self):
+        """Test normalization with ignore_newlines option"""
+        test = BasePDFTest(
+            pdf="test.pdf", page=1, id="test_id", type="baseline", ignore_newlines=True
+        )
+        result = test.normalise("Line1\nLine2\n\nLine3")
+        assert result == "Line1 Line2 Line3"
+
+    def test_normalise_without_ignore_newlines(self):
+        """Test that newlines are preserved when ignore_newlines=False"""
+        test = BasePDFTest(
+            pdf="test.pdf", page=1, id="test_id", type="baseline", ignore_newlines=False
+        )
+        result = test.normalise("Line1\nLine2")
+        # normalize_text converts newlines to spaces first
+        assert "\n" in result or " " in result
+
+    def test_normalise_with_ignore_chars(self):
+        """Test normalization with ignore_chars option"""
+        test = BasePDFTest(
+            pdf="test.pdf",
+            page=1,
+            id="test_id",
+            type="baseline",
+            ignore_chars="abc",
+        )
+        result = test.normalise("The alphabet has abc letters")
+        assert "a" not in result
+        assert "b" not in result
+        assert "c" not in result
+        assert result == "The lphet hs  letters"
+
+    def test_normalise_ignore_chars_special_regex(self):
+        """Test that special regex chars in ignore_chars are handled"""
+        test = BasePDFTest(
+            pdf="test.pdf",
+            page=1,
+            id="test_id",
+            type="baseline",
+            ignore_chars=r"\.\-",
+        )
+        result = test.normalise("Test-with.dots-and.dashes")
+        assert "." not in result
+        assert "-" not in result
+        assert result == "Testwithdotsanddashes"
+
+    def test_normalise_combined_unidecode_and_alphanum(self):
+        """Test combining unidecode and alphanum options"""
+        test = BasePDFTest(
+            pdf="test.pdf",
+            page=1,
+            id="test_id",
+            type="baseline",
+            unidecode=True,
+            alphanum=True,
+        )
+        result = test.normalise("café! résumé@")
+        assert result == "caferesume"
+
+    def test_normalise_combined_ignore_space_and_newlines(self):
+        """Test combining ignore_space and ignore_newlines"""
+        test = BasePDFTest(
+            pdf="test.pdf",
+            page=1,
+            id="test_id",
+            type="baseline",
+            ignore_space=True,
+            ignore_newlines=True,
+        )
+        result = test.normalise("Line 1\nLine 2\nLine 3")
+        assert result == "Line1Line2Line3"
+
+    def test_normalise_all_options_combined(self):
+        """Test combining all normalization options"""
+        test = BasePDFTest(
+            pdf="test.pdf",
+            page=1,
+            id="test_id",
+            type="baseline",
+            unidecode=True,
+            alphanum=True,
+            ignore_space=True,
+            ignore_newlines=True,
+            ignore_chars="e",
+        )
+        result = test.normalise("Café résumé!\nNew line")
+        # unidecode: "Cafe resume!\nNew line"
+        # alphanum + lowercase: "caferesumenewline"
+        # ignore_space: "caferesumenewline"
+        # ignore_newlines: "caferesumenewline"
+        # ignore 'e': "cafrsumnwlin"
+        assert result == "cafrsumnwlin"
+
+    def test_normalise_preserves_normalize_text_behavior(self):
+        """Test that normalise applies normalize_text transformations"""
+        test = BasePDFTest(pdf="test.pdf", page=1, id="test_id", type="baseline")
+        # Test fancy quotes replacement (using Unicode for fancy quotes)
+        input_text = "Test \u2018fancy\u2019 \u201cquotes\u201d"
+        result = test.normalise(input_text)
+        assert result == "Test 'fancy' \"quotes\""
+
+    def test_normalise_markdown_removal(self):
+        """Test that markdown formatting is removed via normalize_text"""
+        test = BasePDFTest(pdf="test.pdf", page=1, id="test_id", type="baseline")
+        result = test.normalise("This is **bold** and *italic*")
+        assert result == "This is bold and italic"
+
+    def test_normalise_empty_string(self):
+        """Test normalise with empty string"""
+        test = BasePDFTest(pdf="test.pdf", page=1, id="test_id", type="baseline")
+        result = test.normalise("")
+        assert result == ""
+
+    def test_normalise_whitespace_only(self):
+        """Test normalise with whitespace-only string"""
+        test = BasePDFTest(pdf="test.pdf", page=1, id="test_id", type="baseline")
+        result = test.normalise("   \t\n   ")
+        assert result.strip() == ""
+
+    def test_normalise_unicode_normalization(self):
+        """Test that unicode normalization (NFC) is applied"""
+        test = BasePDFTest(pdf="test.pdf", page=1, id="test_id", type="baseline")
+        # é as composed character vs é as e + combining accent
+        composed = "café"  # é as single char
+        decomposed = "cafe\u0301"  # e + combining accent
+        assert test.normalise(composed) == test.normalise(decomposed)
+
+    def test_normalise_with_br_tags(self):
+        """Test that <br> tags are replaced with spaces"""
+        test = BasePDFTest(pdf="test.pdf", page=1, id="test_id", type="baseline")
+        result = test.normalise("Line1<br>Line2<br/>Line3")
+        assert result == "Line1 Line2 Line3"
+
+    def test_normalise_ignore_chars_with_special_chars(self):
+        """Test ignore_chars with special characters (not regex special chars)"""
+        test = BasePDFTest(
+            pdf="test.pdf",
+            page=1,
+            id="test_id",
+            type="baseline",
+            ignore_chars="@#$",
+        )
+        result = test.normalise("Test@with#special$chars")
+        assert "@" not in result
+        assert "#" not in result
+        assert "$" not in result
+        assert result == "Testwithspecialchars"

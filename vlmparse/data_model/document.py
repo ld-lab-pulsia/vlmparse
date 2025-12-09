@@ -35,6 +35,7 @@ class Item(VLMParseBaseModel):
 
 class Page(VLMParseBaseModel):
     text: str | None = None
+    raw_response: str | None = None
     items: list[Item] | None = None
     error: ProcessingError | None = None
     buffer_image: Optional[Image.Image | str] = None
