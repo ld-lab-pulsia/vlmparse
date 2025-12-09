@@ -76,6 +76,7 @@ def process_and_run_benchmark(
                 )
         files = list(sorted(set(ds["pdf_path"])))
         if retry is None or regenerate:
+            files = list(sorted(set(ds["pdf_path"])))
             logger.info(f"Number of files to convert: {len(files)}")
             if retry is not None:
                 already_processed = [
