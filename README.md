@@ -13,7 +13,7 @@ Supported Converters:
 
 - **Open Source Small VLMs**: `lightonocr`, `dotsocr`, `nanonets/Nanonets-OCR2-3B`
 - **Pipelines**: `docling`
-- **Proprietary LLMs**: `gemini-2.5-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-pro`, `gpt-5.1`
+- **Proprietary LLMs**: `gemini`, `gpt`
 
 ## Installation
 
@@ -26,6 +26,12 @@ With optional dependencies:
 ```bash
 uv sync --all-extras
 ```
+
+Activate the virtual environment:
+```bash
+source .venv/bin/activate
+```
+Other solution: append uv run to all the commands below.
 
 ## CLI Usage
 
@@ -46,9 +52,11 @@ vlmparse convert --input "*.pdf" --out_folder ./output --model nanonets/Nanonets
 ### Deploy a local model server
 
 Deployment (requires a gpu + docker installation):
+- You need a gpu dedicated for this.
+- Check that the port is not used by another service.
 
 ```bash
-vlmparse serve --model lightonocr --port 8000
+vlmparse serve --model lightonocr --port 8000 --gpus 1
 ```
 
 then convert:
@@ -63,7 +71,17 @@ You can also list all running servers:
 vlmparse list
 ```
 
-### View results with Streamlit
+Show logs of a server (if only one server is running, the container name is not needed):
+```bash
+vlmparse log <container_name>
+```
+
+Stop a server (if only one server is running, the container name is not needed):
+```bash
+vlmparse stop <container_name>
+```
+
+### View conversion results with Streamlit
 
 ```bash
 vlmparse view ./output
