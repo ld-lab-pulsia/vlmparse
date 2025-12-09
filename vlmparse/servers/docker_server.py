@@ -55,11 +55,14 @@ class DockerServerConfig(BaseModel):
         return ""
 
 
+DEFAULT_MODEL_NAME = "vllm-model"
+
+
 class VLLMDockerServerConfig(DockerServerConfig):
     """Configuration for deploying a VLLM Docker server."""
 
     docker_image: str = "vllm/vllm-openai:latest"
-    default_model_name: str = "vllm-model"
+    default_model_name: str = DEFAULT_MODEL_NAME
     hf_home_folder: str | None = os.getenv("HF_HOME", None)
     add_model_key_to_server: bool = True
     container_port: int = 8000

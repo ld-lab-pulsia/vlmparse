@@ -12,7 +12,7 @@ from vlmparse.clients.nanonetocr import (
     NanonetOCR2DockerServerConfig,
 )
 from vlmparse.clients.openai_converter import LLMParams, OpenAIConverterConfig
-from vlmparse.servers.docker_server import docker_config_registry
+from vlmparse.servers.docker_server import DEFAULT_MODEL_NAME, docker_config_registry
 
 docker_config_registry.register("lightonocr", lambda: LightOnOCRDockerServerConfig())
 docker_config_registry.register("dotsocr", lambda: DotsOCRDockerServerConfig())
@@ -97,7 +97,7 @@ converter_config_registry.register(
     lambda uri=None: LightOnOCRConverterConfig(
         llm_params=LLMParams(
             base_url=uri or "http://localhost:8000/v1",
-            model_name="lightonai/LightOnOCR-1B-1025",
+            model_name=DEFAULT_MODEL_NAME,
             api_key="",
         )
     ),
@@ -107,7 +107,7 @@ converter_config_registry.register(
     lambda uri=None: DotsOCRConverterConfig(
         llm_params=LLMParams(
             base_url=uri or "http://localhost:8000/v1",
-            model_name="dotsocr-model",
+            model_name=DEFAULT_MODEL_NAME,
             api_key="",
         )
     ),
@@ -117,7 +117,7 @@ converter_config_registry.register(
     lambda uri=None: NanonetOCR2ConverterConfig(
         llm_params=LLMParams(
             base_url=uri or "http://localhost:8000/v1",
-            model_name="nanonets/Nanonets-OCR2-3B",
+            model_name=DEFAULT_MODEL_NAME,
             api_key="",
         )
     ),
