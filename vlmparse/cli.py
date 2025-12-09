@@ -193,6 +193,119 @@ class DParseCLI:
                 "Make sure Docker is running and you have the necessary permissions"
             )
 
+    def stop(self, container: str | None = None):
+        """Stop a Docker container by its ID or name.
+
+        Args:
+            container: Container ID or name to stop. If not specified, automatically stops the container if only one vlmparse container is running.
+        """
+        import docker
+
+        try:
+            client = docker.from_env()
+
+            # If no container specified, try to auto-select
+            if container is None:
+                containers = client.containers.list()
+                vlmparse_containers = [
+                    c for c in containers if c.name.startswith("vlmparse")
+                ]
+
+                if len(vlmparse_containers) == 0:
+                    logger.error("No vlmparse containers found")
+                    return
+                elif len(vlmparse_containers) > 1:
+                    logger.error(
+                        f"Multiple vlmparse containers found ({len(vlmparse_containers)}). "
+                        "Please specify a container ID or name:"
+                    )
+                    for c in vlmparse_containers:
+                        logger.info(f"  - {c.name} ({c.short_id})")
+                    return
+                else:
+                    target_container = vlmparse_containers[0]
+            else:
+                # Try to get the specified container
+                try:
+                    target_container = client.containers.get(container)
+                except docker.errors.NotFound:
+                    logger.error(f"Container not found: {container}")
+                    return
+
+            # Stop the container
+            logger.info(
+                f"Stopping container: {target_container.name} ({target_container.short_id})"
+            )
+            target_container.stop()
+            logger.info("✓ Container stopped successfully")
+
+        except docker.errors.DockerException as e:
+            logger.error(f"Failed to connect to Docker: {e}")
+            logger.error(
+                "Make sure Docker is running and you have the necessary permissions"
+            )
+
+    def log(self, container: str | None = None, follow: bool = True):
+        """Show logs from a Docker container.
+
+        Args:
+            container: Container ID or name. If not specified, automatically selects the container if only one vlmparse container is running.
+            follow: If True, follow log output (stream logs in real-time)
+        """
+        import docker
+
+        try:
+            client = docker.from_env()
+
+            # If no container specified, try to auto-select
+            if container is None:
+                containers = client.containers.list()
+                vlmparse_containers = [
+                    c for c in containers if c.name.startswith("vlmparse")
+                ]
+
+                if len(vlmparse_containers) == 0:
+                    logger.error("No vlmparse containers found")
+                    return
+                elif len(vlmparse_containers) > 1:
+                    logger.error(
+                        f"Multiple vlmparse containers found ({len(vlmparse_containers)}). "
+                        "Please specify a container ID or name:"
+                    )
+                    for c in vlmparse_containers:
+                        logger.info(f"  - {c.name} ({c.short_id})")
+                    return
+                else:
+                    target_container = vlmparse_containers[0]
+                    logger.info(
+                        f"Showing logs for: {target_container.name} ({target_container.short_id})"
+                    )
+            else:
+                # Try to get the specified container
+                try:
+                    target_container = client.containers.get(container)
+                except docker.errors.NotFound:
+                    logger.error(f"Container not found: {container}")
+                    return
+
+            # Get and display logs
+            if follow:
+                logger.info("Following logs (press Ctrl+C to stop)...")
+                try:
+                    for log_line in target_container.logs(stream=True, follow=True):
+                        print(log_line.decode("utf-8", errors="replace"), end="")
+                except KeyboardInterrupt:
+                    logger.info("\nStopped following logs")
+            else:
+                logs = target_container.logs().decode("utf-8", errors="replace")
+                print(logs)
+
+        except docker.errors.DockerException as e:
+            logger.error(f"Failed to connect to Docker: {e}")
+            logger.error(
+                "Make sure Docker is running and you have the necessary permissions"
+            )
+
     def view(self, folder):
         import subprocess
         import sys
