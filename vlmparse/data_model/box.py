@@ -11,7 +11,7 @@ from pydantic_core import PydanticCustomError
 
 FONT_SIZE = 20
 FONT_CLASS_SIZE = 20
-WIDTH_BOXES = 1
+WIDTH_BOXES = 5
 
 
 class Size(BaseModel):
@@ -503,7 +503,9 @@ def draw_highlighted_text(
         *bg_color,
         int(255 * opacity),
     )  # Ajouter l'opacité à la couleur de fond
-    draw_overlay.rectangle(rectangle_coords, fill=bg_color_with_opacity)
+    draw_overlay.rectangle(
+        rectangle_coords, fill=bg_color_with_opacity, width=WIDTH_BOXES
+    )
 
     # Superposer l'overlay sur l'image de base
     combined = Image.alpha_composite(image.convert("RGBA"), overlay)

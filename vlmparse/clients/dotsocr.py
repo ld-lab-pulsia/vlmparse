@@ -14,7 +14,7 @@ from vlmparse.clients.openai_converter import (
 from vlmparse.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_tables
 from vlmparse.clients.pipe_utils.utils import clean_response
 from vlmparse.data_model.document import BoundingBox, Item, Page
-from vlmparse.servers.docker_server import VLLMDockerServerConfig
+from vlmparse.servers.docker_server import DEFAULT_MODEL_NAME, VLLMDockerServerConfig
 from vlmparse.utils import to_base64
 
 DOCKERFILE_DIR = Path(__file__).parent.parent.parent / "docker_pipelines"
@@ -35,7 +35,7 @@ class DotsOCRDockerServerConfig(VLLMDockerServerConfig):
             "--chat-template-content-format",
             "string",
             "--served-model-name",
-            "dotsocr-model",
+            DEFAULT_MODEL_NAME,
             "--trust-remote-code",
         ]
     )
@@ -57,6 +57,9 @@ class DotsOCRConverterConfig(OpenAIConverterConfig):
 
     dpi: int = 200
     prompt_mode: Literal["prompt_layout_all_en", "prompt_ocr"] = "prompt_ocr"
+
+    def get_client(self, **kwargs) -> "DotsOCRConverter":
+        return DotsOCRConverter(config=self, **kwargs)
 
 
 class DotsOCRConverter(OpenAIConverterClient):
@@ -210,8 +213,8 @@ class DotsOCRConverter(OpenAIConverterClient):
 
         response = await self.model.chat.completions.create(
             messages=messages,
-            model=self.vllm_config.default_model_name,
-            **self.completion_kwargs,
+            model=self.config.llm_params.model_name,
+            **self.config.completion_kwargs,
         )
         return response.choices[0].message.content
 
@@ -264,6 +267,7 @@ class DotsOCRConverter(OpenAIConverterClient):
                     )
                 )
             response = text
+            page.items = items
 
         text = clean_response(response)
         text = html_to_md_keep_tables(text)
