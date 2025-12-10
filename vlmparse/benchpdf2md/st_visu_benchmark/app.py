@@ -33,7 +33,7 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
     if dataset_path == "pulseia/fr-bench-pdf2md":
         local_folder_path = snapshot_download(
             repo_id="pulseia/fr-bench-pdf2md",
-            repo_type="dataset",  # Use "model" or "space" for other types
+            repo_type="dataset",
         )
         dataset_path = local_folder_path
 
@@ -48,12 +48,10 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
         pipe_folder, date = st.selectbox("Dir", sel_folders, index=0)
         res_folder = preds_folder / pipe_folder / date
         df = load_df(res_folder / "test_results.parquet")
-        # df.loc[df.category.isna(), "category"]=="baseline"
-        # print(df.loc[df.category.isna()])
-        # import pdb;pdb.set_trace()
 
         test_type = st.selectbox("Test type", ["present", "absent", "order", "table"])
-        # test_category = st.selectbox("Test category", sorted(df.category.unique()))
+        df["category"] = df["category"].map(str)
+        test_category = st.selectbox("Test category", df.category.map(str).unique())
 
         only_failed = st.checkbox("Only failed", value=False)
         only_not_checked = st.checkbox("Only not checked", value=False)
@@ -62,7 +60,7 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
 
         preds_folder = preds_folder / pipe_folder / date / "results"
 
-        df_sel = df.loc[df.type == test_type]  # & df.category == test_category]
+        df_sel = df.loc[(df.type == test_type) & (df.category == test_category)]
         if only_failed:
             df_sel = df_sel[~df_sel.result]
         if only_not_checked:

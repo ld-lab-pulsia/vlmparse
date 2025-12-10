@@ -68,7 +68,7 @@ The Streamlit app provides:
 - We reduced strictness of the tests compared to the Olmocr benchmark to ensure that failure indicates a real problem with the transcription.
 
 ### Document collection
-We collected ~60000 from CCPDF dataset. Then we selected the most difficult pages to create the benchmark by doing the transcription with two VLMs and comparing the results (the largest edit distances were considered as the most difficult pages).
+We collected ~60000 french documents from the CCPDF dataset. Then we selected the most difficult pages to create the benchmark by doing the transcription with two VLMs and comparing the results (the largest edit distances were considered as the most difficult pages).
 
 This led us to select these categories of pages:
 - Pages with tiny text (the OCR is harder at low resolution)

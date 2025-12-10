@@ -1,5 +1,7 @@
 import datetime
+import json
 import os
+import time
 from pathlib import Path
 
 import fire
@@ -41,6 +43,7 @@ def process_and_run_benchmark(
     in_folder: Path | str = "pulseia/fr-bench-pdf2md",
     save_folder: Path | str = OUT_FOLDER,
     retrylast: bool = False,
+    dry_run: bool = True,
 ):
     # in_folder = Path(in_folder)
     save_folder = Path(save_folder)
@@ -71,7 +74,7 @@ def process_and_run_benchmark(
                 raise ValueError(
                     "No previous runs found, do not use the retrylast flag"
                 )
-
+        files = list(sorted(set(ds["pdf_path"])))
         if retry is None or regenerate:
             files = list(sorted(set(ds["pdf_path"])))
             logger.info(f"Number of files to convert: {len(files)}")
@@ -116,11 +119,23 @@ def process_and_run_benchmark(
             client.num_concurrent_pages = concurrency if not debug else 1
             client.num_concurrent_files = concurrency if not debug else 1
             client.debug = debug
+
+            if dry_run:
+                client.save_folder = None
+                logger.info("Dry run, converting first 3 files")
+                client.batch(files[:3])
+
             client.save_folder = str(save_folder)
+            tic = time.perf_counter()
             client.batch(files)
+            total_time = time.perf_counter() - tic
+            logger.info(
+                f"Time taken to convert {len(files)} files: {total_time:.2f} seconds"
+            )
 
         else:
             save_folder = Path(retry)
+            total_time = None
 
         df = run_pb_benchmark(ds, out_folder=save_folder / "results")
 
@@ -140,24 +155,46 @@ def process_and_run_benchmark(
         logger.info(avg)
 
         if not debug:
-            df.to_parquet(save_folder / "test_results.parquet")
-            by_type_df.to_excel(save_folder / "by_type.xlsx")
+            save_folder_test_results = (
+                save_folder
+                / "test_results"
+                / datetime.datetime.now().strftime("%Y-%m-%dT%Hh%Mm%Ss")
+            )
+            save_folder_test_results.mkdir(parents=True, exist_ok=True)
+            df.to_parquet(save_folder_test_results / "test_results.parquet")
+            by_type_df.to_excel(save_folder_test_results / "by_type.xlsx")
+
+            with open(save_folder_test_results / "metrics.json", "w") as f:
+                json.dump(
+                    {
+                        "total_time": total_time,
+                        "num_pages": len(files),
+                        "num_tests": len(df),
+                        "avg_result": avg,
+                        "avg_doc_latency": df["doc_latency"].mean(),
+                        "avg_page_latency": df["page_latency"].mean(),
+                        "avg_time_per_page": total_time / len(files)
+                        if total_time is not None
+                        else None,
+                    },
+                    f,
+                )
 
     except Exception:
         raise
 
 
 def run_pb_benchmark(
-    ds,
+    ds: pd.DataFrame,
     out_folder: Path,
     num_workers: int = 1,
 ):
     files = list(out_folder.rglob("*.zip"))
 
     def worker(file_path):
-        _ds = ds.filter(lambda x: file_path.stem in x["pdf_path"])
+        _ds = ds.loc[ds.pdf_path.str.contains(file_path.stem)]
         if len(_ds) == 0:
-            print(f"No tests found for {file_path}")
+            logger.warning(f"No tests found for {file_path}")
             return []
         doc = Document.from_zip(file_path)
         md_text = doc.text
@@ -167,8 +204,8 @@ def run_pb_benchmark(
         try:
             tests.append(
                 BaselineTest(
-                    pdf=_ds["pdf_path"][0],
-                    page=_ds["page"][0],
+                    pdf=_ds["pdf_path"].iloc[0],
+                    page=_ds["page"].iloc[0],
                     id=f"{tests_name}-baseline",
                     type="baseline",
                     category="baseline",
@@ -191,6 +228,8 @@ def run_pb_benchmark(
                 "tests_name": tests_name,
                 "pdf_path": str(doc.file_path),
                 "doc_path": str(file_path),
+                "doc_latency": doc.latency,
+                "page_latency": doc.pages[0].latency,
             } | test.model_dump()
 
             results.append(_dict)

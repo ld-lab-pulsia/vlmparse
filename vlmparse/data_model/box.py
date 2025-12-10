@@ -11,8 +11,6 @@ from pydantic_core import PydanticCustomError
 
 FONT_SIZE = 20
 FONT_CLASS_SIZE = 20
-FONT = ImageFont.truetype("DejaVuSans.ttf", FONT_SIZE)
-FONT_CLASS = ImageFont.truetype("DejaVuSans.ttf", FONT_CLASS_SIZE)
 WIDTH_BOXES = 1
 
 

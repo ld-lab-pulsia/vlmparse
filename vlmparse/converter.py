@@ -1,4 +1,5 @@
 import asyncio
+import time
 import traceback
 from pathlib import Path
 from typing import Literal
@@ -42,6 +43,7 @@ class BaseConverter:
         raise NotImplementedError
 
     async def async_call(self, file_path: str | Path) -> Document:
+        tic = time.perf_counter()
         document = Document(file_path=str(file_path))
         try:
             images = convert_pdfium_to_images(file_path, dpi=self.config.dpi)
@@ -64,9 +66,13 @@ class BaseConverter:
 
             async def worker(page: Page):
                 async with semaphore:
-                    logger.info("Image size: " + str(page.image.size))
+                    logger.debug("Image size: " + str(page.image.size))
                     try:
+                        tic = time.perf_counter()
                         await self.async_call_inside_page(page)
+                        toc = time.perf_counter()
+                        page.latency = toc - tic
+                        logger.debug(f"Time taken: {page.latency} seconds")
                     except KeyboardInterrupt:
                         raise
                     except Exception:
@@ -87,7 +93,9 @@ class BaseConverter:
                 logger.exception(traceback.format_exc())
                 document.error = ProcessingError.from_class(self)
                 return document
-
+        toc = time.perf_counter()
+        document.latency = toc - tic
+        logger.debug(f"Time taken to process the document: {document.latency} seconds")
         if self.save_folder is not None:
             self._save_document(document)
 
