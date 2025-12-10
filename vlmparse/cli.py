@@ -54,6 +54,7 @@ class DParseCLI:
         gpus: str | None = None,
         mode: Literal["document", "md", "md_page"] = "document",
         with_vllm_server: bool = False,
+        concurrency: int = 10,
     ):
         """Parse PDF documents and save results.
 
@@ -117,6 +118,8 @@ class DParseCLI:
         else:
             client_config = converter_config_registry.get(model, uri=uri)
             client = client_config.get_client(save_folder=out_folder, save_mode=mode)
+        client.num_concurrent_files = concurrency
+        client.num_concurrent_pages = concurrency
 
         documents = client.batch(file_paths)
 
