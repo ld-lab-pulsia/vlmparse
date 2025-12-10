@@ -56,7 +56,7 @@ class DotsOCRConverterConfig(OpenAIConverterConfig):
     }
 
     dpi: int = 200
-    prompt_mode: Literal["prompt_layout_all_en", "prompt_ocr"] = "prompt_layout_all_en"
+    prompt_mode: Literal["prompt_layout_all_en", "prompt_ocr"] = "prompt_ocr"
 
     def get_client(self, **kwargs) -> "DotsOCRConverter":
         return DotsOCRConverter(config=self, **kwargs)
