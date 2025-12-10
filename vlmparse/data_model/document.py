@@ -35,9 +35,12 @@ class Item(VLMParseBaseModel):
 
 class Page(VLMParseBaseModel):
     text: str | None = None
+    raw_response: str | None = None
     items: list[Item] | None = None
     error: ProcessingError | None = None
     buffer_image: Optional[Image.Image | str] = None
+    latency: Optional[float] = None
+    """Time taken to process the page in seconds."""
 
     @property
     def image(self):
@@ -75,6 +78,8 @@ class Document(VLMParseBaseModel):
     pages: list[Page] = []
     error: ProcessingError | None = None
     metadata: dict = Field(default_factory=dict)
+    latency: Optional[float] = None
+    """Time taken to process the document in seconds."""
 
     @property
     def text(self):

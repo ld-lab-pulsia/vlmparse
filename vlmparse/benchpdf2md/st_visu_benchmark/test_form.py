@@ -10,8 +10,12 @@ def edit_test_form(test_obj, test_type, tests, test_path):
         )
         type_fields["unidecode"] = st.checkbox("Unidecode", value=test_obj.unidecode)
         type_fields["alphanum"] = st.checkbox("Alphanum", value=test_obj.alphanum)
-        type_fields["ignore_chars"] = st.text_input(
-            "Ignore Characters", value=test_obj.ignore_chars
+        type_fields["ignore_str"] = st.text_input(
+            "Ignore strings (seperarated by spaces)",
+            value=" ".join(test_obj.ignore_str),
+        )
+        type_fields["ignore_str"] = (
+            type_fields["ignore_str"].split(" ") if type_fields["ignore_str"] else []
         )
 
         if test_type == "present" or test_type == "absent":

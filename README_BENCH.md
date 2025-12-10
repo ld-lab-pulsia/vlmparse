@@ -58,6 +58,32 @@ The Streamlit app provides:
    - Download PDF pages for reference
    - View test explanations and failure reasons
 
+## Procedure of benchmark creation
+
+### Opinionated choices
+
+- We focused on french documents.
+- We did not include mathematical equations in the benchmark as these are language agnostic and not specific to french documents.
+- We focused on difficult pages, such that the benchmark is difficult even for state of the art VLMs.
+- We reduced strictness of the tests compared to the Olmocr benchmark to ensure that failure indicates a real problem with the transcription.
+
+### Document collection
+We collected ~60000 french documents from the CCPDF dataset. Then we selected the most difficult pages to create the benchmark by doing the transcription with two VLMs and comparing the results (the largest edit distances were considered as the most difficult pages).
+
+This led us to select these categories of pages:
+- Pages with tiny text (the OCR is harder at low resolution)
+- Pages with multiple columns (the flow from one column to the next is not always respected)
+- Pages with long tables (long tables are still difficult even for state of the art VLMs)
+- Pages with manuscript text:
+  - Some pages were downloaded from Gallica
+  - Some pages were generated from French forms (such as CERFA): a filled form was generated from en empty one using the OpenAI image generation API.
+
+### Test generation
+Different catagories of tests were generated with prompts specifically adapted to each category (using the scripts in the `scripts/generation_scripts` folder).
+
+The tests were then manually reviewed and edited by a human annotator using the Streamlit app in (`vlmparse/benchpdf2md/st_visu_benchmark/app.py`).
+
+
 ## Credits
 
 This benchmark is inspired by and adapted from the [AllenAI OLMo OCR benchmark](https://github.com/allenai/olmocr/tree/main/olmocr). The test framework, normalization logic, and evaluation methodology draw heavily from their excellent work on document parsing evaluation.

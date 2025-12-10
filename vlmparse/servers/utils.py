@@ -128,6 +128,7 @@ def docker_server(
             "ports": {f"{container_port}/tcp": config.docker_port},
             "detach": True,
             "remove": True,
+            "name": f"vlmparse-{config.model_name.replace('/', '-')}",
         }
 
         if device_requests is not None:

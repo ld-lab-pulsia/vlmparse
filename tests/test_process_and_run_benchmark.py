@@ -86,8 +86,7 @@ def test_process_and_run_benchmark_end2end(test_data_dir, output_dir):
     process_and_run_benchmark(
         model="gemini-2.5-flash-lite",
         uri=None,
-        num_concurrent_pages=10,
-        num_concurrent_files=1,
+        concurrency=1,
         debug=False,
         in_folder=test_data_dir,
         save_folder=output_dir,
@@ -108,11 +107,14 @@ def test_process_and_run_benchmark_end2end(test_data_dir, output_dir):
     assert len(zip_files) >= 1, "Expected at least one zip file"
 
     # Check that test_results.parquet was created
-    test_results = latest_run / "test_results.parquet"
-    assert test_results.exists(), "test_results.parquet should exist"
+    test_results = list(latest_run.rglob("test_results.parquet"))
+    assert len(test_results) == 1, "test_results.parquet should exist"
+    test_results = test_results[0]
 
     # Check that by_type.xlsx was created
-    by_type_xlsx = latest_run / "by_type.xlsx"
+    by_type_xlsx = list(latest_run.rglob("by_type.xlsx"))
+    assert len(by_type_xlsx) == 1, "by_type.xlsx should exist"
+    by_type_xlsx = by_type_xlsx[0]
     assert by_type_xlsx.exists(), "by_type.xlsx should exist"
 
     # Load and verify results

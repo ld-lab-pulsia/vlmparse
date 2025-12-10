@@ -31,7 +31,7 @@ class DParseCLI:
         # Only override GPU configuration if explicitly specified
         # This preserves CPU-only settings from the config
         if gpus is not None:
-            docker_config.gpu_device_ids = [g.strip() for g in gpus.split(",")]
+            docker_config.gpu_device_ids = [g.strip() for g in str(gpus).split(",")]
         server = docker_config.get_server(auto_stop=False)
 
         # Deploy server and leave it running (cleanup=False)
@@ -47,7 +47,7 @@ class DParseCLI:
 
     def convert(
         self,
-        folders: str | list[str],
+        inputs: str | list[str],
         out_folder: str = ".",
         model: str = "lightonocr",
         uri: str | None = None,
@@ -59,7 +59,7 @@ class DParseCLI:
         """Parse PDF documents and save results.
 
         Args:
-            folders: List of folders to process
+            inputs: List of folders to process
             out_folder: Output folder for parsed documents
             pipe: Converter type ("vllm", "openai", or "lightonocr", default: "vllm")
             model: Model name (required for vllm, optional for others)
@@ -76,19 +76,23 @@ class DParseCLI:
 
         # Expand file paths from glob patterns
         file_paths = []
-        if isinstance(folders, str):
-            folders = [folders]
-        for pattern in folders:
+        if isinstance(inputs, str):
+            inputs = [inputs]
+        for pattern in inputs:
             if "*" in pattern or "?" in pattern:
                 file_paths.extend(glob(pattern, recursive=True))
-            else:
+            elif os.path.isdir(pattern):
+                file_paths.extend(glob(os.path.join(pattern, "*.pdf"), recursive=True))
+            elif os.path.isfile(pattern):
                 file_paths.append(pattern)
+            else:
+                logger.error(f"Invalid input: {pattern}")
 
         # Filter to only existing PDF files
         file_paths = [f for f in file_paths if os.path.exists(f) and f.endswith(".pdf")]
 
         if not file_paths:
-            logger.error("No PDF files found matching the folders patterns")
+            logger.error("No PDF files found matching the inputs patterns")
             return
 
         logger.info(f"Processing {len(file_paths)} files with {model} converter")
@@ -126,7 +130,7 @@ class DParseCLI:
         logger.info(f"Processed {len(documents)} documents to {out_folder}")
 
     def list(self):
-        """List all currently running servers."""
+        """List all containers whose name begins with vlmparse."""
         import docker
 
         try:
@@ -137,25 +141,20 @@ class DParseCLI:
                 logger.info("No running containers found")
                 return
 
-            # Filter for containers that look like VLLM servers
-            vllm_containers = []
-            for container in containers:
-                # Check if it's a VLLM-related container by image name or ports
-                image_name = (
-                    container.image.tags[0]
-                    if container.image.tags
-                    else str(container.image.id)
-                )
-                vllm_containers.append(container)
+            # Filter for containers whose name begins with "vlmparse"
+            vlmparse_containers = [
+                container
+                for container in containers
+                if container.name.startswith("vlmparse")
+            ]
 
-            if not vllm_containers:
-                logger.info("No running servers found")
+            if not vlmparse_containers:
+                logger.info("No vlmparse containers found")
                 return
 
-            logger.info(f"Found {len(vllm_containers)} running container(s):")
-            logger.info("")
-
-            for container in vllm_containers:
+            # Prepare table data
+            table_data = []
+            for container in vlmparse_containers:
                 image_name = (
                     container.image.tags[0]
                     if container.image.tags
@@ -172,15 +171,137 @@ class DParseCLI:
 
                 port_str = ", ".join(ports) if ports else "N/A"
 
-                # Get container status and uptime
-                status = container.status
+                table_data.append(
+                    [
+                        container.name,
+                        container.short_id,
+                        image_name,
+                        container.status,
+                        port_str,
+                    ]
+                )
 
-                logger.info(f"  Container: {container.name}")
-                logger.info(f"    ID: {container.short_id}")
-                logger.info(f"    Image: {image_name}")
-                logger.info(f"    Status: {status}")
-                logger.info(f"    Port(s): {port_str}")
-                logger.info("")
+            # Display as table
+            from tabulate import tabulate
+
+            headers = ["Name", "ID", "Image", "Status", "Port(s)"]
+            table = tabulate(table_data, headers=headers, tablefmt="grid")
+
+            logger.info(f"\nFound {len(vlmparse_containers)} vlmparse container(s):\n")
+            print(table)
+
+        except docker.errors.DockerException as e:
+            logger.error(f"Failed to connect to Docker: {e}")
+            logger.error(
+                "Make sure Docker is running and you have the necessary permissions"
+            )
+
+    def stop(self, container: str | None = None):
+        """Stop a Docker container by its ID or name.
+
+        Args:
+            container: Container ID or name to stop. If not specified, automatically stops the container if only one vlmparse container is running.
+        """
+        import docker
+
+        try:
+            client = docker.from_env()
+
+            # If no container specified, try to auto-select
+            if container is None:
+                containers = client.containers.list()
+                vlmparse_containers = [
+                    c for c in containers if c.name.startswith("vlmparse")
+                ]
+
+                if len(vlmparse_containers) == 0:
+                    logger.error("No vlmparse containers found")
+                    return
+                elif len(vlmparse_containers) > 1:
+                    logger.error(
+                        f"Multiple vlmparse containers found ({len(vlmparse_containers)}). "
+                        "Please specify a container ID or name:"
+                    )
+                    for c in vlmparse_containers:
+                        logger.info(f"  - {c.name} ({c.short_id})")
+                    return
+                else:
+                    target_container = vlmparse_containers[0]
+            else:
+                # Try to get the specified container
+                try:
+                    target_container = client.containers.get(container)
+                except docker.errors.NotFound:
+                    logger.error(f"Container not found: {container}")
+                    return
+
+            # Stop the container
+            logger.info(
+                f"Stopping container: {target_container.name} ({target_container.short_id})"
+            )
+            target_container.stop()
+            logger.info("✓ Container stopped successfully")
+
+        except docker.errors.DockerException as e:
+            logger.error(f"Failed to connect to Docker: {e}")
+            logger.error(
+                "Make sure Docker is running and you have the necessary permissions"
+            )
+
+    def log(self, container: str | None = None, follow: bool = True):
+        """Show logs from a Docker container.
+
+        Args:
+            container: Container ID or name. If not specified, automatically selects the container if only one vlmparse container is running.
+            follow: If True, follow log output (stream logs in real-time)
+        """
+        import docker
+
+        try:
+            client = docker.from_env()
+
+            # If no container specified, try to auto-select
+            if container is None:
+                containers = client.containers.list()
+                vlmparse_containers = [
+                    c for c in containers if c.name.startswith("vlmparse")
+                ]
+
+                if len(vlmparse_containers) == 0:
+                    logger.error("No vlmparse containers found")
+                    return
+                elif len(vlmparse_containers) > 1:
+                    logger.error(
+                        f"Multiple vlmparse containers found ({len(vlmparse_containers)}). "
+                        "Please specify a container ID or name:"
+                    )
+                    for c in vlmparse_containers:
+                        logger.info(f"  - {c.name} ({c.short_id})")
+                    return
+                else:
+                    target_container = vlmparse_containers[0]
+                    logger.info(
+                        f"Showing logs for: {target_container.name} ({target_container.short_id})"
+                    )
+            else:
+                # Try to get the specified container
+                try:
+                    target_container = client.containers.get(container)
+                except docker.errors.NotFound:
+                    logger.error(f"Container not found: {container}")
+                    return
+
+            # Get and display logs
+            if follow:
+                logger.info("Following logs (press Ctrl+C to stop)...")
+                try:
+                    for log_line in target_container.logs(stream=True, follow=True):
+                        print(log_line.decode("utf-8", errors="replace"), end="")
+                except KeyboardInterrupt:
+                    logger.info("\nStopped following logs")
+            else:
+                logs = target_container.logs().decode("utf-8", errors="replace")
+                print(logs)
 
         except docker.errors.DockerException as e:
             logger.error(f"Failed to connect to Docker: {e}")
