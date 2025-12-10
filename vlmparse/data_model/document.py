@@ -45,47 +45,27 @@ class Page(VLMParseBaseModel):
             self.buffer_image = from_base64(self.buffer_image)
         return self.buffer_image
 
-    def get_image_with_boxes(self, text_idx=0, layout=False, key_values=False):
+    def get_image_with_boxes(self, layout=False):
         from PIL import ImageDraw
 
         from .box import draw_text_of_box
 
         image = self.image
-        draw = ImageDraw.Draw(image)
+
         if layout:
-            items = self.texts[text_idx].items
+            items = self.items
             for item in items:
                 box = item.box
 
+                draw = ImageDraw.Draw(image)
                 draw.rectangle(
                     (box.l, box.t, box.r, box.b),
                     outline=(255, 0, 0),
-                    width=1,
+                    width=5,
                 )
 
                 image = draw_text_of_box(
-                    image,
-                    box.l,
-                    box.t,
-                    item.category,
-                )
-        if key_values:
-            # Draw key-value boxes if available
-            for key, kv in self.infer_key_values.items():
-                if kv is None or kv.box is None:
-                    continue
-                kbox = kv.box
-                draw.rectangle(
-                    (kbox.l, kbox.t, kbox.r, kbox.b),
-                    outline=(0, 255, 0),
-                    width=2,
-                )
-                label = f"{key}: {kv.value}"
-                image = draw_text_of_box(
-                    image,
-                    kbox.l,
-                    kbox.t,
-                    label,
+                    image, box.l, box.t, item.category, font_size=40
                 )
         return image
 

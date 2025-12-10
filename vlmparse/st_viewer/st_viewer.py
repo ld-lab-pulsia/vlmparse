@@ -43,7 +43,10 @@ def run_streamlit(folder: str) -> None:
             st.write(doc.pages[settings["page_no"]].text)
 
     with col2:
-        st.image(doc.pages[settings["page_no"]].image)
+        if settings["plot_layouts"]:
+            st.image(doc.pages[settings["page_no"]].get_image_with_boxes(layout=True))
+        else:
+            st.image(doc.pages[settings["page_no"]].image)
 
 
 def parse_args() -> argparse.Namespace:
