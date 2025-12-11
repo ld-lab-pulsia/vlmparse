@@ -142,7 +142,7 @@ class BaseConverter:
     def __call__(self, file_path: str | Path):
         return asyncio.run(self.async_call(file_path))
 
-    async def async_batch(self, file_paths: list[str | Path]) -> list[Document | None]:
+    async def async_batch(self, file_paths: list[str | Path]) -> list[Document] | None:
         """Process multiple files concurrently with semaphore limit."""
         semaphore = asyncio.Semaphore(self.num_concurrent_files)
 
@@ -158,6 +158,6 @@ class BaseConverter:
         if self.return_documents_in_batch_mode:
             return documents
 
-    def batch(self, file_paths: list[str | Path]) -> list[Document | None]:
+    def batch(self, file_paths: list[str | Path]) -> list[Document] | None:
         """Synchronous wrapper for async_batch."""
         return asyncio.run(self.async_batch(file_paths))

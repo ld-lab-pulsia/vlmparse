@@ -73,6 +73,7 @@ class DoclingConverter(BaseConverter):
         save_folder: str | None = None,
         save_mode: Literal["document", "md", "md_page"] = "document",
         debug: bool = False,
+        return_documents_in_batch_mode: bool = False,
     ):
         super().__init__(
             config=config,
@@ -81,6 +82,7 @@ class DoclingConverter(BaseConverter):
             save_folder=save_folder,
             save_mode=save_mode,
             debug=debug,
+            return_documents_in_batch_mode=return_documents_in_batch_mode,
         )
         self.client = httpx.AsyncClient(timeout=self.config.timeout)
 
