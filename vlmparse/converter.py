@@ -31,6 +31,7 @@ class BaseConverter:
         save_folder: str | None = None,
         save_mode: Literal["document", "md", "md_page"] = "document",
         debug: bool = False,
+        return_documents_in_batch_mode: bool = False,
     ):
         self.config = config
         self.num_concurrent_files = num_concurrent_files
@@ -38,6 +39,7 @@ class BaseConverter:
         self.save_folder = save_folder
         self.save_mode = save_mode
         self.debug = debug
+        self.return_documents_in_batch_mode = return_documents_in_batch_mode
 
     async def async_call_inside_page(self, page: Page) -> Page:
         raise NotImplementedError
@@ -140,18 +142,22 @@ class BaseConverter:
     def __call__(self, file_path: str | Path):
         return asyncio.run(self.async_call(file_path))
 
-    async def async_batch(self, file_paths: list[str | Path]) -> list[Document]:
+    async def async_batch(self, file_paths: list[str | Path]) -> list[Document] | None:
         """Process multiple files concurrently with semaphore limit."""
         semaphore = asyncio.Semaphore(self.num_concurrent_files)
 
         async def worker(file_path: str | Path) -> Document:
             async with semaphore:
-                return await self.async_call(file_path)
+                if self.return_documents_in_batch_mode:
+                    return await self.async_call(file_path)
+                else:
+                    await self.async_call(file_path)
 
         tasks = [asyncio.create_task(worker(file_path)) for file_path in file_paths]
         documents = await asyncio.gather(*tasks)
-        return documents
+        if self.return_documents_in_batch_mode:
+            return documents
 
-    def batch(self, file_paths: list[str | Path]) -> list[Document]:
+    def batch(self, file_paths: list[str | Path]) -> list[Document] | None:
         """Synchronous wrapper for async_batch."""
         return asyncio.run(self.async_batch(file_paths))

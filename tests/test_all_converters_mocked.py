@@ -163,7 +163,11 @@ class TestConverterBatchProcessing:
     def test_batch_processing(self, file_path, model_name, mock_openai_client):
         """Test batch processing of multiple files."""
         config = converter_config_registry.get(model_name)
-        converter = config.get_client(num_concurrent_files=2, num_concurrent_pages=2)
+        converter = config.get_client(
+            num_concurrent_files=2,
+            num_concurrent_pages=2,
+            return_documents_in_batch_mode=True,
+        )
 
         # Process multiple files (same file for testing)
         file_paths = [file_path, file_path]

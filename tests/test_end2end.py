@@ -8,7 +8,7 @@ from vlmparse.registries import converter_config_registry, docker_config_registr
 @pytest.mark.parametrize("model", ["gemini-2.5-flash-lite"])
 def test_convert(file_path, model):
     config = converter_config_registry.get(model)
-    client = config.get_client()
+    client = config.get_client(return_documents_in_batch_mode=True)
     docs = client.batch([file_path])
     assert len(docs) == 1
     doc = docs[0]
@@ -38,7 +38,7 @@ def test_convert_with_docker(file_path, model):
     server.start()
 
     # Get client from docker config
-    client = docker_config.get_client()
+    client = docker_config.get_client(return_documents_in_batch_mode=True)
 
     # Convert document
     docs = client.batch([file_path])

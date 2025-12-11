@@ -127,7 +127,10 @@ class DParseCLI:
 
         documents = client.batch(file_paths)
 
-        logger.info(f"Processed {len(documents)} documents to {out_folder}")
+        if documents is not None:
+            logger.info(f"Processed {len(documents)} documents to {out_folder}")
+        else:
+            logger.info(f"Processed {len(file_paths)} documents to {out_folder}")
 
     def list(self):
         """List all containers whose name begins with vlmparse."""

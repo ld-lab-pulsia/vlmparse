@@ -63,13 +63,8 @@ def mock_converter_client():
         mock_converter = MagicMock()
         mock_config = MagicMock()
 
-        # Create mock documents
-        mock_doc1 = Document(file_path="test1.pdf")
-        mock_doc1.pages = [Page(text="Page 1 content"), Page(text="Page 2 content")]
-        mock_doc2 = Document(file_path="test2.pdf")
-        mock_doc2.pages = [Page(text="Page 1 content"), Page(text="Page 2 content")]
-
-        mock_converter.batch.return_value = [mock_doc1, mock_doc2]
+        # Batch now returns None by default (documents are saved to disk instead)
+        mock_converter.batch.return_value = None
         mock_config.get_client.return_value = mock_converter
         mock_registry.get.return_value = mock_config
 
@@ -232,7 +227,7 @@ class TestConvertCommand:
                 mock_docker_config = MagicMock()
                 mock_server = MagicMock()
                 mock_converter = MagicMock()
-                mock_converter.batch.return_value = [Document(file_path=str(file_path))]
+                mock_converter.batch.return_value = None
 
                 mock_docker_config.get_server.return_value = mock_server
                 mock_docker_config.get_client.return_value = mock_converter
@@ -257,7 +252,7 @@ class TestConvertCommand:
                 mock_docker_config = MagicMock()
                 mock_server = MagicMock()
                 mock_converter = MagicMock()
-                mock_converter.batch.return_value = [Document(file_path=str(file_path))]
+                mock_converter.batch.return_value = None
 
                 mock_docker_config.get_server.return_value = mock_server
                 mock_docker_config.get_client.return_value = mock_converter
@@ -338,7 +333,7 @@ class TestConvertWithDifferentModels:
             with patch("vlmparse.registries.docker_config_registry"):
                 mock_config = MagicMock()
                 mock_converter = MagicMock()
-                mock_converter.batch.return_value = [Document(file_path=str(file_path))]
+                mock_converter.batch.return_value = None
                 mock_config.get_client.return_value = mock_converter
                 mock_registry.get.return_value = mock_config
 
@@ -368,9 +363,7 @@ class TestCLIIntegration:
                 mock_server = MagicMock()
                 mock_converter = MagicMock()
 
-                mock_doc = Document(file_path=str(file_path))
-                mock_doc.pages = [Page(text="Test content")]
-                mock_converter.batch.return_value = [mock_doc]
+                mock_converter.batch.return_value = None
 
                 mock_docker_config.get_server.return_value = mock_server
                 mock_docker_config.get_client.return_value = mock_converter
@@ -412,7 +405,7 @@ class TestCLIIntegration:
             with patch("vlmparse.registries.docker_config_registry"):
                 mock_config = MagicMock()
                 mock_converter = MagicMock()
-                mock_converter.batch.return_value = [Document(file_path=str(file_path))]
+                mock_converter.batch.return_value = None
                 mock_config.get_client.return_value = mock_converter
                 mock_converter_registry.get.return_value = mock_config
 
