@@ -19,8 +19,9 @@ def test_convert(file_path, model):
 
 @pytest.mark.skipif(
     "RUN_DEPLOYMENT_VLLM" not in os.environ
-    or os.environ["RUN_DEPLOYMENT_VLLM"] == "false",
-    reason="Skipping because RUN_DEPLOYMENT_VLLM is not set or is false",
+    or os.environ["RUN_DEPLOYMENT_VLLM"] == "false"
+    or "GPU_TEST_VLMPARSE" not in os.environ,
+    reason="Skipping because RUN_DEPLOYMENT_VLLM is not set or is false or GPU_TEST is not set",
 )
 @pytest.mark.parametrize(
     "model", ["docling", "lightonocr", "dotsocr", "nanonets/Nanonets-OCR2-3B"]
@@ -33,6 +34,7 @@ def test_convert_with_docker(file_path, model):
 
     # Start server with auto_stop=True for automatic cleanup
     server = docker_config.get_server(auto_stop=True)
+    server.gpu_device_ids = os.environ["GPU_TEST_VLMPARSE"].split(",")
     server.start()
 
     # Get client from docker config

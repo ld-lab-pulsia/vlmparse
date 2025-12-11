@@ -27,7 +27,7 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
     preds_folder = Path(folder)
 
     # tests = glob(str(tests_folder / "**/**/tests.jsonl"))
-    files = glob(str(preds_folder / "**/**/test_results.parquet"))
+    files = glob(str(preds_folder / "**/**/test_results/**/test_results.parquet"))
 
     # map_tests = {Path(t).parent.name: t for t in tests}
     if dataset_path == "pulseia/fr-bench-pdf2md":
@@ -40,13 +40,20 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
     tests = glob(str(Path(dataset_path) / "**/tests*.jsonl"), recursive=True)
     map_tests = {Path(t).parent.name: t for t in tests}
     with st.sidebar:
-        sel_folders = [(Path(f).parent.parent.name, Path(f).parent.name) for f in files]
+        sel_folders = [
+            (
+                Path(f).parent.parent.parent.parent.name,
+                Path(f).parent.parent.parent.name,
+                Path(f).parent.name,
+            )
+            for f in files
+        ]
 
         if len(sel_folders) == 0:
             st.error(f"No results found in folder {preds_folder}")
             return
-        pipe_folder, date = st.selectbox("Dir", sel_folders, index=0)
-        res_folder = preds_folder / pipe_folder / date
+        pipe_folder, date1, date2 = st.selectbox("Dir", sel_folders, index=0)
+        res_folder = preds_folder / pipe_folder / date1 / "test_results" / date2
         df = load_df(res_folder / "test_results.parquet")
 
         test_type = st.selectbox("Test type", ["present", "absent", "order", "table"])
@@ -58,7 +65,7 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
 
         display_image = st.checkbox("Display image", value=False)
 
-        preds_folder = preds_folder / pipe_folder / date / "results"
+        preds_folder = preds_folder / pipe_folder / date1 / "results"
 
         df_sel = df.loc[(df.type == test_type) & (df.category == test_category)]
         if only_failed:
@@ -196,7 +203,7 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
             def get_image(pipe_folder, date, test_id, show_layout):
                 return doc.pages[0].image
 
-            st.image(get_image(pipe_folder, date, row.id, show_layout))
+            st.image(get_image(pipe_folder, date1, row.id, show_layout))
     else:
         show_text(res)
 

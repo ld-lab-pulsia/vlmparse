@@ -52,15 +52,38 @@ Focus on:
 - Extract the exact text as it appears
 - Do not include text that is part of the main body content
 - Do not include text that appears in images, plots, charts, etc.""",
-    "graphics": """Analyze this page and identify graphics, ie plots, curve, charts, diagrams, schemas, histograms, etc... Return a list of strings that should be the exact unmodified OCR of single text elements in the graphics (a number, a label, a title, a legend, a paragraph, etc...). The goal is to test the presence of this text single element in a pdf to markdown OCR conversion.
+    "graphics": """Your task is to identify textual elements that appear **inside graphical components** of the page (e.g., plots, charts, diagrams, schemas, histograms, maps) and return them as a **list of exact OCR-extracted strings**. These strings will be used to check whether the OCR-to-Markdown conversion preserved text that was embedded within graphics.
 
-Focus on:
-- Graphics: plots, curve, charts, diagrams, schemas, histograms, maps.
-- Single text elements: a number, a label, a title, a legend, a paragraph.
-- Extract the exact text as it appears
-- If there is none of the graphics mentioned above, return an empty list.
-- Do not include text that is in footers or headers.
-""",
+Follow these rules:
+
+1. **Scope of input**  
+   Use only the text that appears in the OCR output provided to you. Do not attempt to correct OCR errors; return the text exactly as it appears in the OCR output.
+
+2. **What to extract**  
+   Extract only textual items that belong to graphical elements, including:  
+   - Axis labels  
+   - Tick labels (numbers or words)  
+   - Titles of figures or plots  
+   - Legends  
+   - Text embedded within diagrams  
+   - Any other standalone textual components visually tied to the graphic
+
+3. **What not to extract**  
+   Do not include:  
+   - Main body text  
+   - Captions under the graphics  
+   - Footers or headers  
+   - Page numbers  
+   - Multi-sentence paragraphs unless they appear *inside* the graphic itself
+
+4. **Granularity**  
+   Output each textual element as an independent string. If the OCR output merges elements or presents them out of sequence, split them into minimal meaningful units (e.g., one label, one number, one legend item).
+
+5. **Order**  
+   The order of the list does not matter.
+
+6. **Empty result**  
+   If the page contains no graphics, return an empty list.""",
 }
 
 
@@ -128,7 +151,7 @@ async def main(
     no_inverse_aspect_ratio: bool = False,
     test_type: str = "tiny_text",
     model: str = "gemini-2.5-pro",
-    add_page_num: bool = True,
+    add_page_num: bool = False,
 ):
     # save_folder = save_folder / test_type
     async_client = AsyncOpenAI(
@@ -211,7 +234,7 @@ if __name__ == "__main__":
     parser.add_argument("--start_idx", type=int, default=0)
     parser.add_argument("--end_idx", type=int, default=10000)
     parser.add_argument("--test_type", type=str, default="handwritten_text")
-    parser.add_argument("--model", type=str, default="gemini-2.5-pro")
+    parser.add_argument("--model", type=str, default="gemini-3-pro-preview")
     args = parser.parse_args()
     asyncio.run(
         main(
