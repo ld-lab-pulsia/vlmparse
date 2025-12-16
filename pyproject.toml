@@ -52,6 +52,8 @@ bench = [
     "datasets>=4.4.1",
     "openpyxl>=3.1.5",
     "joblib[bench]>=1.5.2",
+    "playwright",
+    "fuzzysearch"
     ]
 test = [
     "pre-commit",
