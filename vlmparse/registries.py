@@ -3,6 +3,10 @@ from collections.abc import Callable
 
 from vlmparse.clients.docling import DoclingConverterConfig, DoclingDockerServerConfig
 from vlmparse.clients.dotsocr import DotsOCRConverterConfig, DotsOCRDockerServerConfig
+from vlmparse.clients.hunyuanocr import (
+    HunyuanOCRConverterConfig,
+    HunyuanOCRDockerServerConfig,
+)
 from vlmparse.clients.lightonocr import (
     LightOnOCRConverterConfig,
     LightOnOCRDockerServerConfig,
@@ -10,10 +14,6 @@ from vlmparse.clients.lightonocr import (
 from vlmparse.clients.nanonetocr import (
     NanonetOCR2ConverterConfig,
     NanonetOCR2DockerServerConfig,
-)
-from vlmparse.clients.hunyuanocr import (
-    HunyuanOCRConverterConfig,
-    HunyuanOCRDockerServerConfig,
 )
 from vlmparse.clients.openai_converter import LLMParams, OpenAIConverterConfig
 from vlmparse.servers.docker_server import DEFAULT_MODEL_NAME, docker_config_registry
