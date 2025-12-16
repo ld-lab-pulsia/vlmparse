@@ -11,6 +11,10 @@ from vlmparse.clients.nanonetocr import (
     NanonetOCR2ConverterConfig,
     NanonetOCR2DockerServerConfig,
 )
+from vlmparse.clients.hunyuanocr import (
+    HunyuanOCRConverterConfig,
+    HunyuanOCRDockerServerConfig,
+)
 from vlmparse.clients.openai_converter import LLMParams, OpenAIConverterConfig
 from vlmparse.servers.docker_server import DEFAULT_MODEL_NAME, docker_config_registry
 
@@ -19,6 +23,10 @@ docker_config_registry.register("dotsocr", lambda: DotsOCRDockerServerConfig())
 docker_config_registry.register(
     "nanonets/Nanonets-OCR2-3B", lambda: NanonetOCR2DockerServerConfig()
 )
+docker_config_registry.register(
+    "tencent/HunyuanOCR", lambda: HunyuanOCRDockerServerConfig()
+)
+docker_config_registry.register("hunyuanocr", lambda: HunyuanOCRDockerServerConfig())
 docker_config_registry.register("docling", lambda: DoclingDockerServerConfig())
 
 
@@ -115,6 +123,26 @@ converter_config_registry.register(
 converter_config_registry.register(
     "nanonets/Nanonets-OCR2-3B",
     lambda uri=None: NanonetOCR2ConverterConfig(
+        llm_params=LLMParams(
+            base_url=uri or "http://localhost:8000/v1",
+            model_name=DEFAULT_MODEL_NAME,
+            api_key="",
+        )
+    ),
+)
+converter_config_registry.register(
+    "nanonets/Nanonets-OCR2-3B",
+    lambda uri=None: NanonetOCR2ConverterConfig(
+        llm_params=LLMParams(
+            base_url=uri or "http://localhost:8000/v1",
+            model_name=DEFAULT_MODEL_NAME,
+            api_key="",
+        )
+    ),
+)
+converter_config_registry.register(
+    "hunyuanocr",
+    lambda uri=None: HunyuanOCRConverterConfig(
         llm_params=LLMParams(
             base_url=uri or "http://localhost:8000/v1",
             model_name=DEFAULT_MODEL_NAME,
