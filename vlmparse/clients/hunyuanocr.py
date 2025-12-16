@@ -18,7 +18,6 @@ class HunyuanOCRDockerServerConfig(VLLMDockerServerConfig):
             "0",
             "--gpu-memory-utilization",
             "0.2",
-            
         ]
     )
 
