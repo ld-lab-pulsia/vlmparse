@@ -13,6 +13,12 @@ class HunyuanOCRDockerServerConfig(VLLMDockerServerConfig):
             "--limit-mm-per-prompt",
             '{"image": 1}',
             "--async-scheduling",
+            "--no-enable-prefix-caching",
+            "--mm-processor-cache-gb",
+            "0",
+            "--gpu-memory-utilization",
+            "0.2",
+            
         ]
     )
 
