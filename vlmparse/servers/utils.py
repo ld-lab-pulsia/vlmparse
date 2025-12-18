@@ -1,9 +1,11 @@
+import getpass
 import time
 from contextlib import contextmanager
 from pathlib import Path
 
-import docker
 from loguru import logger
+
+import docker
 
 
 def _ensure_image_exists(
@@ -128,7 +130,7 @@ def docker_server(
             "ports": {f"{container_port}/tcp": config.docker_port},
             "detach": True,
             "remove": True,
-            "name": f"vlmparse-{config.model_name.replace('/', '-')}",
+            "name": f"vlmparse-{config.model_name.replace('/', '-')}-{getpass.getuser()}",
         }
 
         if device_requests is not None:

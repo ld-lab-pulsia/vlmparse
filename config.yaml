@@ -10,5 +10,5 @@ volumes:
   host: /data
   container: /mnt/projects/rag-pretraitement
 - variable: WORKSPACE 
-  host: /workspace
-  container: .
+  host: /wsp
+  container: /home/ldap/brigal/wsp/vlmparse

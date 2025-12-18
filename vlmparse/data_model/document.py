@@ -56,6 +56,8 @@ class Page(VLMParseBaseModel):
         image = self.image
 
         if layout:
+            if self.items is None:
+                return image
             items = self.items
             for item in items:
                 box = item.box

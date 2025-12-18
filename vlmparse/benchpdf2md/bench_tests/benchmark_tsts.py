@@ -1187,9 +1187,10 @@ class TableTest(BasePDFTest):
                 f"No cell matching '{cell}' found with threshold {threshold}\nDiff:\n\n{diff_display}",
             )
         else:
+            exp = "\n\n".join(best_match_reasons)
             return (
                 False,
-                f"Found cells matching '{cell}' but relationships not satisfied: {'\n\n'.join(best_match_reasons)}",
+                f"Found cells matching '{cell}' but relationships not satisfied: {exp}",
             )
 
 
@@ -1686,20 +1687,32 @@ def load_tests_from_ds(ds) -> List[BasePDFTest]:
                 raise ValidationError(f"Unknown test type: {test_type}")
             return test
         except json.JSONDecodeError as e:
-            print(f"Error parsing ds on {row.id}: {e}")
+            print(f"Error parsing ds on {row['id']}: {e}")
             raise
         except (ValidationError, KeyError) as e:
-            print(f"Error on line {row.id}: {e}")
+            print(f"Error on line {row['id']}: {e}")
             raise
         except Exception as e:
-            print(f"Unexpected error on {row.id}: {e}")
+            print(f"Unexpected error on {row['id']}: {e}")
             raise
 
     tests = []
 
     # Read all lines along with their line numbers.
     for row in ds.to_dict(orient="records"):
-        tests.append(process_line(row))
+        # tests.append(process_line(row))
+        from vlmparse.benchpdf2md.olmocrbench.tests import load_single_test
+
+        _data = {}
+        for k, v in row.items():
+            if isinstance(v, float) and math.isnan(v) or v is None or k in ["pdf_path"]:
+                continue
+            _data[k] = v
+        data = _data
+        for k in ["max_diffs", "first_n", "last_n", "page"]:
+            if k in data:
+                data[k] = int(data[k])
+        tests.append(load_single_test(data))
 
     # Check for duplicate test IDs after parallel processing.
     unique_ids = set()

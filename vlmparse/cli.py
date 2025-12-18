@@ -251,12 +251,13 @@ class DParseCLI:
                 "Make sure Docker is running and you have the necessary permissions"
             )
 
-    def log(self, container: str | None = None, follow: bool = True):
+    def log(self, container: str | None = None, follow: bool = True, tail: int = 500):
         """Show logs from a Docker container.
 
         Args:
             container: Container ID or name. If not specified, automatically selects the container if only one vlmparse container is running.
             follow: If True, follow log output (stream logs in real-time)
+            tail: Number of lines to show from the end of the logs
         """
         import docker
 
@@ -298,7 +299,9 @@ class DParseCLI:
             if follow:
                 logger.info("Following logs (press Ctrl+C to stop)...")
                 try:
-                    for log_line in target_container.logs(stream=True, follow=True):
+                    for log_line in target_container.logs(
+                        stream=True, follow=True, tail=tail
+                    ):
                         print(log_line.decode("utf-8", errors="replace"), end="")
                 except KeyboardInterrupt:
                     logger.info("\nStopped following logs")

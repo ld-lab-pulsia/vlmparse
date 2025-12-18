@@ -53,7 +53,7 @@ bench = [
     "openpyxl>=3.1.5",
     "joblib[bench]>=1.5.2",
     "playwright",
-    "fuzzysearch"
+    "fuzzysearch>=0.8.1",
     ]
 test = [
     "pre-commit",

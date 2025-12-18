@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 from huggingface_hub import snapshot_download
+from pypdfium2.internal.bases import uuid
 from streamlit import runtime
 
 from vlmparse.benchpdf2md.bench_tests.benchmark_tsts import load_tests, save_tests
@@ -19,6 +20,16 @@ from vlmparse.benchpdf2md.st_visu_benchmark.utils import get_doc, save_new_test
 @st.cache_data
 def load_df(results_file):
     return pd.read_parquet(results_file).set_index("test_id")
+
+
+@st.cache_data
+def get_pdf_map(folder: Path) -> dict[str, Path]:
+    return {path.name: path for path in Path(folder).rglob("*.pdf")}
+
+
+@st.cache_data
+def get_doc_zip_map(folder: Path) -> dict[str, Path]:
+    return {path.name: path for path in Path(folder).rglob("*.zip")}
 
 
 def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
@@ -37,8 +48,9 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
         )
         dataset_path = local_folder_path
 
-    tests = glob(str(Path(dataset_path) / "**/tests*.jsonl"), recursive=True)
-    map_tests = {Path(t).parent.name: t for t in tests}
+    tests = glob(str(Path(dataset_path) / "**/*.jsonl"), recursive=True)
+
+    map_tests = {Path(t).name: t for t in tests}
     with st.sidebar:
         sel_folders = [
             (
@@ -57,6 +69,8 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
         df = load_df(res_folder / "test_results.parquet")
 
         test_type = st.selectbox("Test type", ["present", "absent", "order", "table"])
+        if "category" not in df.columns:
+            df["category"] = None
         df["category"] = df["category"].map(str)
         test_category = st.selectbox("Test category", df.category.map(str).unique())
 
@@ -89,14 +103,13 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
         display_markdown = st.checkbox("Display markdown", value=True)
         show_layout = st.checkbox("Show layout", value=False)
         display_original_text = st.checkbox("Display original text", value=False)
-        pdf_path = Path(row.pdf_path)
+        pdf_map = get_pdf_map(Path(dataset_path))
 
-        # pdf_path = Path(dataset_path) / pdf_path.stem / pdf_path.name
+        pdf_path = pdf_map[row.pdf.split("/")[-1]]
 
         download_pdf_page(pdf_path, page_no=0, file_name=f"{row.tests_name}.pdf")
 
-    # doc_path = Path(res_folder) / "results" / Path(row.doc_path).name
-    doc_path = row.doc_path
+    doc_path = get_doc_zip_map(preds_folder)[row.doc_path.split("/")[-1]]
     doc = get_doc(doc_path)
 
     col1_head, col2_head = st.columns(2)
@@ -137,18 +150,33 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
         elif len(_tests) > 1:
             st.error("Multiple tests found")
         test_obj = _tests[0]
-        print(test_obj)
 
         if st.button("Run test"):
-            res, message = test_obj.run(res)
-            st.markdown(f"Success: {res}")
+            success, message = test_obj.run(res)
+            st.markdown(f"Success: {success}")
             st.markdown(message)
-        test_obj_edited = edit_test_form(
-            test_obj,
-            test_type,
-            st.session_state["tests"],
-            st.session_state["current_tests_path"],
-        )
+
+        add_presence_test = st.checkbox("Add presence test")
+        if add_presence_test:
+            from vlmparse.benchpdf2md.bench_tests.benchmark_tsts import TextPresenceTest
+
+            test_obj_edited = edit_test_form(
+                TextPresenceTest(
+                    pdf=row.pdf_path,
+                    page=0,
+                    id=f"presence_test_{uuid.uuid4()}",
+                    type="present",
+                    text="",
+                ),
+                "present",
+            )
+            if test_obj_edited is not None:
+                st.session_state["tests"].append(test_obj_edited)
+        else:
+            test_obj_edited = edit_test_form(
+                test_obj,
+                test_type,
+            )
 
         if test_obj_edited is not None:
             save_new_test(
@@ -178,7 +206,7 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
                     st.session_state["tests"], st.session_state["current_tests_path"]
                 )
     with col3_button:
-        if st.button("Supress page"):
+        if st.button("Supress page (Warning, this is irreversible)"):
             import shutil
 
             shutil.rmtree(Path(row.pdf_path).parent)

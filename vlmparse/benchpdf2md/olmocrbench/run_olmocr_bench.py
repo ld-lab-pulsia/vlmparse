@@ -2,6 +2,7 @@ import datetime
 import json
 import os
 import time
+from dataclasses import asdict
 from pathlib import Path
 
 import fire
@@ -11,11 +12,6 @@ from joblib import Parallel, delayed
 from loguru import logger
 from tqdm import tqdm
 
-from vlmparse.benchpdf2md.bench_tests.benchmark_tsts import (
-    BaselineTest,
-    load_tests_from_ds,
-)
-from vlmparse.benchpdf2md.create_dataset import create_dataset
 from vlmparse.benchpdf2md.utils import bootstrap_and_format_results
 from vlmparse.data_model.document import Document
 from vlmparse.registries import converter_config_registry, docker_config_registry
@@ -38,16 +34,14 @@ def process_and_run_benchmark(
     retry: str | None = None,
     concurrency: int = 1,
     debug: bool = False,
-    gpu: int = 2,
+    gpu: int = 1,
     regenerate: bool = False,
-    in_folder: Path | str = "pulseia/fr-bench-pdf2md",
+    in_folder: Path | str = "allenai/olmOCR-bench",
     save_folder: Path | str = OUT_FOLDER,
     retrylast: bool = False,
     dry_run: bool = True,
     filter_type: str | list[str] | None = None,
-    filter_category: str | list[str] | None = None,
 ):
-    # in_folder = Path(in_folder)
     save_folder = Path(save_folder)
 
     # if not in_folder.exists():
@@ -57,7 +51,7 @@ def process_and_run_benchmark(
 
     # ds = create_dataset(in_folder)
 
-    if in_folder == "pulseia/fr-bench-pdf2md" or in_folder == "allenai/olmOCR-bench":
+    if in_folder == "allenai/olmOCR-bench":
         local_folder_path = snapshot_download(
             repo_id=in_folder,
             repo_type="dataset",  # Use "model" or "space" for other types
@@ -65,16 +59,8 @@ def process_and_run_benchmark(
         in_folder = local_folder_path
     logger.info(f"In folder: {in_folder}")
 
-    ds = create_dataset(in_folder)
+    pdfs = list(Path(in_folder).rglob("*.pdf"))
 
-    if filter_type is not None:
-        if isinstance(filter_type, str):
-            filter_type = [filter_type]
-        ds = ds[ds.type.isin(filter_type)]
-    if filter_category is not None:
-        if isinstance(filter_category, str):
-            filter_category = [filter_category]
-        ds = ds[ds.category.isin(filter_category)]
     try:
         if retrylast:
             retry = save_folder / model
@@ -85,9 +71,9 @@ def process_and_run_benchmark(
                 raise ValueError(
                     "No previous runs found, do not use the retrylast flag"
                 )
-        files = list(sorted(set(ds["pdf_path"])))
+        files = list(sorted(set(pdfs)))
         if retry is None or regenerate:
-            files = list(sorted(set(ds["pdf_path"])))
+            files = list(sorted(set(pdfs)))
             logger.info(f"Number of files to convert: {len(files)}")
             if retry is not None:
                 already_processed = [
@@ -103,7 +89,7 @@ def process_and_run_benchmark(
 
             if len(files) == 0:
                 raise ValueError(
-                    f"No PDF files found in the input folder: {in_folder}\nDataset paths: {ds['pdf_path'][:5]}"
+                    f"No PDF files found in the input folder: {in_folder}\nDataset paths: {pdfs[:5]}"
                 )
 
             save_folder = (
@@ -148,7 +134,11 @@ def process_and_run_benchmark(
             save_folder = Path(retry)
             total_time = None
 
-        df = run_pb_benchmark(ds, out_folder=save_folder / "results")
+        tests_files = list(Path(in_folder).rglob("**/*.jsonl"))
+        if filter_type is not None:
+            tests_files = [tf for tf in tests_files if filter_type in tf.name]
+
+        df = run_olmocr_benchmark(tests_files, out_folder=save_folder / "results")
 
         logger.info(
             f"Number of pages: {df['pdf_path'].unique().shape[0]}, Number of tests: {len(df)}"
@@ -157,9 +147,13 @@ def process_and_run_benchmark(
             by_type_df = bootstrap_and_format_results(df, "type", "result")
             logger.info(f"By type:\n{by_type_df}")
 
-        if "category" in df.columns:
-            by_category_df = bootstrap_and_format_results(df, "category", "result")
-            logger.info(f"By category:\n{by_category_df}")
+        import pdb
+
+        pdb.set_trace()
+
+        if "tests_name" in df.columns:
+            by_tests_name_df = bootstrap_and_format_results(df, "tests_name", "result")
+            logger.info(f"By tests_name:\n{by_tests_name_df}")
 
         logger.info("average result:")
         avg = df.loc[df.type != "baseline"]["result"].mean()
@@ -195,63 +189,51 @@ def process_and_run_benchmark(
         raise
 
 
-def run_pb_benchmark(
-    ds: pd.DataFrame,
+def run_olmocr_benchmark(
+    tests_files: list[Path],
     out_folder: Path,
-    num_workers: int = 1,
+    num_workers: int = 64,
 ):
+    from vlmparse.benchpdf2md.olmocrbench.tests import load_tests
+
     files = list(out_folder.rglob("*.zip"))
+    map_files = {path.stem: path for path in files}
+    tests = [test for tf in tests_files for test in load_tests(tf)]
 
-    def worker(file_path):
-        _ds = ds.loc[ds.pdf_path.str.contains(file_path.stem)]
-        if len(_ds) == 0:
-            logger.warning(f"No tests found for {file_path}")
-            return []
-        doc = Document.from_zip(file_path)
-        md_text = doc.text
-        tests_name = Path(doc.file_path).parent.name
+    def worker(test):
+        key = Path(test.pdf).stem
 
-        tests = load_tests_from_ds(_ds)
-        try:
-            tests.append(
-                BaselineTest(
-                    pdf=_ds["pdf_path"].iloc[0],
-                    page=_ds["page"].iloc[0],
-                    id=f"{tests_name}-baseline",
-                    type="baseline",
-                    category="baseline",
-                )
-            )
-        except Exception as e:
-            import pdb
+        _dict = {
+            "test_id": test.id,
+        } | asdict(test)
+        if key not in map_files:
+            logger.warning(f"No zip document found for {test.pdf}")
+            _dict["result"] = False
+            _dict["explanation"] = f"No zip document found for {test.pdf}"
 
-            pdb.set_trace()
-            raise e
+        else:
+            file_path = map_files[key]
 
-        results = []
+            doc = Document.from_zip(file_path)
+            md_text = doc.text
+            tests_name = Path(doc.file_path).parent.name
 
-        for test in tests:
             passed, explanation = test.run(md_text)
-            _dict = {
-                "test_id": test.id,
-                "result": passed,
-                "explanation": explanation,
-                "tests_name": tests_name,
-                "pdf_path": str(doc.file_path),
-                "doc_path": str(file_path),
-                "doc_latency": doc.latency,
-                "page_latency": doc.pages[0].latency,
-            } | test.model_dump()
+            _dict["result"] = passed
+            _dict["explanation"] = explanation
+            _dict["tests_name"] = tests_name
+            _dict["pdf_path"] = str(doc.file_path)
+            _dict["doc_path"] = str(file_path)
+            _dict["doc_latency"] = doc.latency
+            _dict["page_latency"] = doc.pages[0].latency
 
-            results.append(_dict)
-
-        return results
+        return _dict
 
     results = Parallel(n_jobs=num_workers)(
-        delayed(worker)(file_path) for file_path in tqdm(files)
+        delayed(worker)(test) for test in tqdm(tests)
     )
 
-    df = pd.DataFrame([r for r in results for r in r])
+    df = pd.DataFrame(results)
 
     return df
 
