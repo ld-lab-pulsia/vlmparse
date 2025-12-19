@@ -125,16 +125,7 @@ converter_config_registry.register(
         )
     ),
 )
-converter_config_registry.register(
-    "nanonets/Nanonets-OCR2-3B",
-    lambda uri=None: NanonetOCR2ConverterConfig(
-        llm_params=LLMParams(
-            base_url=uri or "http://localhost:8000/v1",
-            model_name=DEFAULT_MODEL_NAME,
-            api_key="",
-        )
-    ),
-)
+
 converter_config_registry.register(
     "nanonets/Nanonets-OCR2-3B",
     lambda uri=None: NanonetOCR2ConverterConfig(
