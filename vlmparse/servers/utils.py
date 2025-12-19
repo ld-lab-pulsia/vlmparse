@@ -2,8 +2,9 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
-import docker
 from loguru import logger
+
+import docker
 
 
 def _ensure_image_exists(
@@ -55,7 +56,7 @@ def _ensure_image_exists(
 @contextmanager
 def docker_server(
     config: "DockerServerConfig",  # noqa: F821
-    timeout: int = 500,
+    timeout: int = 1000,
     cleanup: bool = True,
 ):
     """Generic context manager for Docker server deployment.
