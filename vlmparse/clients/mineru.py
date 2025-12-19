@@ -7,7 +7,21 @@ from vlmparse.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_ta
 from vlmparse.clients.pipe_utils.utils import clean_response
 from vlmparse.converter import BaseConverter, ConverterConfig
 from vlmparse.data_model.document import BoundingBox, Item, Page
+from vlmparse.servers.docker_server import DockerServerConfig
 from vlmparse.utils import to_base64
+
+
+class MinerUDockerServerConfig(DockerServerConfig):
+    """Configuration for MinerU Docker server."""
+
+    model_name: str = "mineru25"
+    docker_image: str = "pulsia/mineru25apipulsia"
+    docker_port: int = 4297
+    container_port: int = 8000
+
+    @property
+    def client_config(self):
+        return MinerUConverterConfig(api_url=f"http://localhost:{self.docker_port}")
 
 
 class MinerUConverterConfig(ConverterConfig):

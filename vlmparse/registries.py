@@ -11,6 +11,7 @@ from vlmparse.clients.lightonocr import (
     LightOnOCRConverterConfig,
     LightOnOCRDockerServerConfig,
 )
+from vlmparse.clients.mineru import MinerUConverterConfig, MinerUDockerServerConfig
 from vlmparse.clients.nanonetocr import (
     NanonetOCR2ConverterConfig,
     NanonetOCR2DockerServerConfig,
@@ -28,6 +29,8 @@ docker_config_registry.register(
 )
 docker_config_registry.register("hunyuanocr", lambda: HunyuanOCRDockerServerConfig())
 docker_config_registry.register("docling", lambda: DoclingDockerServerConfig())
+
+docker_config_registry.register("mineru25", lambda: MinerUDockerServerConfig())
 
 
 class ConverterConfigRegistry:
@@ -153,4 +156,9 @@ converter_config_registry.register(
 converter_config_registry.register(
     "docling",
     lambda uri=None: DoclingConverterConfig(base_url=uri or "http://localhost:5001"),
+)
+
+converter_config_registry.register(
+    "mineru25",
+    lambda uri=None: MinerUConverterConfig(api_url=uri or "http://localhost:4297"),
 )
