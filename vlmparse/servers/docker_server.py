@@ -15,7 +15,11 @@ class DockerServerConfig(BaseModel):
     dockerfile_dir: str | None = None
     command_args: list[str] = Field(default_factory=list)
     server_ready_indicators: list[str] = Field(
-        default_factory=lambda: ["Application startup complete", "Uvicorn running"]
+        default_factory=lambda: [
+            "Application startup complete",
+            "Uvicorn running",
+            "Starting vLLM API server",
+        ]
     )
     docker_port: int = 8056
     gpu_device_ids: list[str] | None = None
