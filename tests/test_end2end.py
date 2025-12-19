@@ -31,6 +31,7 @@ def test_convert(file_path, model):
         "dotsocr",
         "nanonets/Nanonets-OCR2-3B",
         "hunyuanocr",
+        "olmocr-2-fp8",
         "paddleocrvl",
     ],
 )

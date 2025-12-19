@@ -15,6 +15,7 @@ from vlmparse.clients.nanonetocr import (
     NanonetOCR2ConverterConfig,
     NanonetOCR2DockerServerConfig,
 )
+from vlmparse.clients.olmocr import OlmOCRConverterConfig, OlmOCRDockerServerConfig
 from vlmparse.clients.openai_converter import LLMParams, OpenAIConverterConfig
 from vlmparse.clients.paddleocrvl import (
     PaddleOCRVLConverterConfig,
@@ -33,6 +34,10 @@ docker_config_registry.register(
 )
 docker_config_registry.register("hunyuanocr", lambda: HunyuanOCRDockerServerConfig())
 docker_config_registry.register("docling", lambda: DoclingDockerServerConfig())
+docker_config_registry.register(
+    "allenai/olmOCR-2-7B-1025-FP8", lambda: OlmOCRDockerServerConfig()
+)
+docker_config_registry.register("olmocr-2-fp8", lambda: OlmOCRDockerServerConfig())
 
 
 class ConverterConfigRegistry:
@@ -135,16 +140,7 @@ converter_config_registry.register(
         )
     ),
 )
-converter_config_registry.register(
-    "nanonets/Nanonets-OCR2-3B",
-    lambda uri=None: NanonetOCR2ConverterConfig(
-        llm_params=LLMParams(
-            base_url=uri or "http://localhost:8000/v1",
-            model_name=DEFAULT_MODEL_NAME,
-            api_key="",
-        )
-    ),
-)
+
 converter_config_registry.register(
     "nanonets/Nanonets-OCR2-3B",
     lambda uri=None: NanonetOCR2ConverterConfig(
@@ -168,4 +164,14 @@ converter_config_registry.register(
 converter_config_registry.register(
     "docling",
     lambda uri=None: DoclingConverterConfig(base_url=uri or "http://localhost:5001"),
+)
+converter_config_registry.register(
+    "olmocr-2-fp8",
+    lambda uri=None: OlmOCRConverterConfig(
+        llm_params=LLMParams(
+            base_url=uri or "http://localhost:8000/v1",
+            model_name="olmocr",
+            api_key="",
+        )
+    ),
 )
