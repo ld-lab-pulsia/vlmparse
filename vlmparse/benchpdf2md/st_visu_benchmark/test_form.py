@@ -1,7 +1,7 @@
 import streamlit as st
 
 
-def edit_test_form(test_obj, test_type, tests, test_path):
+def edit_test_form(test_obj, test_type):
     st.markdown("### Edit Test Fields")
     with st.form("edit_test_fields"):
         type_fields = {}
@@ -14,6 +14,10 @@ def edit_test_form(test_obj, test_type, tests, test_path):
             "Ignore strings (seperarated by spaces)",
             value=" ".join(test_obj.ignore_str),
         )
+        type_fields["ignore_space"] = st.checkbox(
+            "Ignore space", value=test_obj.ignore_space
+        )
+
         type_fields["ignore_str"] = (
             type_fields["ignore_str"].split(" ") if type_fields["ignore_str"] else []
         )
