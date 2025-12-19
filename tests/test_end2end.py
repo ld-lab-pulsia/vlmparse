@@ -24,7 +24,8 @@ def test_convert(file_path, model):
     reason="Skipping because RUN_DEPLOYMENT_VLLM is not set or is false or GPU_TEST is not set",
 )
 @pytest.mark.parametrize(
-    "model", ["docling", "lightonocr", "dotsocr", "nanonets/Nanonets-OCR2-3B"]
+    "model",
+    ["docling", "lightonocr", "dotsocr", "nanonets/Nanonets-OCR2-3B", "hunyuanocr"],
 )
 def test_convert_with_docker(file_path, model):
     """Test conversion with automatic Docker deployment (requires GPU due to vllm limitations)."""
