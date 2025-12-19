@@ -11,6 +11,7 @@ from vlmparse.clients.lightonocr import (
     LightOnOCRConverterConfig,
     LightOnOCRDockerServerConfig,
 )
+from vlmparse.clients.mineru import MinerUConverterConfig, MinerUDockerServerConfig
 from vlmparse.clients.nanonetocr import (
     NanonetOCR2ConverterConfig,
     NanonetOCR2DockerServerConfig,
@@ -38,6 +39,8 @@ docker_config_registry.register(
     "allenai/olmOCR-2-7B-1025-FP8", lambda: OlmOCRDockerServerConfig()
 )
 docker_config_registry.register("olmocr-2-fp8", lambda: OlmOCRDockerServerConfig())
+
+docker_config_registry.register("mineru25", lambda: MinerUDockerServerConfig())
 
 
 class ConverterConfigRegistry:
@@ -174,4 +177,8 @@ converter_config_registry.register(
             api_key="",
         )
     ),
+)
+converter_config_registry.register(
+    "mineru25",
+    lambda uri=None: MinerUConverterConfig(api_url=uri or "http://localhost:4297"),
 )
