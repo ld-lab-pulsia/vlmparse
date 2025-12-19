@@ -32,6 +32,7 @@ def test_convert(file_path, model):
         "nanonets/Nanonets-OCR2-3B",
         "hunyuanocr",
         "olmocr-2-fp8",
+        "paddleocrvl",
     ],
 )
 def test_convert_with_docker(file_path, model):
