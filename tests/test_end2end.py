@@ -25,7 +25,15 @@ def test_convert(file_path, model):
 )
 @pytest.mark.parametrize(
     "model",
-    ["docling", "lightonocr", "dotsocr", "nanonets/Nanonets-OCR2-3B", "hunyuanocr"],
+    [
+        "docling",
+        "lightonocr",
+        "dotsocr",
+        "nanonets/Nanonets-OCR2-3B",
+        "hunyuanocr",
+        "olmocr-2-fp8",
+        "paddleocrvl",
+    ],
 )
 def test_convert_with_docker(file_path, model):
     """Test conversion with automatic Docker deployment (requires GPU due to vllm limitations)."""

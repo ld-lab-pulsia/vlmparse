@@ -1,0 +1,14 @@
+image_name: vlmparse
+container_name: vlmparse-container
+cpus: 32
+gpu: 0
+ssh_port: 9875
+jupyter_port: 9876
+tensorboard_port: 9877
+volumes:
+- variable: DATA 
+  host: /data
+  container: /mnt/projects/rag-pretraitement
+- variable: WORKSPACE 
+  host: /workspace
+  container: .
