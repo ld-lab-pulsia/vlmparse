@@ -51,7 +51,7 @@ bench = [
     "lxml>=6.0.2",
     "datasets>=4.4.1",
     "openpyxl>=3.1.5",
-    "joblib[bench]>=1.5.2",
+    "joblib>=1.5.2",
     "playwright",
     "fuzzysearch>=0.8.1",
     ]
