@@ -1,6 +1,7 @@
 import os
 from collections.abc import Callable
 
+from vlmparse.clients.chandra import ChandraConverterConfig, ChandraDockerServerConfig
 from vlmparse.clients.docling import DoclingConverterConfig, DoclingDockerServerConfig
 from vlmparse.clients.dotsocr import DotsOCRConverterConfig, DotsOCRDockerServerConfig
 from vlmparse.clients.hunyuanocr import (
@@ -24,6 +25,10 @@ from vlmparse.clients.paddleocrvl import (
 )
 from vlmparse.servers.docker_server import DEFAULT_MODEL_NAME, docker_config_registry
 
+docker_config_registry.register("chandra", lambda: ChandraDockerServerConfig())
+docker_config_registry.register(
+    "datalab-to/chandra", lambda: ChandraDockerServerConfig()
+)
 docker_config_registry.register("lightonocr", lambda: LightOnOCRDockerServerConfig())
 docker_config_registry.register("dotsocr", lambda: DotsOCRDockerServerConfig())
 docker_config_registry.register("paddleocrvl", lambda: PaddleOCRVLDockerServerConfig())
@@ -113,6 +118,17 @@ for openai_model in [
             )
         ),
     )
+converter_config_registry.register(
+    "chandra",
+    lambda uri=None: ChandraConverterConfig(
+        llm_params=LLMParams(
+            base_url=uri or "http://localhost:8000/v1",
+            model_name="chandra",
+            api_key="",
+        )
+    ),
+)
+
 converter_config_registry.register(
     "lightonocr",
     lambda uri=None: LightOnOCRConverterConfig(

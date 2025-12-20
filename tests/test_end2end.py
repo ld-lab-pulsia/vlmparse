@@ -34,6 +34,7 @@ def test_convert(file_path, model):
         "olmocr-2-fp8",
         "paddleocrvl",
         "mineru25",
+        "chandra",
     ],
 )
 def test_convert_with_docker(file_path, model):
