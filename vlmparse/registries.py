@@ -2,6 +2,10 @@ import os
 from collections.abc import Callable
 
 from vlmparse.clients.chandra import ChandraConverterConfig, ChandraDockerServerConfig
+from vlmparse.clients.deepseekocr import (
+    DeepSeekOCRConverterConfig,
+    DeepSeekOCRDockerServerConfig,
+)
 from vlmparse.clients.docling import DoclingConverterConfig, DoclingDockerServerConfig
 from vlmparse.clients.dotsocr import DotsOCRConverterConfig, DotsOCRDockerServerConfig
 from vlmparse.clients.hunyuanocr import (
@@ -46,6 +50,7 @@ docker_config_registry.register(
 docker_config_registry.register("olmocr-2-fp8", lambda: OlmOCRDockerServerConfig())
 
 docker_config_registry.register("mineru25", lambda: MinerUDockerServerConfig())
+docker_config_registry.register("deepseekocr", lambda: DeepSeekOCRDockerServerConfig())
 
 
 class ConverterConfigRegistry:
@@ -173,6 +178,16 @@ converter_config_registry.register(
 converter_config_registry.register(
     "hunyuanocr",
     lambda uri=None: HunyuanOCRConverterConfig(
+        llm_params=LLMParams(
+            base_url=uri or "http://localhost:8000/v1",
+            model_name=DEFAULT_MODEL_NAME,
+            api_key="",
+        )
+    ),
+)
+converter_config_registry.register(
+    "deepseekocr",
+    lambda uri=None: DeepSeekOCRConverterConfig(
         llm_params=LLMParams(
             base_url=uri or "http://localhost:8000/v1",
             model_name=DEFAULT_MODEL_NAME,

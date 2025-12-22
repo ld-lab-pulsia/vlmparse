@@ -35,6 +35,7 @@ def test_convert(file_path, model):
         "paddleocrvl",
         "mineru25",
         "chandra",
+        "deepseekocr",
     ],
 )
 def test_convert_with_docker(file_path, model):
