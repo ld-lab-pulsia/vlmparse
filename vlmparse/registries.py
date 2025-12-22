@@ -13,6 +13,10 @@ from vlmparse.clients.lightonocr import (
     LightOnOCRDockerServerConfig,
 )
 from vlmparse.clients.mineru import MinerUConverterConfig, MinerUDockerServerConfig
+from vlmparse.clients.monkeyocr import (
+    MonkeyOCRConverterConfig,
+    MonkeyOCRDockerServerConfig,
+)
 from vlmparse.clients.nanonetocr import (
     NanonetOCR2ConverterConfig,
     NanonetOCR2DockerServerConfig,
@@ -46,6 +50,7 @@ docker_config_registry.register(
 docker_config_registry.register("olmocr-2-fp8", lambda: OlmOCRDockerServerConfig())
 
 docker_config_registry.register("mineru25", lambda: MinerUDockerServerConfig())
+docker_config_registry.register("monkeyocr", lambda: MonkeyOCRDockerServerConfig())
 
 
 class ConverterConfigRegistry:
@@ -197,4 +202,8 @@ converter_config_registry.register(
 converter_config_registry.register(
     "mineru25",
     lambda uri=None: MinerUConverterConfig(api_url=uri or "http://localhost:4297"),
+)
+converter_config_registry.register(
+    "monkeyocr",
+    lambda uri=None: MonkeyOCRConverterConfig(api_url=uri or "http://localhost:7861"),
 )
