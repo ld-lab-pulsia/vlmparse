@@ -11,6 +11,8 @@ def convert_pdfium(file_path, dpi):
     pil_images = []
     for page in pdf:
         pil_images.append(page.render(scale=dpi / 72).to_pil())
+
+    pdf.close()
     return pil_images
 
 
