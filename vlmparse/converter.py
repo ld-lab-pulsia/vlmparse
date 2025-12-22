@@ -1,4 +1,5 @@
 import asyncio
+import os
 import time
 import traceback
 from pathlib import Path
@@ -41,6 +42,15 @@ class BaseConverter:
         self.debug = debug
         self.return_documents_in_batch_mode = return_documents_in_batch_mode
 
+        # Limit disk I/O concurrency
+        self._save_semaphore = asyncio.Semaphore(2)
+
+        # Track background tasks to avoid premature cancellation
+        self._background_tasks: set[asyncio.Task] = set()
+
+        # Limit CPU-bound executor fan-out (PDF + PIL)
+        self._cpu_semaphore = asyncio.Semaphore(os.cpu_count() or 4)
+
     async def async_call_inside_page(self, page: Page) -> Page:
         raise NotImplementedError
 
@@ -48,26 +58,41 @@ class BaseConverter:
         tic = time.perf_counter()
         document = Document(file_path=str(file_path))
         try:
-            images = convert_pdfium_to_images(file_path, dpi=self.config.dpi)
+            # Run PDF conversion in thread pool to avoid blocking
+            loop = asyncio.get_running_loop()
 
-            new_images = []
+            async with self._cpu_semaphore:
+                images = await loop.run_in_executor(
+                    None, convert_pdfium_to_images, file_path, self.config.dpi
+                )
+
+            # Resize images concurrently
             if self.config.max_image_size is not None:
-                for image in images:
-                    ratio = self.config.max_image_size / max(image.size)
-                    new_size = (int(image.size[0] * ratio), int(image.size[1] * ratio))
-                    image = image.resize(new_size)
-                    logger.info(f"Resized image to {new_size}")
-                    new_images.append(image)
-            else:
-                new_images = images
 
-            document.pages = [Page(buffer_image=image) for image in new_images]
+                async def resize_image(image):
+                    # Run PIL resize in thread pool (CPU-bound)
+                    def _resize():
+                        ratio = self.config.max_image_size / max(image.size)
+                        new_size = (
+                            int(image.size[0] * ratio),
+                            int(image.size[1] * ratio),
+                        )
+                        resized = image.resize(new_size)
+                        logger.info(f"Resized image to {new_size}")
+                        return resized
+
+                    async with self._cpu_semaphore:
+                        return await loop.run_in_executor(None, _resize)
+
+                images = await asyncio.gather(*[resize_image(img) for img in images])
+
+            document.pages = [Page(buffer_image=image) for image in images]
 
             # Process pages concurrently with semaphore
-            semaphore = asyncio.Semaphore(self.num_concurrent_pages)
+            page_semaphore = asyncio.Semaphore(self.num_concurrent_pages)
 
             async def worker(page: Page):
-                async with semaphore:
+                async with page_semaphore:
                     logger.debug("Image size: " + str(page.image.size))
                     try:
                         tic = time.perf_counter()
@@ -80,12 +105,11 @@ class BaseConverter:
                     except Exception:
                         if self.debug:
                             raise
-                        else:
-                            logger.exception(traceback.format_exc())
-                            page.error = ProcessingError.from_class(self)
+                        logger.exception(traceback.format_exc())
+                        page.error = ProcessingError.from_class(self)
 
-            tasks = [asyncio.create_task(worker(page)) for page in document.pages]
-            await asyncio.gather(*tasks)
+            await asyncio.gather(*(worker(page) for page in document.pages))
+
         except KeyboardInterrupt:
             raise
         except Exception:
@@ -94,12 +118,23 @@ class BaseConverter:
             else:
                 logger.exception(traceback.format_exc())
                 document.error = ProcessingError.from_class(self)
+                logger.info(f"Skip {document.file_path}")
                 return document
+
         toc = time.perf_counter()
         document.latency = toc - tic
-        logger.debug(f"Time taken to process the document: {document.latency} seconds")
-        if self.save_folder is not None:
-            self._save_document(document)
+        num_pages = len(document.pages)
+        throughput = num_pages / document.latency if document.latency > 0 else 0
+        logger.debug(
+            f"Time taken to process the document: {document.latency:.2f} seconds "
+            f"({num_pages} pages, {throughput:.2f} pages/sec)"
+        )
+
+        # -------- Async save (background) --------
+        if self.save_folder:
+            task = asyncio.create_task(self._aio_save_document(document))
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
 
         return document
 
@@ -139,6 +174,20 @@ class BaseConverter:
         else:
             logger.warning(f"Unknown save_mode: {self.save_mode}, skipping save")
 
+    async def _aio_save_document(self, document: Document):
+        async with self._save_semaphore:
+            if document.is_error:
+                save_folder = Path(self.save_folder) / "errors"
+            else:
+                save_folder = Path(self.save_folder) / "results"
+
+            document.save(save_folder, self.save_mode)
+
+            save_folder.mkdir(parents=True, exist_ok=True)
+
+            loop = asyncio.get_running_loop()
+            loop.run_in_executor(None, document.save, save_folder, self.save_mode)
+
     def __call__(self, file_path: str | Path):
         return asyncio.run(self.async_call(file_path))
 
@@ -153,8 +202,12 @@ class BaseConverter:
                 else:
                     await self.async_call(file_path)
 
-        tasks = [asyncio.create_task(worker(file_path)) for file_path in file_paths]
-        documents = await asyncio.gather(*tasks)
+        documents = await asyncio.gather(*(worker(p) for p in file_paths))
+
+        # Ensure background saves complete
+        if self._background_tasks:
+            await asyncio.gather(*self._background_tasks)
+
         if self.return_documents_in_batch_mode:
             return documents
 

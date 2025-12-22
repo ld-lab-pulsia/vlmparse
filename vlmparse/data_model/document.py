@@ -2,9 +2,10 @@ import os
 import traceback
 import zipfile
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 import orjson
+from loguru import logger
 from PIL import Image
 from PIL import Image as PILImage
 from pydantic import Field
@@ -135,3 +136,35 @@ class Document(VLMParseBaseModel):
             json_bytes = zipf.read("data.json")
             data = orjson.loads(json_bytes)
         return cls.model_validate(data)
+
+    def save(
+        self, save_folder: str, mode: Literal["document", "md", "md_page"] = "document"
+    ):
+        save_folder = Path(save_folder)
+        save_folder.mkdir(parents=True, exist_ok=True)
+        doc_name = Path(self.file_path).stem
+
+        if mode == "document":
+            zip_path = save_folder / f"{doc_name}.zip"
+            self.to_zip(zip_path)
+            logger.info(f"Saved document to {zip_path}")
+
+        elif mode == "md":
+            md_path = save_folder / f"{doc_name}.md"
+            text_content = "\n\n".join([page.text or "" for page in self.pages])
+            with open(md_path, "w", encoding="utf-8") as f:
+                f.write(text_content)
+            logger.info(f"Saved markdown to {md_path}")
+
+        elif mode == "md_page":
+            doc_folder = save_folder / doc_name
+            doc_folder.mkdir(parents=True, exist_ok=True)
+            for i, page in enumerate(self.pages, start=1):
+                page_text = page.text if page.text else ""
+                page_path = doc_folder / f"page_{i:04d}.md"
+                with open(page_path, "w", encoding="utf-8") as f:
+                    f.write(page_text)
+            logger.info(f"Saved {len(self.pages)} pages to {doc_folder}")
+
+        else:
+            logger.warning(f"Unknown save_mode: {mode}, skipping save")
