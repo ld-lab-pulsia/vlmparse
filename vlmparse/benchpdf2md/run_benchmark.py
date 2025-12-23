@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 from vlmparse.benchpdf2md.bench_tests.benchmark_tsts import (
     BaselineTest,
-    load_tests_from_ds,
+    load_single_test,
 )
 from vlmparse.benchpdf2md.create_dataset import create_dataset
 from vlmparse.benchpdf2md.utils import bootstrap_and_format_results
@@ -40,7 +40,8 @@ def process_and_run_benchmark(
     debug: bool = False,
     gpu: int = 2,
     regenerate: bool = False,
-    in_folder: Path | str = "pulseia/fr-bench-pdf2md",
+    in_folder: Path
+    | str = "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/fr-bench-pdf2md",
     save_folder: Path | str = OUT_FOLDER,
     retrylast: bool = False,
     dry_run: bool = True,
@@ -151,15 +152,14 @@ def process_and_run_benchmark(
         df = run_pb_benchmark(ds, out_folder=save_folder / "results")
 
         logger.info(
-            f"Number of pages: {df['pdf_path'].unique().shape[0]}, Number of tests: {len(df)}"
+            f"Number of pages: {ds['pdf_path'].unique().shape[0]}, Number of tests: {len(ds)}"
         )
-        if "type" in df.columns:
-            by_type_df = bootstrap_and_format_results(df, "type", "result")
-            logger.info(f"By type:\n{by_type_df}")
-
-        if "category" in df.columns:
-            by_category_df = bootstrap_and_format_results(df, "category", "result")
-            logger.info(f"By category:\n{by_category_df}")
+        for col in ["type", "category"]:
+            if col in df.columns:
+                by_col_df = bootstrap_and_format_results(df, col, "result")
+                logger.info(f"By {col}:\n{by_col_df}")
+            if not debug:
+                by_col_df.to_excel(save_folder / f"by_{col}.xlsx")
 
         logger.info("average result:")
         avg = df.loc[df.type != "baseline"]["result"].mean()
@@ -173,7 +173,6 @@ def process_and_run_benchmark(
             )
             save_folder_test_results.mkdir(parents=True, exist_ok=True)
             df.to_parquet(save_folder_test_results / "test_results.parquet")
-            by_type_df.to_excel(save_folder_test_results / "by_type.xlsx")
 
             with open(save_folder_test_results / "metrics.json", "w") as f:
                 json.dump(
@@ -198,35 +197,51 @@ def process_and_run_benchmark(
 def run_pb_benchmark(
     ds: pd.DataFrame,
     out_folder: Path,
-    num_workers: int = 1,
+    num_workers: int = -1,
 ):
     files = list(out_folder.rglob("*.zip"))
+    stem_to_zip_path = {path.stem: path for path in files}
+    pdf_to_zip = {}
+    for pdf_path in ds.pdf_path.unique():
+        if Path(pdf_path).stem not in stem_to_zip_path.keys():
+            logger.warning(f"No zip document found for {pdf_path}")
+            continue
+        pdf_to_zip[Path(pdf_path).stem] = stem_to_zip_path[Path(pdf_path).stem]
 
-    def worker(file_path):
-        _ds = ds.loc[ds.pdf_path.str.contains(file_path.stem)]
-        if len(_ds) == 0:
-            logger.warning(f"No tests found for {file_path}")
-            return []
-        doc = Document.from_zip(file_path)
-        md_text = doc.text
-        tests_name = Path(doc.file_path).parent.name
+    def worker(row):
+        zip_path = pdf_to_zip.get(Path(row["pdf_path"]).stem)
 
-        tests = load_tests_from_ds(_ds)
-        try:
-            tests.append(
-                BaselineTest(
-                    pdf=_ds["pdf_path"].iloc[0],
-                    page=_ds["page"].iloc[0],
-                    id=f"{tests_name}-baseline",
+        if zip_path is None:
+            return [
+                row
+                | {
+                    "result": False,
+                    "explanation": f"No zip document found for {row['pdf_path']}",
+                },
+                dict(
+                    result=False,
+                    explanation=f"No zip document found for {row['pdf_path']}",
+                    pdf=row["pdf_path"],
+                    page=row["page"],
+                    id=f"{Path(row["pdf_path"]).stem}-baseline",
                     type="baseline",
                     category="baseline",
-                )
-            )
-        except Exception as e:
-            import pdb
+                ),
+            ]
+        doc = Document.from_zip(zip_path)
+        md_text = doc.text
+        tests_name = Path(doc.file_path).parent.name
+        tests = [load_single_test(row)]
 
-            pdb.set_trace()
-            raise e
+        tests.append(
+            BaselineTest(
+                pdf=row["pdf_path"],
+                page=row["page"],
+                id=f"{tests_name}-baseline",
+                type="baseline",
+                category="baseline",
+            )
+        )
 
         results = []
 
@@ -238,7 +253,7 @@ def run_pb_benchmark(
                 "explanation": explanation,
                 "tests_name": tests_name,
                 "pdf_path": str(doc.file_path),
-                "doc_path": str(file_path),
+                "doc_path": str(zip_path),
                 "doc_latency": doc.latency,
                 "page_latency": doc.pages[0].latency,
             } | test.model_dump()
@@ -248,7 +263,7 @@ def run_pb_benchmark(
         return results
 
     results = Parallel(n_jobs=num_workers)(
-        delayed(worker)(file_path) for file_path in tqdm(files)
+        delayed(worker)(row) for row in tqdm(ds.to_dict(orient="records"))
     )
 
     df = pd.DataFrame([r for r in results for r in r])

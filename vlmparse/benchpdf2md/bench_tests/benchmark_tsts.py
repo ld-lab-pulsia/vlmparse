@@ -686,6 +686,8 @@ class BasePDFTest(BaseModel):
 
         if self.alphanum:
             text = re.sub(r"[^a-zA-Z0-9\.,:;\+\(\)\'\"]", "", text).lower()
+            text = text.replace(",", ".")
+            text = text.replace(";", ":")
 
         # if self.ignore_space_and_newlines:
         #     text = re.sub(r"\s+", "", text)
@@ -1645,6 +1647,47 @@ def load_tests(jsonl_file: str) -> List[BasePDFTest]:
     return tests
 
 
+def load_single_test(row: dict) -> Optional[BasePDFTest]:
+    """
+    Process a single line from the JSONL file and return a tuple of (line_number, test object).
+    Returns None for empty lines.
+    """
+
+    try:
+        _data = {}
+        for k, v in row.items():
+            if isinstance(v, float) and math.isnan(v) or v is None:
+                continue
+            _data[k] = v
+        data = _data
+        if "resources" in data:
+            data.pop("resources")
+        if "tags" in data:
+            data.pop("tags")
+        test_type = data.get("type")
+
+        if test_type in {"present", "absent"}:
+            test = TextPresenceTest(**data)
+        elif test_type == "order":
+            test = TextOrderTest(**data)
+        elif test_type == "table":
+            test = TableTest(**data)
+        elif test_type == "baseline":
+            test = BaselineTest(**data)
+        else:
+            raise ValidationError(f"Unknown test type: {test_type}")
+        return test
+    except json.JSONDecodeError as e:
+        print(f"Error parsing ds on {row['id']}: {e}")
+        raise
+    except (ValidationError, KeyError) as e:
+        print(f"Error on line {row['id']}: {e}")
+        raise
+    except Exception as e:
+        print(f"Unexpected error on {row['id']}: {e}")
+        raise
+
+
 def load_tests_from_ds(ds) -> List[BasePDFTest]:
     """
     Load tests from a JSONL file using parallel processing with a ThreadPoolExecutor.
@@ -1656,63 +1699,22 @@ def load_tests_from_ds(ds) -> List[BasePDFTest]:
         A list of test objects.
     """
 
-    def process_line(row: dict) -> Optional[BasePDFTest]:
-        """
-        Process a single line from the JSONL file and return a tuple of (line_number, test object).
-        Returns None for empty lines.
-        """
-
-        try:
-            _data = {}
-            for k, v in row.items():
-                if isinstance(v, float) and math.isnan(v) or v is None:
-                    continue
-                _data[k] = v
-            data = _data
-            if "resources" in data:
-                data.pop("resources")
-            if "tags" in data:
-                data.pop("tags")
-            test_type = data.get("type")
-
-            if test_type in {"present", "absent"}:
-                test = TextPresenceTest(**data)
-            elif test_type == "order":
-                test = TextOrderTest(**data)
-            elif test_type == "table":
-                test = TableTest(**data)
-            elif test_type == "baseline":
-                test = BaselineTest(**data)
-            else:
-                raise ValidationError(f"Unknown test type: {test_type}")
-            return test
-        except json.JSONDecodeError as e:
-            print(f"Error parsing ds on {row['id']}: {e}")
-            raise
-        except (ValidationError, KeyError) as e:
-            print(f"Error on line {row['id']}: {e}")
-            raise
-        except Exception as e:
-            print(f"Unexpected error on {row['id']}: {e}")
-            raise
-
     tests = []
 
     # Read all lines along with their line numbers.
     for row in ds.to_dict(orient="records"):
-        # tests.append(process_line(row))
-        from vlmparse.benchpdf2md.olmocrbench.tests import load_single_test
+        tests.append(load_single_test(row))
 
-        _data = {}
-        for k, v in row.items():
-            if isinstance(v, float) and math.isnan(v) or v is None or k in ["pdf_path"]:
-                continue
-            _data[k] = v
-        data = _data
-        for k in ["max_diffs", "first_n", "last_n", "page"]:
-            if k in data:
-                data[k] = int(data[k])
-        tests.append(load_single_test(data))
+        # _data = {}
+        # for k, v in row.items():
+        #     if isinstance(v, float) and math.isnan(v) or v is None or k in ["pdf_path"]:
+        #         continue
+        #     _data[k] = v
+        # data = _data
+        # for k in ["max_diffs", "first_n", "last_n", "page"]:
+        #     if k in data:
+        #         data[k] = int(data[k])
+        # tests.append(load_single_test(data))
 
     # Check for duplicate test IDs after parallel processing.
     unique_ids = set()
