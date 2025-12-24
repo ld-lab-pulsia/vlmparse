@@ -3,8 +3,9 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
-import docker
 from loguru import logger
+
+import docker
 
 
 def _ensure_image_exists(
