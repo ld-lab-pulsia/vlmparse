@@ -59,7 +59,7 @@ class OpenAIConverterConfig(ConverterConfig):
     preprompt: str | None = None
     postprompt: str | None = PDF2MD_PROMPT
     completion_kwargs: dict = Field(default_factory=dict)
-    stream: bool = True
+    stream: bool = False
 
     def get_client(self, **kwargs) -> "OpenAIConverterClient":
         return OpenAIConverterClient(config=self, **kwargs)
