@@ -686,8 +686,8 @@ class BasePDFTest(BaseModel):
 
         if self.alphanum:
             text = re.sub(r"[^a-zA-Z0-9\.,:;\+\(\)\'\"]", "", text).lower()
-            text = text.replace(",", ".")
-            text = text.replace(";", ":")
+            # text = text.replace(",", ".")
+            # text = text.replace(";", ":")
 
         # if self.ignore_space_and_newlines:
         #     text = re.sub(r"\s+", "", text)

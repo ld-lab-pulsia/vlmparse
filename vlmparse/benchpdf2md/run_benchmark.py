@@ -47,6 +47,8 @@ def process_and_run_benchmark(
     dry_run: bool = True,
     filter_type: str | list[str] | None = None,
     filter_category: str | list[str] | None = None,
+    dpi: int | None = None,
+    port: int | None = None,
 ):
     # in_folder = Path(in_folder)
     save_folder = Path(save_folder)
@@ -78,7 +80,7 @@ def process_and_run_benchmark(
         ds = ds[ds.category.isin(filter_category)]
     try:
         if retrylast:
-            retry = save_folder / model
+            retry = save_folder / model + "_" + str(dpi)
             previous_runs = sorted(os.listdir(retry))
             if len(previous_runs) > 0:
                 retry = retry / previous_runs[-1]
@@ -119,8 +121,10 @@ def process_and_run_benchmark(
 
             if uri is None:
                 docker_config = docker_config_registry.get(model)
+
                 if docker_config is not None:
                     docker_config.gpu_device_ids = [str(gpu)]
+                    docker_config.docker_port = port
                     server = docker_config.get_server(auto_stop=True)
                     server.start()
                     client = docker_config.get_client()
@@ -130,6 +134,9 @@ def process_and_run_benchmark(
                 client = converter_config_registry.get(model, uri=uri).get_client()
             client.num_concurrent_pages = concurrency if not debug else 1
             client.num_concurrent_files = concurrency if not debug else 1
+            if dpi is not None:
+                client.config.dpi = int(dpi)
+
             client.debug = debug
 
             if dry_run:

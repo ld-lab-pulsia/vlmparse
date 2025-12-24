@@ -211,12 +211,7 @@ class DotsOCRConverter(OpenAIConverterClient):
             }
         ]
 
-        response = await self.model.chat.completions.create(
-            messages=messages,
-            model=self.config.llm_params.model_name,
-            **self.config.completion_kwargs,
-        )
-        return response.choices[0].message.content
+        return await self._get_chat_completion(messages)
 
     async def _parse_image_vllm(self, origin_image, prompt_mode="prompt_layout_all_en"):
         """Parse image using VLLM inference."""

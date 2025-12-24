@@ -59,6 +59,7 @@ class OpenAIConverterConfig(ConverterConfig):
     preprompt: str | None = None
     postprompt: str | None = PDF2MD_PROMPT
     completion_kwargs: dict = Field(default_factory=dict)
+    stream: bool = True
 
     def get_client(self, **kwargs) -> "OpenAIConverterClient":
         return OpenAIConverterClient(config=self, **kwargs)
@@ -94,6 +95,33 @@ class OpenAIConverterClient(BaseConverter):
             timeout=self.config.llm_params.timeout,
         )
 
+    async def _get_chat_completion(
+        self, messages: list[dict], completion_kwargs: dict | None = None
+    ) -> str:
+        """Helper to handle chat completion with optional streaming."""
+        if completion_kwargs is None:
+            completion_kwargs = self.config.completion_kwargs
+
+        if self.config.stream:
+            response_stream = await self.model.chat.completions.create(
+                model=self.config.llm_params.model_name,
+                messages=messages,
+                stream=True,
+                **completion_kwargs,
+            )
+            response_parts = []
+            async for chunk in response_stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    response_parts.append(chunk.choices[0].delta.content)
+            return "".join(response_parts)
+        else:
+            response_obj = await self.model.chat.completions.create(
+                model=self.config.llm_params.model_name,
+                messages=messages,
+                **completion_kwargs,
+            )
+            return response_obj.choices[0].message.content
+
     async def async_call_inside_page(self, page: Page) -> Page:
         """Process a single page using OpenAI-compatible API."""
         image = page.image
@@ -124,13 +152,7 @@ class OpenAIConverterClient(BaseConverter):
             }
         ]
 
-        response_obj = await self.model.chat.completions.create(
-            model=self.config.llm_params.model_name,
-            messages=messages,
-            **self.config.completion_kwargs,
-        )
-
-        response = response_obj.choices[0].message.content
+        response = await self._get_chat_completion(messages)
         logger.info("Response: " + str(response))
         page.raw_response = response
         text = clean_response(response)
