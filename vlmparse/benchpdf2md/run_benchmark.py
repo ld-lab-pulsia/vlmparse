@@ -188,8 +188,12 @@ def process_and_run_benchmark(
                         "num_pages": len(files),
                         "num_tests": len(df),
                         "avg_result": avg,
-                        "avg_doc_latency": df["doc_latency"].mean(),
-                        "avg_page_latency": df["page_latency"].mean(),
+                        "avg_doc_latency": df["doc_latency"].mean()
+                        if "doc_latency" in df.columns
+                        else None,
+                        "avg_page_latency": df["page_latency"].mean()
+                        if "page_latency" in df.columns
+                        else None,
                         "avg_time_per_page": total_time / len(files)
                         if total_time is not None
                         else None,
