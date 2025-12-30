@@ -21,10 +21,8 @@ models/**
 
 
 ## VSCODE
-.ruff_cache/**
 .pytest_cache/**
 .venv/**
-.hypothesis/**
 
 .idea
 
@@ -169,6 +167,7 @@ celerybeat.pid
 # Environments
 .venv
 .env
+env.sh
 env/
 venv/
 ENV/
@@ -214,7 +213,6 @@ obliteration_waves_imgs/
 mnist/
 
 # All debug datas
-**/to_delete/**
 **/to_delete**
 **/images*
 **.csv
@@ -246,3 +244,5 @@ perso/
 .cursorrules
 .vscode/settings.json
 perso
+
+output/**
