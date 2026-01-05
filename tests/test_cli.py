@@ -451,8 +451,8 @@ class TestCLIConvertInDepth:
         # Create fake PIL images for the pages
         fake_images = [Image.new("RGB", (100, 100), color="white") for _ in range(2)]
 
-        with patch("vlmparse.converter.convert_pdfium_to_images") as mock_convert:
-            mock_convert.return_value = fake_images
+        with patch("vlmparse.converter.convert_specific_page_to_image") as mock_convert:
+            mock_convert.return_value = fake_images[0]
             yield mock_convert
 
     @pytest.fixture

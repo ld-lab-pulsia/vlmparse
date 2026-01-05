@@ -39,3 +39,19 @@ def convert_pdfium_to_images(file_path, dpi=175):
         images = convert_pdfium(file_path, dpi=dpi)
 
     return images
+
+
+def convert_specific_page_to_image(file_path, page_number, dpi=175):
+    pdf = pdfium.PdfDocument(file_path)
+    page = pdf.get_page(page_number)
+    image = page.render(scale=dpi / 72).to_pil()
+    image = image.convert("L").convert("RGB") if image.mode != "RGB" else image
+    pdf.close()
+    return image
+
+
+def get_page_count(file_path):
+    pdf = pdfium.PdfDocument(file_path)
+    count = len(pdf)
+    pdf.close()
+    return count

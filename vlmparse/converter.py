@@ -1,4 +1,5 @@
 import asyncio
+import threading
 import time
 import traceback
 from pathlib import Path
@@ -8,7 +9,7 @@ import nest_asyncio
 from loguru import logger
 
 from .base_model import VLMParseBaseModel
-from .build_doc import convert_pdfium_to_images
+from .build_doc import convert_specific_page_to_image, get_page_count
 from .data_model.document import Document, Page, ProcessingError
 
 nest_asyncio.apply()
@@ -32,6 +33,7 @@ class BaseConverter:
         save_mode: Literal["document", "md", "md_page"] = "document",
         debug: bool = False,
         return_documents_in_batch_mode: bool = False,
+        save_page_images: bool = False,
     ):
         self.config = config
         self.num_concurrent_files = num_concurrent_files
@@ -40,38 +42,53 @@ class BaseConverter:
         self.save_mode = save_mode
         self.debug = debug
         self.return_documents_in_batch_mode = return_documents_in_batch_mode
+        self.save_page_images = save_page_images
+        # Add a lock to ensure PDFium is accessed by only one thread/task at a time
+        self._render_lock = threading.Lock()
 
     async def async_call_inside_page(self, page: Page) -> Page:
         raise NotImplementedError
+
+    def add_page_image(self, page: Page, file_path, page_idx):
+        with self._render_lock:
+            image = convert_specific_page_to_image(
+                file_path,
+                page_idx,
+                dpi=self.config.dpi,
+            )
+
+        if self.config.max_image_size is not None:
+            ratio = self.config.max_image_size / max(image.size)
+            new_size = (
+                int(image.size[0] * ratio),
+                int(image.size[1] * ratio),
+            )
+            image = image.resize(new_size)
+            logger.info(f"Resized image to {new_size}")
+
+        page.buffer_image = image
+        logger.debug("Image size: " + str(page.image.size))
+
+        return page
 
     async def async_call(self, file_path: str | Path) -> Document:
         tic = time.perf_counter()
         document = Document(file_path=str(file_path))
         try:
-            images = convert_pdfium_to_images(file_path, dpi=self.config.dpi)
+            num_pages = get_page_count(file_path)
+            document.pages = [Page() for _ in range(num_pages)]
 
-            new_images = []
-            if self.config.max_image_size is not None:
-                for image in images:
-                    ratio = self.config.max_image_size / max(image.size)
-                    new_size = (int(image.size[0] * ratio), int(image.size[1] * ratio))
-                    image = image.resize(new_size)
-                    logger.info(f"Resized image to {new_size}")
-                    new_images.append(image)
-            else:
-                new_images = images
-
-            document.pages = [Page(buffer_image=image) for image in new_images]
-
-            # Process pages concurrently with semaphore
             semaphore = asyncio.Semaphore(self.num_concurrent_pages)
 
-            async def worker(page: Page):
+            async def worker(page_idx: int, page: Page):
                 async with semaphore:
-                    logger.debug("Image size: " + str(page.image.size))
                     try:
+                        page = await asyncio.to_thread(
+                            self.add_page_image, page, file_path, page_idx
+                        )
+
                         tic = time.perf_counter()
-                        await self.async_call_inside_page(page)
+                        page = await self.async_call_inside_page(page)
                         toc = time.perf_counter()
                         page.latency = toc - tic
                         logger.debug(f"Time taken: {page.latency} seconds")
@@ -83,8 +100,13 @@ class BaseConverter:
                         else:
                             logger.exception(traceback.format_exc())
                             page.error = ProcessingError.from_class(self)
+                    if not self.save_page_images:
+                        page.buffer_image = None
 
-            tasks = [asyncio.create_task(worker(page)) for page in document.pages]
+            tasks = [
+                asyncio.create_task(worker(i, page))
+                for i, page in enumerate(document.pages)
+            ]
             await asyncio.gather(*tasks)
         except KeyboardInterrupt:
             raise

@@ -1,6 +1,9 @@
+import io
 import os
 
+import orjson
 from loguru import logger
+from nest_asyncio import asyncio
 from pydantic import Field
 
 from vlmparse.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_tables
@@ -8,15 +11,14 @@ from vlmparse.clients.pipe_utils.utils import clean_response
 from vlmparse.converter import BaseConverter, ConverterConfig
 from vlmparse.data_model.document import BoundingBox, Item, Page
 from vlmparse.servers.docker_server import DockerServerConfig
-from vlmparse.utils import to_base64
 
 
 class MinerUDockerServerConfig(DockerServerConfig):
     """Configuration for MinerU Docker server."""
 
     model_name: str = "mineru25"
-    docker_image: str = "pulsia/mineru25apipulsia"
-    docker_port: int = 4297
+    docker_image: str = "pulsia/mineru25apipulsia:latest"
+    docker_port: int = 4299
     container_port: int = 8000
 
     @property
@@ -28,12 +30,19 @@ class MinerUConverterConfig(ConverterConfig):
     """Configuration for MinerU API converter."""
 
     api_url: str = Field(
-        default_factory=lambda: os.getenv("MINERU_API_URL", "http://localhost:4297")
+        default_factory=lambda: os.getenv("MINERU_API_URL", "http://localhost:4299")
     )
     timeout: int = 600
 
     def get_client(self, **kwargs) -> "MinerUConverter":
         return MinerUConverter(config=self, **kwargs)
+
+
+def to_bytes_io(image):
+    img_byte_arr = io.BytesIO()
+    image.save(img_byte_arr, format="PNG")
+    img_byte_arr.seek(0)
+    return img_byte_arr
 
 
 class MinerUConverter(BaseConverter):
@@ -49,19 +58,25 @@ class MinerUConverter(BaseConverter):
 
     async def _async_inference_with_api(self, image) -> list:
         """Run async inference with MinerU API."""
+
+        img_byte_arr = await asyncio.to_thread(to_bytes_io, image)
+
         response = await self.client.post(
             "process-image",
-            json={"image": to_base64(image)},
+            files={"image": ("image.png", img_byte_arr, "image/png")},
         )
+
         response.raise_for_status()
-        return response.json()
+
+        res = orjson.loads(response.content)
+
+        return res
 
     async def _parse_image_with_api(self, origin_image):
         response = await self._async_inference_with_api(origin_image)
 
         original_width, original_height = origin_image.size
 
-        cells_out = []
         for cell in response:
             bbox = cell["bbox"]
             bbox_resized = [
@@ -70,10 +85,10 @@ class MinerUConverter(BaseConverter):
                 bbox[2] * original_width,
                 bbox[3] * original_height,
             ]
-            cell_copy = cell.copy()
-            cell_copy["bbox"] = bbox_resized
-            cells_out.append(cell_copy)
-        return cells_out
+
+            cell["bbox"] = bbox_resized
+
+        return response
 
     async def async_call_inside_page(self, page: Page) -> Page:
         image = page.image
