@@ -56,8 +56,8 @@ class BaseConverter:
                 page_idx,
                 dpi=self.config.dpi,
             )
-            image = resize_image(image, self.config.max_image_size)
-            page.buffer_image = image
+        image = resize_image(image, self.config.max_image_size)
+        page.buffer_image = image
         return page
 
     async def async_call(self, file_path: str | Path) -> Document:
