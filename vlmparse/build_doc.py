@@ -50,6 +50,18 @@ def convert_specific_page_to_image(file_path, page_number, dpi=175):
     return image
 
 
+def resize_image(image, max_image_size):
+    if max_image_size is not None:
+        ratio = max_image_size / max(image.size)
+        new_size = (
+            int(image.size[0] * ratio),
+            int(image.size[1] * ratio),
+        )
+        image = image.resize(new_size)
+        logger.info(f"Resized image to {new_size}")
+    return image
+
+
 def get_page_count(file_path):
     pdf = pdfium.PdfDocument(file_path)
     count = len(pdf)
