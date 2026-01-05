@@ -9,7 +9,7 @@ import nest_asyncio
 from loguru import logger
 
 from .base_model import VLMParseBaseModel
-from .build_doc import convert_specific_page_to_image, get_page_count
+from .build_doc import convert_specific_page_to_image, get_page_count, resize_image
 from .data_model.document import Document, Page, ProcessingError
 
 nest_asyncio.apply()
@@ -56,19 +56,8 @@ class BaseConverter:
                 page_idx,
                 dpi=self.config.dpi,
             )
-
-        if self.config.max_image_size is not None:
-            ratio = self.config.max_image_size / max(image.size)
-            new_size = (
-                int(image.size[0] * ratio),
-                int(image.size[1] * ratio),
-            )
-            image = image.resize(new_size)
-            logger.info(f"Resized image to {new_size}")
-
+        image = resize_image(image, self.config.max_image_size)
         page.buffer_image = image
-        logger.debug("Image size: " + str(page.image.size))
-
         return page
 
     async def async_call(self, file_path: str | Path) -> Document:
@@ -101,7 +90,12 @@ class BaseConverter:
                             logger.exception(traceback.format_exc())
                             page.error = ProcessingError.from_class(self)
                     if not self.save_page_images:
-                        page.buffer_image = None
+                        page.buffer_image = dict(
+                            file_path=str(file_path),
+                            page_idx=page_idx,
+                            dpi=self.config.dpi,
+                            max_image_size=self.config.max_image_size,
+                        )
 
             tasks = [
                 asyncio.create_task(worker(i, page))

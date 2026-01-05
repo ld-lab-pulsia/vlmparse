@@ -38,12 +38,23 @@ class Page(VLMParseBaseModel):
     raw_response: str | None = None
     items: list[Item] | None = None
     error: ProcessingError | None = None
-    buffer_image: Optional[Image.Image | str] = None
+    buffer_image: Optional[Image.Image | str | dict] = None
     latency: Optional[float] = None
     """Time taken to process the page in seconds."""
 
     @property
     def image(self):
+        if isinstance(self.buffer_image, dict):
+            from vlmparse.build_doc import convert_specific_page_to_image, resize_image
+
+            image = convert_specific_page_to_image(
+                self.buffer_image["file_path"],
+                self.buffer_image["page_idx"],
+                self.buffer_image["dpi"],
+            )
+            image = resize_image(image, self.buffer_image["max_image_size"])
+            self.buffer_image = image
+
         if isinstance(self.buffer_image, str):
             self.buffer_image = from_base64(self.buffer_image)
         return self.buffer_image

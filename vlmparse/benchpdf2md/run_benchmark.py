@@ -234,7 +234,7 @@ def run_pb_benchmark(
                     explanation=f"No zip document found for {row['pdf_path']}",
                     pdf=row["pdf_path"],
                     page=row["page"],
-                    id=f"{Path(row["pdf_path"]).stem}-baseline",
+                    id=f"{Path(row['pdf_path']).stem}-baseline",
                     type="baseline",
                     category="baseline",
                 ),
