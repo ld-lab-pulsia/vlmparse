@@ -255,12 +255,9 @@ class ChandraConverterClient(OpenAIConverterClient):
                 if retries > 0:
                     completion_kwargs["top_p"] = 0.95
 
-                response_obj = await self.model.chat.completions.create(
-                    model=self.config.llm_params.model_name,
-                    messages=messages,
-                    **completion_kwargs,
+                result_content = await self._get_chat_completion(
+                    messages, completion_kwargs=completion_kwargs
                 )
-                result_content = response_obj.choices[0].message.content
                 error_occurred = False
             except Exception as e:
                 logger.error(f"Error during VLLM generation: {e}")
