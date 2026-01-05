@@ -1,4 +1,5 @@
 import asyncio
+import threading
 import time
 import traceback
 from pathlib import Path
@@ -32,6 +33,7 @@ class BaseConverter:
         save_mode: Literal["document", "md", "md_page"] = "document",
         debug: bool = False,
         return_documents_in_batch_mode: bool = False,
+        save_page_images: bool = False,
     ):
         self.config = config
         self.num_concurrent_files = num_concurrent_files
@@ -40,11 +42,34 @@ class BaseConverter:
         self.save_mode = save_mode
         self.debug = debug
         self.return_documents_in_batch_mode = return_documents_in_batch_mode
+        self.save_page_images = save_page_images
         # Add a lock to ensure PDFium is accessed by only one thread/task at a time
-        self._render_lock = asyncio.Lock()
+        self._render_lock = threading.Lock()
 
     async def async_call_inside_page(self, page: Page) -> Page:
         raise NotImplementedError
+
+    def add_page_image(self, page: Page, file_path, page_idx):
+        with self._render_lock:
+            image = convert_specific_page_to_image(
+                file_path,
+                page_idx,
+                dpi=self.config.dpi,
+            )
+
+        if self.config.max_image_size is not None:
+            ratio = self.config.max_image_size / max(image.size)
+            new_size = (
+                int(image.size[0] * ratio),
+                int(image.size[1] * ratio),
+            )
+            image = image.resize(new_size)
+            logger.info(f"Resized image to {new_size}")
+
+        page.buffer_image = image
+        logger.debug("Image size: " + str(page.image.size))
+
+        return page
 
     async def async_call(self, file_path: str | Path) -> Document:
         tic = time.perf_counter()
@@ -58,28 +83,12 @@ class BaseConverter:
             async def worker(page_idx: int, page: Page):
                 async with semaphore:
                     try:
-                        async with self._render_lock:
-                            image = await asyncio.to_thread(
-                                convert_specific_page_to_image,
-                                file_path,
-                                page_idx,
-                                dpi=self.config.dpi,
-                            )
-
-                        if self.config.max_image_size is not None:
-                            ratio = self.config.max_image_size / max(image.size)
-                            new_size = (
-                                int(image.size[0] * ratio),
-                                int(image.size[1] * ratio),
-                            )
-                            image = image.resize(new_size)
-                            logger.info(f"Resized image to {new_size}")
-
-                        page.buffer_image = image
-                        logger.debug("Image size: " + str(page.image.size))
+                        page = await asyncio.to_thread(
+                            self.add_page_image, page, file_path, page_idx
+                        )
 
                         tic = time.perf_counter()
-                        await self.async_call_inside_page(page)
+                        page = await self.async_call_inside_page(page)
                         toc = time.perf_counter()
                         page.latency = toc - tic
                         logger.debug(f"Time taken: {page.latency} seconds")
@@ -91,6 +100,8 @@ class BaseConverter:
                         else:
                             logger.exception(traceback.format_exc())
                             page.error = ProcessingError.from_class(self)
+                    if not self.save_page_images:
+                        page.buffer_image = None
 
             tasks = [
                 asyncio.create_task(worker(i, page))
