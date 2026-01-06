@@ -22,7 +22,11 @@ from vlmparse.clients.nanonetocr import (
     NanonetOCR2DockerServerConfig,
 )
 from vlmparse.clients.olmocr import OlmOCRConverterConfig, OlmOCRDockerServerConfig
-from vlmparse.clients.openai_converter import LLMParams, OpenAIConverterConfig
+from vlmparse.clients.openai_converter import (
+    LLMParams,
+    OpenAIConverterConfig,
+    is_openai_model,
+)
 from vlmparse.clients.paddleocrvl import (
     PaddleOCRVLConverterConfig,
     PaddleOCRVLDockerServerConfig,
@@ -77,6 +81,14 @@ class ConverterConfigRegistry:
         if uri is not None:
             return OpenAIConverterConfig(
                 llm_params=LLMParams(base_url=uri, model_name=model_name)
+            )
+        if is_openai_model(model_name):
+            return OpenAIConverterConfig(
+                llm_params=LLMParams(
+                    model_name=model_name,
+                    base_url=None,
+                    api_key=os.getenv("OPENAI_API_KEY"),
+                )
             )
         return OpenAIConverterConfig(llm_params=LLMParams(model_name=model_name))
 

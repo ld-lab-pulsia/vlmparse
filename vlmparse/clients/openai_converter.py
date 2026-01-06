@@ -14,6 +14,34 @@ from vlmparse.utils import to_base64
 from .prompts import PDF2MD_PROMPT
 
 GOOGLE_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+_OPENAI_MODEL_NAMES_CACHE: set[str] | None = None
+
+
+def get_openai_model_names() -> set[str]:
+    """Return available OpenAI model IDs, cached for the process lifetime."""
+    global _OPENAI_MODEL_NAMES_CACHE
+    if _OPENAI_MODEL_NAMES_CACHE is not None:
+        return _OPENAI_MODEL_NAMES_CACHE
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        _OPENAI_MODEL_NAMES_CACHE = set()
+        return _OPENAI_MODEL_NAMES_CACHE
+
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=api_key)
+        models = client.models.list()
+        _OPENAI_MODEL_NAMES_CACHE = {model.id for model in models.data}
+    except Exception as exc:
+        logger.warning("Failed to fetch OpenAI models: {}", exc)
+        _OPENAI_MODEL_NAMES_CACHE = set()
+    return _OPENAI_MODEL_NAMES_CACHE
+
+
+def is_openai_model(model_name: str) -> bool:
+    return model_name in get_openai_model_names()
 
 
 class LLMParams(VLMParseBaseModel):
@@ -29,16 +57,7 @@ class LLMParams(VLMParseBaseModel):
 def get_llm_params(model_name: str, uri: str | None = None):
     if uri is not None:
         return LLMParams(base_url=uri, model_name="vllm-model", api_key="")
-    if model_name in [
-        "gpt-4o",
-        "gpt-4o-mini",
-        "gpt-4.1",
-        "gpt-4.1-mini",
-        "gpt-4.1-nano",
-        "gpt-5",
-        "gpt-5-mini",
-        "gpt-5-nano",
-    ]:
+    if is_openai_model(model_name):
         base_url = None
         api_key = os.getenv("OPENAI_API_KEY")
     else:
