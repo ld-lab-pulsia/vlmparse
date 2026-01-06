@@ -21,6 +21,7 @@ dependencies = [
     "loguru>=0.7.3",
     "nest-asyncio>=1.6.0",
     "numpy>=2.3.2",
+    "mistralai>=1.0.0",
     "openai>=1.102.0",
     "orjson>=3.11.3",
     "pillow>=11.3.0",
@@ -82,4 +83,3 @@ ignore = ["E741", "B006"]
 config-settings = { editable_mode = "compat" }
 
 [tool.uv.sources]
-
