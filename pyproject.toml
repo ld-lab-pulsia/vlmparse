@@ -35,6 +35,9 @@ dependencies = [
 dev = [
     "jupyter"
 ]
+docling_core = [
+    "docling-core",
+]
 st_app = [
     "streamlit>=1.49.0",
 ]

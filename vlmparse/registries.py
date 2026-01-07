@@ -8,6 +8,10 @@ from vlmparse.clients.deepseekocr import (
 )
 from vlmparse.clients.docling import DoclingConverterConfig, DoclingDockerServerConfig
 from vlmparse.clients.dotsocr import DotsOCRConverterConfig, DotsOCRDockerServerConfig
+from vlmparse.clients.granite_docling import (
+    GraniteDoclingConverterConfig,
+    GraniteDoclingDockerServerConfig,
+)
 from vlmparse.clients.hunyuanocr import (
     HunyuanOCRConverterConfig,
     HunyuanOCRDockerServerConfig,
@@ -51,6 +55,12 @@ docker_config_registry.register("olmocr-2-fp8", lambda: OlmOCRDockerServerConfig
 
 docker_config_registry.register("mineru25", lambda: MinerUDockerServerConfig())
 docker_config_registry.register("deepseekocr", lambda: DeepSeekOCRDockerServerConfig())
+docker_config_registry.register(
+    "granite-docling", lambda: GraniteDoclingDockerServerConfig()
+)
+docker_config_registry.register(
+    "ibm-granite/granite-docling-258M", lambda: GraniteDoclingDockerServerConfig()
+)
 
 
 class ConverterConfigRegistry:
@@ -203,6 +213,18 @@ converter_config_registry.register(
     "docling",
     lambda uri=None: DoclingConverterConfig(base_url=uri or "http://localhost:5001"),
 )
+for name in ["granite-docling", "ibm-granite/granite-docling-258M"]:
+    converter_config_registry.register(
+        name,
+        lambda uri=None: GraniteDoclingConverterConfig(
+            llm_params=LLMParams(
+                base_url=uri or "http://localhost:8000/v1",
+                # Served model name from GraniteDoclingDockerServerConfig.default_model_name
+                model_name="granite-docling",
+                api_key="",
+            )
+        ),
+    )
 converter_config_registry.register(
     "olmocr-2-fp8",
     lambda uri=None: OlmOCRConverterConfig(
