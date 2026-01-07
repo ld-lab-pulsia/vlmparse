@@ -40,6 +40,7 @@ class DotsOCRDockerServerConfig(VLLMDockerServerConfig):
         ]
     )
     add_model_key_to_server: bool = False
+    aliases: list[str] = Field(default_factory=lambda: ["dotsocr"])
 
     @property
     def client_config(self):
@@ -54,7 +55,7 @@ class DotsOCRConverterConfig(OpenAIConverterConfig):
         "top_p": 1.0,
         "max_completion_tokens": 16384,
     }
-
+    aliases: list[str] = Field(default_factory=lambda: ["dotsocr"])
     dpi: int = 200
     prompt_mode: Literal["prompt_layout_all_en", "prompt_ocr"] = "prompt_ocr"
 

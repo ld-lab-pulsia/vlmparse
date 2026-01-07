@@ -29,7 +29,7 @@ class MinerUDockerServerConfig(DockerServerConfig):
 class MinerUConverterConfig(ConverterConfig):
     """Configuration for MinerU API converter."""
 
-    api_url: str = Field(
+    base_url: str = Field(
         default_factory=lambda: os.getenv("MINERU_API_URL", "http://localhost:4299")
     )
     timeout: int = 600

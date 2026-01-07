@@ -18,6 +18,7 @@ class PaddleOCRVLDockerServerConfig(VLLMDockerServerConfig):
             "0",
         ]
     )
+    aliases: list[str] = Field(default_factory=lambda: ["paddleocrvl"])
 
     @property
     def client_config(self):
@@ -44,3 +45,4 @@ class PaddleOCRVLConverterConfig(OpenAIConverterConfig):
     }
     max_image_size: int | None = 1540
     dpi: int = 200
+    aliases: list[str] = Field(default_factory=lambda: ["paddleocrvl"])

@@ -27,6 +27,7 @@ class DockerServerConfig(BaseModel):
     environment: dict[str, str] = Field(default_factory=dict)
     volumes: dict[str, dict] | None = None
     entrypoint: str | None = None
+    aliases: list[str] = Field(default_factory=list)
 
     class Config:
         extra = "allow"
@@ -70,6 +71,7 @@ class VLLMDockerServerConfig(DockerServerConfig):
     hf_home_folder: str | None = os.getenv("HF_HOME", None)
     add_model_key_to_server: bool = True
     container_port: int = 8000
+    aliases: list[str] = Field(default_factory=list)
 
     @property
     def llm_params(self):
