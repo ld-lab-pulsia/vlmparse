@@ -120,6 +120,12 @@ class OpenAIConverterClient(BaseConverter):
                 messages=messages,
                 **completion_kwargs,
             )
+
+            if response_obj.choices[0].message.content is None:
+                raise ValueError(
+                    "Response is None, finish reason: "
+                    + response_obj.choices[0].finish_reason
+                )
             return response_obj.choices[0].message.content
 
     async def async_call_inside_page(self, page: Page) -> Page:

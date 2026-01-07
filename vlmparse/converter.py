@@ -5,14 +5,11 @@ import traceback
 from pathlib import Path
 from typing import Literal
 
-import nest_asyncio
 from loguru import logger
 
 from .base_model import VLMParseBaseModel
 from .build_doc import convert_specific_page_to_image, get_page_count, resize_image
 from .data_model.document import Document, Page, ProcessingError
-
-nest_asyncio.apply()
 
 
 class ConverterConfig(VLMParseBaseModel):

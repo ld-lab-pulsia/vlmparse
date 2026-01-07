@@ -146,7 +146,7 @@ class TestTextPresenceTest:
         test = TextPresenceTest(
             pdf="test.pdf", page=1, id="test_id", type="present", text="target text"
         )
-        result, _ = test.run("This is some target text in a document")
+        result, _, _ = test.run("This is some target text in a document")
         assert result is True
 
     def test_present_text_not_found(self):
@@ -154,7 +154,7 @@ class TestTextPresenceTest:
         test = TextPresenceTest(
             pdf="test.pdf", page=1, id="test_id", type="present", text="missing text"
         )
-        result, explanation = test.run("This document doesn't have the target")
+        result, explanation, _ = test.run("This document doesn't have the target")
         assert result is False
         assert "missing text" in explanation
 
@@ -168,7 +168,7 @@ class TestTextPresenceTest:
             text="target text",
             max_diffs=2,
         )
-        result, _ = test.run("This is some targett textt in a document")
+        result, _, _ = test.run("This is some targett textt in a document")
         assert result is True
 
     def test_absent_text_found(self):
@@ -176,7 +176,7 @@ class TestTextPresenceTest:
         test = TextPresenceTest(
             pdf="test.pdf", page=1, id="test_id", type="absent", text="target text"
         )
-        result, explanation = test.run("This is some target text in a document")
+        result, explanation, _ = test.run("This is some target text in a document")
         assert result is False
         assert "target text" in explanation
 
@@ -190,13 +190,13 @@ class TestTextPresenceTest:
             text="target text",
             max_diffs=2,
         )
-        result, explanation = test.run("This is some target text in a document")
+        result, explanation, _ = test.run("This is some target text in a document")
         assert result is False
-        result, explanation = test.run("This is some targett text in a document")
+        result, explanation, _ = test.run("This is some targett text in a document")
         assert result is False
         # With max_diffs=2 and text "target text" (11 chars), threshold is ~0.82
         # "targettt text" still matches within fuzzy threshold
-        result, explanation = test.run("This is some targettt text in a document")
+        result, explanation, _ = test.run("This is some targettt text in a document")
         assert result is False
         # # Even more diffs still matches due to fuzzy matching
         # result, explanation = test.run("This is some targetttt text in a document")
@@ -207,7 +207,7 @@ class TestTextPresenceTest:
         test = TextPresenceTest(
             pdf="test.pdf", page=1, id="test_id", type="absent", text="missing text"
         )
-        result, _ = test.run("This document doesn't have the target")
+        result, _, _ = test.run("This document doesn't have the target")
         assert result is True
 
     def test_case_insensitive_present(self):
@@ -220,7 +220,7 @@ class TestTextPresenceTest:
             text="TARGET TEXT",
             case_sensitive=False,
         )
-        result, _ = test.run("This is some target text in a document")
+        result, _, _ = test.run("This is some target text in a document")
         assert result is True
 
     def test_case_insensitive_absent(self):
@@ -233,7 +233,7 @@ class TestTextPresenceTest:
             text="TARGET TEXT",
             case_sensitive=False,
         )
-        result, explanation = test.run("This is some target text in a document")
+        result, explanation, _ = test.run("This is some target text in a document")
         assert result is False
 
     def test_first_n_limit(self):
@@ -246,14 +246,14 @@ class TestTextPresenceTest:
             text="beginning",
             first_n=20,
         )
-        result, _ = test.run("beginning of text, but not the end")
+        result, _, _ = test.run("beginning of text, but not the end")
         assert result is True
 
         # Test that text beyond first_n isn't matched
         test = TextPresenceTest(
             pdf="test.pdf", page=1, id="test_id", type="present", text="end", first_n=20
         )
-        result, _ = test.run("beginning of text, but not the end")
+        result, _, _ = test.run("beginning of text, but not the end")
         assert result is False
 
     def test_last_n_limit(self):
@@ -261,7 +261,7 @@ class TestTextPresenceTest:
         test = TextPresenceTest(
             pdf="test.pdf", page=1, id="test_id", type="present", text="end", last_n=20
         )
-        result, _ = test.run("beginning of text, but not the end")
+        result, _, _ = test.run("beginning of text, but not the end")
         assert result is True
 
         # Test that text beyond last_n isn't matched
@@ -273,7 +273,7 @@ class TestTextPresenceTest:
             text="beginning",
             last_n=20,
         )
-        result, _ = test.run("beginning of text, but not the end")
+        result, _, _ = test.run("beginning of text, but not the end")
         assert result is False
 
     def test_both_first_and_last_n(self):
@@ -287,7 +287,7 @@ class TestTextPresenceTest:
             first_n=15,
             last_n=10,
         )
-        result, _ = test.run("beginning of text, middle part, but not the end")
+        result, _, _ = test.run("beginning of text, middle part, but not the end")
         assert result is True
 
         # Text only in middle shouldn't be found
@@ -300,7 +300,7 @@ class TestTextPresenceTest:
             first_n=15,
             last_n=10,
         )
-        result, _ = test.run("beginning of text, middle part, but not the end")
+        result, _, _ = test.run("beginning of text, middle part, but not the end")
         assert result is False
 
     def test_unicode_normalized_forms(self):
@@ -312,10 +312,10 @@ class TestTextPresenceTest:
             type="present",
             text="I like to eat at a café",
         )
-        result, _ = test.run("I like to eat at a café")
+        result, _, _ = test.run("I like to eat at a café")
         assert result is True
 
-        result, _ = test.run("I like to eat at a cafe\u0301")
+        result, _, _ = test.run("I like to eat at a cafe\u0301")
         assert result is True
 
 
@@ -383,7 +383,7 @@ class TestTextOrderTest:
             before="first",
             after="second",
         )
-        result, _ = test.run("This has first and then second in correct order")
+        result, _, _ = test.run("This has first and then second in correct order")
         assert result is True
 
     def test_incorrect_order(self):
@@ -396,7 +396,7 @@ class TestTextOrderTest:
             before="second",
             after="first",
         )
-        result, explanation = test.run(
+        result, explanation, _ = test.run(
             "This has first and then second in correct order"
         )
         assert result is False
@@ -411,7 +411,9 @@ class TestTextOrderTest:
             before="missing",
             after="present",
         )
-        result, explanation = test.run("This text has present but not the other word")
+        result, explanation, _ = test.run(
+            "This text has present but not the other word"
+        )
         assert result is False
 
     def test_after_not_found(self):
@@ -424,7 +426,9 @@ class TestTextOrderTest:
             before="present",
             after="missing",
         )
-        result, explanation = test.run("This text has present but not the other word")
+        result, explanation, _ = test.run(
+            "This text has present but not the other word"
+        )
         assert result is False
 
     def test_max_diffs(self):
@@ -438,7 +442,7 @@ class TestTextOrderTest:
             after="second",
             max_diffs=1,
         )
-        result, _ = test.run("This has firsst and then secand in correct order")
+        result, _, _ = test.run("This has firsst and then secand in correct order")
         assert result is True
 
     def test_multiple_occurrences(self):
@@ -454,7 +458,7 @@ class TestTextOrderTest:
             before="target",
             after="target",
         )
-        result, explanation = test.run("This has target and then target again")
+        result, explanation, _ = test.run("This has target and then target again")
         # This should fail because "target" cannot appear before itself
         assert result is False
 
@@ -468,7 +472,7 @@ class TestTextOrderTest:
             before="first",
             after="second",
         )
-        result, _ = test.run("first then second appears here")
+        result, _, _ = test.run("first then second appears here")
         assert result is True
 
 
@@ -485,13 +489,13 @@ class TestBaselineTest:
     def test_non_empty_content(self):
         """Test that non-empty content passes"""
         test = BaselineTest(pdf="test.pdf", page=1, id="test_id", type="baseline")
-        result, _ = test.run("This is some normal content")
+        result, _, _ = test.run("This is some normal content")
         assert result is True
 
     def test_empty_content(self):
         """Test that empty content fails"""
         test = BaselineTest(pdf="test.pdf", page=1, id="test_id", type="baseline")
-        result, explanation = test.run("   \n\t  ")
+        result, explanation, _ = test.run("   \n\t  ")
         assert result is False
         assert "no alpha numeric characters" in explanation
 
@@ -502,28 +506,28 @@ class TestBaselineTest:
         )
         # Create highly repeating content - repeat "abc" many times
         repeating_content = "abc" * 10
-        result, explanation = test.run(repeating_content)
+        result, explanation, _ = test.run(repeating_content)
         assert result is False
         assert "repeating" in explanation
 
     def test_content_with_disallowed_characters(self):
         """Test that content with disallowed characters fails"""
         test = BaselineTest(pdf="test.pdf", page=1, id="test_id", type="baseline")
-        result, explanation = test.run("This has Chinese characters: 你好")
+        result, explanation, _ = test.run("This has Chinese characters: 你好")
         assert result is False
         assert "disallowed characters" in explanation
 
     def test_content_with_emoji(self):
         """Test that content with emoji fails"""
         test = BaselineTest(pdf="test.pdf", page=1, id="test_id", type="baseline")
-        result, explanation = test.run("This has emoji: 😊")
+        result, explanation, _ = test.run("This has emoji: 😊")
         assert result is False
         assert "disallowed characters" in explanation
         assert "😊" in explanation
 
     def test_content_with_mandarin(self):
         test = BaselineTest(pdf="test.pdf", page=1, id="test_id", type="baseline")
-        result, explanation = test.run("asdfasdfas維基百科/中文asdfw")
+        result, explanation, _ = test.run("asdfasdfas維基百科/中文asdfw")
         assert result is False
         assert "disallowed characters" in explanation
 
@@ -531,7 +535,7 @@ class TestBaselineTest:
         """Test that valid content passes all checks"""
         test = BaselineTest(pdf="test.pdf", page=1, id="test_id", type="baseline")
         content = "This is some normal content with proper English letters and no suspicious repetition."
-        result, _ = test.run(content)
+        result, _, _ = test.run(content)
         assert result is True
 
 

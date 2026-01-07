@@ -188,6 +188,10 @@ class DockerConfigRegistry:
             return None
         return self._registry[model_name]()
 
+    def list_models(self) -> list[str]:
+        """List all registered model names."""
+        return list(self._registry.keys())
+
 
 # Global registry instance
 docker_config_registry = DockerConfigRegistry()

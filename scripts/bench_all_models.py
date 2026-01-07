@@ -9,6 +9,7 @@ def main(
     models=[
         "mineru25",
         "dotsocr",
+        # "gemini-3-flash-preview"
         "nanonets/Nanonets-OCR2-3B",
         "chandra",
         "hunyuanocr",
@@ -16,11 +17,11 @@ def main(
         "olmocr",
         "lightonocr",
     ],
-    concurrency=32,
+    concurrency=16,
     port=8056,
+    dpis=[None],
+    uri=None,
 ):
-    dpis = [None]
-
     for model in models:
         for dpi in dpis:
             try:
@@ -31,6 +32,8 @@ def main(
                     concurrency=concurrency,
                     gpu=gpu,
                     port=port,
+                    retrylast=False,
+                    uri=uri,
                 )
             except Exception as e:
                 print(f"Error running benchmark for {model} with dpi {dpi}: {e}")

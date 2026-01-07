@@ -19,6 +19,7 @@ from vlmparse.benchpdf2md.create_dataset import create_dataset
 from vlmparse.benchpdf2md.utils import bootstrap_and_format_results
 from vlmparse.data_model.document import Document
 from vlmparse.registries import converter_config_registry, docker_config_registry
+from vlmparse.servers.utils import get_model_from_uri
 
 IN_FOLDER = Path(
     "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/validated_tests/tiny_test_tests_first_batch/tests/tiny_text_long_text/"
@@ -27,13 +28,13 @@ IN_FOLDER = Path(
 OUT_FOLDER = Path(
     os.getenv(
         "OUT_FOLDER_FR_BENCHMARK",
-        "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/fr-bench-pdf2md-preds",
+        "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/fr-bench-pdf2md-preds3",
     )
 )
 
 
 def process_and_run_benchmark(
-    model="gemini-2.5-flash-lite",
+    model: str | None = None,
     uri: str | None = None,
     retry: str | None = None,
     concurrency: int = 1,
@@ -50,15 +51,15 @@ def process_and_run_benchmark(
     dpi: int | None = None,
     port: int | None = None,
 ):
+    # Infer model and URI from Docker if URI is provided
+    if uri is not None:
+        model = get_model_from_uri(uri)
+
+    if model is None:
+        model = "gemini-2.5-flash-lite"
+
     # in_folder = Path(in_folder)
     save_folder = Path(save_folder)
-
-    # if not in_folder.exists():
-    #     raise ValueError(f"Input folder does not exist: {in_folder}")
-    # if not in_folder.is_dir():
-    #     raise ValueError(f"Input path is not a directory: {in_folder}")
-
-    # ds = create_dataset(in_folder)
 
     if in_folder == "pulseia/fr-bench-pdf2md" or in_folder == "allenai/olmOCR-bench":
         local_folder_path = snapshot_download(
@@ -75,12 +76,15 @@ def process_and_run_benchmark(
             filter_type = [filter_type]
         ds = ds[ds.type.isin(filter_type)]
     if filter_category is not None:
+        assert (
+            filter_category in ds.category.unique()
+        ), f"Filter category {filter_category} not in dataset categories: {ds.category.unique()}"
         if isinstance(filter_category, str):
             filter_category = [filter_category]
         ds = ds[ds.category.isin(filter_category)]
     try:
         if retrylast:
-            retry = save_folder / model + "_" + str(dpi)
+            retry = save_folder / (model + "_" + str(dpi) if dpi is not None else model)
             previous_runs = sorted(os.listdir(retry))
             if len(previous_runs) > 0:
                 retry = retry / previous_runs[-1]
@@ -108,16 +112,19 @@ def process_and_run_benchmark(
                 raise ValueError(
                     f"No PDF files found in the input folder: {in_folder}\nDataset paths: {ds['pdf_path'][:5]}"
                 )
-
+            model_folder = model
+            if dpi is not None:
+                model_folder = model + "_" + str(dpi)
             save_folder = (
                 (
                     save_folder
-                    / model
+                    / model_folder
                     / (datetime.datetime.now().strftime("%Y-%m-%dT%Hh%Mm%Ss"))
                 )
                 if not retry
                 else retry
             )
+            save_folder.mkdir(parents=True, exist_ok=True)
 
             if uri is None:
                 docker_config = docker_config_registry.get(model)
@@ -136,6 +143,8 @@ def process_and_run_benchmark(
             client.num_concurrent_files = concurrency if not debug else 1
             if dpi is not None:
                 client.config.dpi = int(dpi)
+            else:
+                dpi = client.config.dpi
 
             client.debug = debug
 
@@ -182,24 +191,27 @@ def process_and_run_benchmark(
             df.to_parquet(save_folder_test_results / "test_results.parquet")
 
             with open(save_folder_test_results / "metrics.json", "w") as f:
-                json.dump(
-                    {
-                        "total_time": total_time,
-                        "num_pages": len(files),
-                        "num_tests": len(df),
-                        "avg_result": avg,
-                        "avg_doc_latency": df["doc_latency"].mean()
-                        if "doc_latency" in df.columns
-                        else None,
-                        "avg_page_latency": df["page_latency"].mean()
-                        if "page_latency" in df.columns
-                        else None,
-                        "avg_time_per_page": total_time / len(files)
-                        if total_time is not None
-                        else None,
-                    },
-                    f,
-                )
+                metrics = {
+                    "total_time": total_time,
+                    "num_pages": len(files),
+                    "num_tests": len(df),
+                    "avg_result": avg,
+                    "avg_doc_latency": df["doc_latency"].mean()
+                    if "doc_latency" in df.columns
+                    else None,
+                    "avg_page_latency": df["page_latency"].mean()
+                    if "page_latency" in df.columns
+                    else None,
+                    "avg_time_per_page": total_time / len(files)
+                    if total_time is not None
+                    else None,
+                    "dpi": dpi,
+                    "concurrency": concurrency,
+                    "model": model,
+                }
+                for k, v in df.groupby("category")["result"].mean().items():
+                    metrics[f"{k}"] = v
+                json.dump(metrics, f)
 
     except Exception:
         raise
@@ -228,6 +240,8 @@ def run_pb_benchmark(
                 | {
                     "result": False,
                     "explanation": f"No zip document found for {row['pdf_path']}",
+                    "best_match_score": 0.0,
+                    "document_processed": False,
                 },
                 dict(
                     result=False,
@@ -257,7 +271,7 @@ def run_pb_benchmark(
         results = []
 
         for test in tests:
-            passed, explanation = test.run(md_text)
+            passed, explanation, best_match_score = test.run(md_text)
             _dict = {
                 "test_id": test.id,
                 "result": passed,
@@ -267,6 +281,8 @@ def run_pb_benchmark(
                 "doc_path": str(zip_path),
                 "doc_latency": doc.latency,
                 "page_latency": doc.pages[0].latency,
+                "best_match_score": best_match_score,
+                "document_processed": True,
             } | test.model_dump()
 
             results.append(_dict)

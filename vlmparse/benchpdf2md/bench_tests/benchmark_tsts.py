@@ -251,9 +251,19 @@ def normalize_text(md_content: str) -> str:
         " :": ":",
         " ,": ",",
         "É": "E",
+        "☑": "[x]",
+        "☐": "[ ]",
+        "☒": "[x]",
+        "✅": "[x]",
+        "❌": "[x]",
+        "❎": "[x]",
+        "✓": "[x]",
+        "✔": "[x]",
+        "✗": "[x]",
+        "✖": "[x]",
+        "🗹": "[x]",
+        "[X]": "[x]",
     }
-
-    # Apply all replacements from the dictionary
     for fancy_char, ascii_char in replacements.items():
         md_content = md_content.replace(fancy_char, ascii_char)
 
@@ -717,7 +727,7 @@ class BasePDFTest(BaseModel):
                 diff_display = format_diff_text(reference, best_match_text)
                 return diff_display
 
-    def run(self, md_content: str) -> Tuple[bool, str]:
+    def run(self, md_content: str) -> Tuple[bool, str, float]:
         """
         Run the test on the provided markdown content.
 
@@ -779,7 +789,7 @@ class TextPresenceTest(BasePDFTest):
 
         if self.type == "present":
             if best_ratio >= threshold:
-                return True, ""
+                return True, "", best_ratio
             else:
                 best_match_text = ""
                 diff_display = "No match found"
@@ -790,10 +800,10 @@ class TextPresenceTest(BasePDFTest):
                     f"but best match ratio was {best_ratio:.3f}\n"
                     f"Diff:\n\n{diff_display}"
                 )
-                return False, msg
+                return False, msg, best_ratio
         else:  # ABSENT
             if best_ratio < threshold:
-                return True, ""
+                return True, "", 1 - best_ratio
             else:
                 reference = reference_query  # normalize_text(self.text)
 
@@ -812,7 +822,7 @@ class TextPresenceTest(BasePDFTest):
                     f"but best match ratio was {best_ratio:.3f}\n"
                     f"Diff:\n\n{diff_display}"
                 )
-                return False, msg
+                return False, msg, 1 - best_ratio
 
 
 class TextOrderTest(BasePDFTest):
@@ -839,7 +849,7 @@ class TextOrderTest(BasePDFTest):
             )
         return self
 
-    def run(self, md_content: str) -> Tuple[bool, str]:
+    def run(self, md_content: str) -> Tuple[bool, str, float]:
         md_content = self.normalise(md_content)
         before = self.normalise(self.before)
         after = self.normalise(self.after)
@@ -853,20 +863,29 @@ class TextOrderTest(BasePDFTest):
             return (
                 False,
                 f"'before' text '{before[:40]}...' not found with max_l_dist {self.max_diffs}",
+                0.0,
             )
         if not after_matches:
             return (
                 False,
                 f"'after' text '{after[:40]}...' not found with max_l_dist {self.max_diffs}",
+                0.0,
             )
 
         for before_match in before_matches:
             for after_match in after_matches:
                 if before_match.start < after_match.start:
-                    return True, ""
-        return False, (
+                    return (
+                        True,
+                        "",
+                        min(before_match.dist, after_match.dist)
+                        / max(len(before), len(after)),
+                    )
+        return (
+            False,
             f"Could not find a location where '{before[:40]}...' appears before "
-            f"'{after[:40]}...'."
+            f"'{after[:40]}...'.",
+            0.0,
         )
 
 
@@ -880,7 +899,7 @@ class TableTest(BasePDFTest):
     top_heading: str = ""
     left_heading: str = ""
 
-    def run(self, content: str) -> Tuple[bool, str]:
+    def run(self, content: str) -> Tuple[bool, str, float]:
         from vlmparse.clients.pipe_utils.html_to_md_conversion import md_tables_to_html
 
         content = md_tables_to_html(content)
@@ -902,7 +921,7 @@ class TableTest(BasePDFTest):
         tables = soup.find_all("table")
 
         if not tables:
-            return False, "No HTML tables found in the content"
+            return False, "No HTML tables found in the content", 0.0
 
         best_match_score = -1
         best_match_reasons = []
@@ -1173,7 +1192,7 @@ class TableTest(BasePDFTest):
                         reasons.append("Left heading not found (sim: 0.00)")
 
                 if all_satisfied:
-                    return True, ""
+                    return True, "", best_match_score
 
                 if total_score > best_match_score:
                     best_match_score = total_score
@@ -1187,12 +1206,14 @@ class TableTest(BasePDFTest):
             return (
                 False,
                 f"No cell matching '{cell}' found with threshold {threshold}\nDiff:\n\n{diff_display}",
+                best_match_score,
             )
         else:
             exp = "\n\n".join(best_match_reasons)
             return (
                 False,
                 f"Found cells matching '{cell}' but relationships not satisfied: {exp}",
+                best_match_score,
             )
 
 
@@ -1532,9 +1553,9 @@ class BaselineTest(BasePDFTest):
     check_disallowed_characters: bool = True
     type: Literal["baseline"] = Field(default="baseline")
 
-    def run(self, content: str) -> Tuple[bool, str]:
+    def run(self, content: str) -> Tuple[bool, str, float]:
         if len("".join(c for c in content if c.isalnum()).strip()) == 0:
-            return False, "The text contains no alpha numeric characters"
+            return False, "The text contains no alpha numeric characters", 0.0
 
         # Makes sure that the content has no egregious repeated ngrams at the end, which indicate a degradation of quality
         # Honestly, this test doesn't seem to catch anything at the moment, maybe it can be refactored to a "text-quality"
@@ -1548,6 +1569,7 @@ class BaselineTest(BasePDFTest):
                 return (
                     False,
                     f"Text ends with {count} repeating {index+1}-grams, invalid",
+                    0.0,
                 )
 
         pattern = re.compile(
@@ -1565,9 +1587,9 @@ class BaselineTest(BasePDFTest):
 
         matches = pattern.findall(content)
         if self.check_disallowed_characters and matches:
-            return False, f"Text contains disallowed characters {matches}"
+            return False, f"Text contains disallowed characters {matches}", 0.0
 
-        return True, ""
+        return True, "", 1.0
 
 
 def load_tests(jsonl_file: str) -> List[BasePDFTest]:

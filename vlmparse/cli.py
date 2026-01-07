@@ -55,6 +55,7 @@ class DParseCLI:
         mode: Literal["document", "md", "md_page"] = "document",
         with_vllm_server: bool = False,
         concurrency: int = 10,
+        dpi: int | None = None,
     ):
         """Parse PDF documents and save results.
 
@@ -67,8 +68,34 @@ class DParseCLI:
             gpus: Comma-separated GPU device IDs (e.g., "0" or "0,1,2"). If not specified, all GPUs will be used.
             mode: Output mode - "document" (save as JSON zip), "md" (save as markdown file), "md_page" (save as folder of markdown pages)
             with_vllm_server: If True, a local VLLM server will be deployed if the model is not found in the registry. Note that if the model is in the registry and the uri is None, the server will be anyway deployed.
+            dpi: DPI to use for the conversion. If not specified, the default DPI will be used.
         """
         from vlmparse.registries import converter_config_registry
+
+        # Infer model from URI if provided
+        if uri is not None:
+            import docker
+
+            try:
+                docker_client = docker.from_env()
+                containers = docker_client.containers.list()
+                for container in containers:
+                    # Check both exact match and match with/without trailing slash
+                    container_uri = container.labels.get("vlmparse_uri", "")
+                    if container_uri and (
+                        container_uri == uri
+                        or container_uri.rstrip("/") == uri.rstrip("/")
+                    ):
+                        inferred_model = container.labels.get("vlmparse_model_name")
+                        if inferred_model:
+                            logger.info(
+                                f"Inferred model {inferred_model} from URI {uri}"
+                            )
+                            model = inferred_model
+                            break
+            except Exception:
+                # If Docker is not available or fails, just proceed with provided arguments
+                pass
 
         if mode not in ["document", "md", "md_page"]:
             logger.error(f"Invalid mode: {mode}. Must be one of: document, md, md_page")
@@ -124,7 +151,8 @@ class DParseCLI:
             client = client_config.get_client(save_folder=out_folder, save_mode=mode)
         client.num_concurrent_files = concurrency
         client.num_concurrent_pages = concurrency
-
+        if dpi is not None:
+            client.config.dpi = int(dpi)
         documents = client.batch(file_paths)
 
         if documents is not None:
@@ -158,12 +186,6 @@ class DParseCLI:
             # Prepare table data
             table_data = []
             for container in vlmparse_containers:
-                image_name = (
-                    container.image.tags[0]
-                    if container.image.tags
-                    else str(container.image.id)[:12]
-                )
-
                 # Extract port mappings
                 ports = []
                 if container.ports:
@@ -172,22 +194,24 @@ class DParseCLI:
                             for binding in host_bindings:
                                 ports.append(f"{binding['HostPort']}")
 
-                port_str = ", ".join(ports) if ports else "N/A"
+                port_str = ", ".join(set(ports)) if ports else "N/A"
+                uri = container.labels.get("vlmparse_uri", "N/A")
+                gpu = container.labels.get("vlmparse_gpus", "N/A")
 
                 table_data.append(
                     [
                         container.name,
-                        container.short_id,
-                        image_name,
                         container.status,
                         port_str,
+                        gpu,
+                        uri,
                     ]
                 )
 
             # Display as table
             from tabulate import tabulate
 
-            headers = ["Name", "ID", "Image", "Status", "Port(s)"]
+            headers = ["Name", "Status", "Port(s)", "GPU", "URI"]
             table = tabulate(table_data, headers=headers, tablefmt="grid")
 
             logger.info(f"\nFound {len(vlmparse_containers)} vlmparse container(s):\n")
@@ -314,6 +338,24 @@ class DParseCLI:
             logger.error(
                 "Make sure Docker is running and you have the necessary permissions"
             )
+
+    def list_register(self):
+        """List all model keys registered in client and server registries."""
+        from vlmparse.registries import (
+            converter_config_registry,
+            docker_config_registry,
+        )
+
+        client_models = sorted(converter_config_registry.list_models())
+        server_models = sorted(docker_config_registry.list_models())
+
+        print("\nClient Models Registry:")
+        for model in client_models:
+            print(f"  - {model}")
+
+        print("\nServer Models Registry:")
+        for model in server_models:
+            print(f"  - {model}")
 
     def view(self, folder):
         import subprocess

@@ -50,7 +50,7 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
 
     tests = glob(str(Path(dataset_path) / "**/*.jsonl"), recursive=True)
 
-    map_tests = {Path(t).name: t for t in tests}
+    map_tests = {Path(t).parent.name: t for t in tests}
     with st.sidebar:
         sel_folders = [
             (
@@ -105,7 +105,7 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
         display_original_text = st.checkbox("Display original text", value=False)
         pdf_map = get_pdf_map(Path(dataset_path))
 
-        pdf_path = pdf_map[row.pdf.split("/")[-1]]
+        pdf_path = pdf_map[row.pdf_path.split("/")[-1]]
 
         download_pdf_page(pdf_path, page_no=0, file_name=f"{row.tests_name}.pdf")
 
@@ -152,8 +152,8 @@ def run_streamlit(folder: str, dataset_path="pulseia/fr-bench-pdf2md") -> None:
         test_obj = _tests[0]
 
         if st.button("Run test"):
-            success, message = test_obj.run(res)
-            st.markdown(f"Success: {success}")
+            success, message, best_match_score = test_obj.run(res)
+            st.markdown(f"Success: {success}, score: {best_match_score:.3f}")
             st.markdown(message)
 
         add_presence_test = st.checkbox("Add presence test")
