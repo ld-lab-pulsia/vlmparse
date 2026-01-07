@@ -192,7 +192,6 @@ class ChandraConverterConfig(OpenAIConverterConfig):
     """Chandra converter configuration."""
 
     model_name: str = "datalab-to/chandra"
-    default_model_name: str = "chandra"
     prompt_type: str = "ocr"  # Default prompt type
     bbox_scale: int = 1024
     max_retries: int = 6

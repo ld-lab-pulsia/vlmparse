@@ -73,7 +73,7 @@ class DParseCLI:
         from vlmparse.registries import converter_config_registry
 
         # Infer model from URI if provided
-        if uri is not None:
+        if uri is not None and model is None:
             import docker
 
             try:
