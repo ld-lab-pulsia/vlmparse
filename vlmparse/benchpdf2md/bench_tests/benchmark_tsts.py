@@ -881,7 +881,8 @@ class TextOrderTest(BasePDFTest):
                         min(before_match.dist, after_match.dist)
                         / max(len(before), len(after)),
                     )
-        return False, (
+        return (
+            False,
             f"Could not find a location where '{before[:40]}...' appears before "
             f"'{after[:40]}...'.",
             0.0,
