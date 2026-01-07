@@ -8,7 +8,6 @@ class OlmOCRDockerServerConfig(VLLMDockerServerConfig):
     """Configuration for OlmOCR model."""
 
     model_name: str = "allenai/olmOCR-2-7B-1025-FP8"
-    default_model_name: str = "olmocr"
     command_args: list[str] = Field(
         default_factory=lambda: [
             "--limit-mm-per-prompt",

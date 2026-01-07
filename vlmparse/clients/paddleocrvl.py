@@ -37,7 +37,7 @@ class PaddleOCRVLConverterConfig(OpenAIConverterConfig):
     """PaddleOCRVL converter"""
 
     model_name: str = "PaddlePaddle/PaddleOCR-VL"
-    preprompt: str | None = ""
+    preprompt: str | None = None
     postprompt: str | None = TASKS["ocr"]
     completion_kwargs: dict | None = {
         "temperature": 0.0,

@@ -131,11 +131,16 @@ class OpenAIConverterClient(BaseConverter):
     async def async_call_inside_page(self, page: Page) -> Page:
         """Process a single page using OpenAI-compatible API."""
         image = page.image
-        preprompt = (
-            [{"type": "text", "text": self.config.preprompt}]
-            if self.config.preprompt
-            else []
-        )
+        if self.config.preprompt:
+            preprompt = [
+                {
+                    "role": "system",
+                    "content": [{"type": "text", "text": self.config.preprompt}],
+                }
+            ]
+        else:
+            preprompt = []
+
         postprompt = (
             [{"type": "text", "text": self.config.postprompt}]
             if self.config.postprompt
@@ -143,10 +148,10 @@ class OpenAIConverterClient(BaseConverter):
         )
 
         messages = [
+            *preprompt,
             {
                 "role": "user",
                 "content": [
-                    *preprompt,
                     {
                         "type": "image_url",
                         "image_url": {
@@ -155,7 +160,7 @@ class OpenAIConverterClient(BaseConverter):
                     },
                     *postprompt,
                 ],
-            }
+            },
         ]
 
         response = await self._get_chat_completion(messages)

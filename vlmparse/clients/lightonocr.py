@@ -30,7 +30,7 @@ class LightOnOCRDockerServerConfig(VLLMDockerServerConfig):
 class LightOnOCRConverterConfig(OpenAIConverterConfig):
     """LightOnOCR converter - backward compatibility alias."""
 
-    preprompt: str | None = ""
+    preprompt: str | None = None
     postprompt: str | None = None
     completion_kwargs: dict | None = {"temperature": 0.2}
     max_image_size: int | None = 1540
