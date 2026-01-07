@@ -190,7 +190,7 @@ class TestConverterConfigurations:
         # Check specific settings
         assert config.dpi == 200
         assert config.max_image_size == 1540
-        assert config.preprompt == ""
+        assert config.preprompt is None
         assert config.postprompt is None
         assert config.completion_kwargs.get("temperature") == 0.2
 
