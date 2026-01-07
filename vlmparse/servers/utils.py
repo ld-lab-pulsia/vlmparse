@@ -124,6 +124,19 @@ def docker_server(
         container_port = config.container_port
         log_prefix = config.model_name
 
+        # Construct URI for label
+        uri = f"http://localhost:{config.docker_port}{config.get_base_url_suffix()}"
+
+        # Determine GPU label
+        if config.gpu_device_ids is None:
+            gpu_label = "all"
+        elif len(config.gpu_device_ids) == 0 or (
+            len(config.gpu_device_ids) == 1 and config.gpu_device_ids[0] == ""
+        ):
+            gpu_label = "cpu"
+        else:
+            gpu_label = ",".join(config.gpu_device_ids)
+
         # Start container
         container_kwargs = {
             "image": config.docker_image,
@@ -131,6 +144,11 @@ def docker_server(
             "detach": True,
             "remove": True,
             "name": f"vlmparse-{config.model_name.replace('/', '-')}-{getpass.getuser()}",
+            "labels": {
+                "vlmparse_model_name": config.model_name,
+                "vlmparse_uri": uri,
+                "vlmparse_gpus": gpu_label,
+            },
         }
 
         if device_requests is not None:
@@ -203,3 +221,30 @@ def docker_server(
             logger.info(f"Stopping container {container.short_id}")
             container.stop(timeout=10)
             logger.info("Container stopped")
+
+
+def get_model_from_uri(uri: str) -> str:
+    model = None
+    client = docker.from_env()
+    containers = client.containers.list()
+    for container in containers:
+        c_uri = container.labels.get("vlmparse_uri")
+        c_model = container.labels.get("vlmparse_model_name")
+
+        # Check if user URI matches container URI (ignoring /v1 suffix if missing)
+        if c_uri and (
+            c_uri == uri or c_uri.startswith(uri.rstrip("/")) or uri.startswith(c_uri)
+        ):
+            # Update URI to the correct one from container (likely has /v1)
+            if len(c_uri) > len(uri.rstrip("/")):
+                logger.info(f"Updating URI from {uri} to {c_uri}")
+                uri = c_uri
+
+            # Infer model if not provided
+            if model is None and c_model:
+                logger.info(f"Inferred model {c_model} from container")
+                model = c_model
+            break
+    if model is None:
+        raise ValueError(f"No model found for URI {uri}")
+    return model

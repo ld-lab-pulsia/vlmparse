@@ -80,6 +80,10 @@ class ConverterConfigRegistry:
             )
         return OpenAIConverterConfig(llm_params=LLMParams(model_name=model_name))
 
+    def list_models(self) -> list[str]:
+        """List all registered model names."""
+        return list(self._registry.keys())
+
 
 # Global registry instance
 converter_config_registry = ConverterConfigRegistry()

@@ -1,9 +1,9 @@
+import asyncio
 import io
 import os
 
 import orjson
 from loguru import logger
-from nest_asyncio import asyncio
 from pydantic import Field
 
 from vlmparse.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_tables

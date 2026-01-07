@@ -1,5 +1,3 @@
-SYSTEM_PROMPT = """You are an AI assistant specialized in converting PDF images to Markdown format."""
-
 PDF2MD_PROMPT = r"""Please follow these instructions for the conversion:
 1. Text Processing:
 - Accurately recognize all text content in the PDF image without guessing or inferring. Strictly adhere to the text of the PDF image without reformulating.
@@ -30,7 +28,9 @@ PDF2MD_PROMPT = r"""Please follow these instructions for the conversion:
 - For complex layouts, try to maintain the original document's structure and format as closely as possible.
 - Ignore headers or footers.
 - Do not surround your output with triple backticks.
-- If there is nothing on the image, just return the tag <blank> without anything else.
+- If there is nothing on the image, just return ONLY the tag <blank> without anything else.
+- Convert checked and unchecked boxes to [x] and [ ] respectively.
+- For form fields with individual character boxes, transcribe the text as a continuous string instead of splitting characters into separate table cells or using '|' as a separator.
 
 Please strictly follow these guidelines to ensure accuracy and consistency in the conversion. Your task is to accurately convert the content of the PDF image into Markdown format without adding any extra explanations or comments."""
 
@@ -58,7 +58,9 @@ PDF2HTML_PROMPT = r"""You are an AI assistant specialized in converting PDF imag
 - Ensure the output HTML document has a simple linear structure without complex hierarchy such as <div> tags.
 - Do not translate formatting such as color, bold, italic, etc.
 - Do not surround your output with triple backticks.
-- If there is nothing on the image, just return the tag <blank> without anything else.
+- If there is nothing on the image, just return ONLY the tag <blank> without anything else.
 - Ignore headers or footers, do not add them to the transcription.
+- Convert checked and unchecked boxes to [x] and [ ] respectively.
+- For form fields with individual character boxes, transcribe the text as a continuous string instead of splitting characters into separate table cells or using '|' as a separator.
 
 Please strictly follow these guidelines to ensure accuracy and consistency in the conversion. Your task is to accurately convert the content of the PDF image into HTML format without adding any extra explanations or comments."""

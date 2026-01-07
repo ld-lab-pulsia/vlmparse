@@ -26,6 +26,16 @@ OUT_FOLDER = Path(
         "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/fr-bench-pdf2md-preds",
     )
 )
+IN_FOLDER = Path(
+    "/data/data/docparser/benchmarks/select_difficult_pdf/validated_tests/tiny_test_tests_first_batch/tests/tiny_text_long_text/"
+)
+
+OUT_FOLDER = Path(
+    os.getenv(
+        "OUT_FOLDER_FR_BENCHMARK",
+        "/data/data/docparser/benchmarks/fr-bench-pdf2md-preds",
+    )
+)
 
 
 def process_and_run_benchmark(
