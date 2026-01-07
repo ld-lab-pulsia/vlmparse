@@ -1,7 +1,10 @@
+import asyncio
+from io import BytesIO
 from typing import Literal
 
 import httpx
 from loguru import logger
+from PIL import Image
 from pydantic import Field
 
 from vlmparse.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_tables
@@ -28,6 +31,11 @@ class DoclingDockerServerConfig(DockerServerConfig):
         default_factory=lambda: {
             "DOCLING_SERVE_HOST": "0.0.0.0",
             "DOCLING_SERVE_PORT": "5001",
+            "LOG_LEVEL": "DEBUG",  # Enable verbose logging
+            # Performance Tuning
+            # "UVICORN_WORKERS": "4",  # Increase web server workers (Default: 1)
+            # "DOCLING_SERVE_ENG_LOC_NUM_WORKERS": "4",  # Increase processing workers (Default: 2)
+            "DOCLING_NUM_THREADS": "32",  # Increase torch threads (Default: 4)
         }
     )
 
@@ -54,12 +62,21 @@ class DoclingDockerServerConfig(DockerServerConfig):
 class DoclingConverterConfig(ConverterConfig):
     """Configuration for Docling converter client."""
 
+    model_name: str = "docling"
     base_url: str = "http://localhost:5001"
     timeout: int = 300
     api_kwargs: dict = {"output_format": "markdown", "image_export_mode": "referenced"}
 
     def get_client(self, **kwargs) -> "DoclingConverter":
         return DoclingConverter(config=self, **kwargs)
+
+
+def image_to_bytes(image: Image.Image) -> bytes:
+    # Convert image to bytes for file upload
+    img_byte_arr = BytesIO()
+    image.save(img_byte_arr, format="PNG")
+    img_bytes = img_byte_arr.getvalue()
+    return img_bytes
 
 
 class DoclingConverter(BaseConverter):
@@ -84,29 +101,21 @@ class DoclingConverter(BaseConverter):
             debug=debug,
             return_documents_in_batch_mode=return_documents_in_batch_mode,
         )
-        self.client = httpx.AsyncClient(timeout=self.config.timeout)
 
     async def async_call_inside_page(self, page: Page) -> Page:
         """Process a single page using Docling Serve API."""
-        from io import BytesIO
+        img_bytes = await asyncio.to_thread(image_to_bytes, page.image)
 
-        image = page.image
-
-        # Convert image to bytes for file upload
-        img_byte_arr = BytesIO()
-        image.save(img_byte_arr, format="PNG")
-        img_bytes = img_byte_arr.getvalue()
-
-        files = {"files": ("image.png", img_bytes, "image/png")}
         data = self.config.api_kwargs
-
         url = f"{self.config.base_url}/v1/convert/file"
         logger.debug(f"Calling Docling API at: {url}")
+        files = {"files": ("image.png", img_bytes, "image/png")}
 
         try:
-            response = await self.client.post(
-                url, files=files, data=data, headers={"Accept": "application/json"}
-            )
+            async with httpx.AsyncClient(timeout=self.config.timeout) as client:
+                response = await client.post(
+                    url, files=files, data=data, headers={"Accept": "application/json"}
+                )
             response.raise_for_status()
 
             result = response.json()
@@ -135,24 +144,3 @@ class DoclingConverter(BaseConverter):
             page.text = f"Error: {str(e)}"
 
         return page
-
-    async def __aenter__(self):
-        """Async context manager entry."""
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit."""
-        await self.client.aclose()
-
-    def __del__(self):
-        """Cleanup when the converter is destroyed."""
-        try:
-            import asyncio
-
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(self.client.aclose())
-            else:
-                asyncio.run(self.client.aclose())
-        except Exception:
-            pass

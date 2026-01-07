@@ -170,5 +170,5 @@ for converter_config_cls in [MinerUConverterConfig, DoclingConverterConfig]:
     for name in names:
         converter_config_registry.register(
             name,
-            lambda uri, cls=converter_config_cls: cls(api_url=uri),
+            lambda uri, cls=converter_config_cls: cls(base_url=uri),
         )
