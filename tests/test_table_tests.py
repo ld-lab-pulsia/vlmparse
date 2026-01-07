@@ -87,7 +87,7 @@ def test_parse_html_tables(html_table):
 
 def test_match_cell(markdown_table):
     test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
-    result, _ = test.run(markdown_table)
+    result, _, _ = test.run(markdown_table)
     assert result
 
 
@@ -95,7 +95,7 @@ def test_cell_not_found(markdown_table):
     test = TableTest(
         pdf="test.pdf", page=1, id="test_id", type="table", cell="Missing Cell"
     )
-    result, explanation = test.run(markdown_table)
+    result, explanation, _ = test.run(markdown_table)
     assert not result
     assert "No cell matching" in explanation
 
@@ -109,7 +109,7 @@ def test_up_relationship(markdown_table):
         cell="Cell A2",
         up="Header 2",
     )
-    result, _ = test.run(markdown_table)
+    result, _, _ = test.run(markdown_table)
     assert result
 
     test = TableTest(
@@ -120,7 +120,7 @@ def test_up_relationship(markdown_table):
         cell="Cell A2",
         up="Wrong Header",
     )
-    result, explanation = test.run(markdown_table)
+    result, explanation, _ = test.run(markdown_table)
     assert not result
 
 
@@ -133,7 +133,7 @@ def test_down_relationship(markdown_table):
         cell="Cell A2",
         down="Cell B2",
     )
-    result, _ = test.run(markdown_table)
+    result, _, _ = test.run(markdown_table)
     assert result
 
     test = TableTest(
@@ -144,7 +144,7 @@ def test_down_relationship(markdown_table):
         cell="Cell A2",
         down="Wrong Cell",
     )
-    result, explanation = test.run(markdown_table)
+    result, explanation, _ = test.run(markdown_table)
     assert not result
 
 
@@ -157,7 +157,7 @@ def test_left_relationship(markdown_table):
         cell="Cell A2",
         left="Cell A1",
     )
-    result, _ = test.run(markdown_table)
+    result, _, _ = test.run(markdown_table)
     assert result
 
     test = TableTest(
@@ -168,7 +168,7 @@ def test_left_relationship(markdown_table):
         cell="Cell A2",
         left="Wrong Cell",
     )
-    result, explanation = test.run(markdown_table)
+    result, explanation, _ = test.run(markdown_table)
     assert not result
 
 
@@ -181,7 +181,7 @@ def test_right_relationship(markdown_table):
         cell="Cell A2",
         right="Cell A3",
     )
-    result, _ = test.run(markdown_table)
+    result, _, _ = test.run(markdown_table)
     assert result
 
     test = TableTest(
@@ -192,7 +192,7 @@ def test_right_relationship(markdown_table):
         cell="Cell A2",
         right="Wrong Cell",
     )
-    result, explanation = test.run(markdown_table)
+    result, explanation, _ = test.run(markdown_table)
     assert not result
 
 
@@ -205,7 +205,7 @@ def test_top_heading_relationship(markdown_table):
         cell="Cell B2",
         top_heading="Header 2",
     )
-    result, _ = test.run(markdown_table)
+    result, _, _ = test.run(markdown_table)
     assert result
 
     test = TableTest(
@@ -216,7 +216,7 @@ def test_top_heading_relationship(markdown_table):
         cell="Cell B2",
         top_heading="Wrong Header",
     )
-    result, explanation = test.run(markdown_table)
+    result, explanation, _ = test.run(markdown_table)
     assert not result
 
 
@@ -229,7 +229,7 @@ def test_left_heading_relationship(markdown_table):
         cell="Cell A3",
         left_heading="Cell A1",
     )
-    result, _ = test.run(markdown_table)
+    result, _, _ = test.run(markdown_table)
     assert result
 
     test = TableTest(
@@ -240,7 +240,7 @@ def test_left_heading_relationship(markdown_table):
         cell="Cell A3",
         left_heading="Wrong Cell",
     )
-    result, explanation = test.run(markdown_table)
+    result, explanation, _ = test.run(markdown_table)
     assert not result
 
 
@@ -256,7 +256,7 @@ def test_multiple_relationships(markdown_table):
         left="Cell A1",
         right="Cell A3",
     )
-    result, _ = test.run(markdown_table)
+    result, _, _ = test.run(markdown_table)
     assert result
 
     test = TableTest(
@@ -270,13 +270,13 @@ def test_multiple_relationships(markdown_table):
         left="Wrong Cell",
         right="Cell A3",
     )
-    result, explanation = test.run(markdown_table)
+    result, explanation, _ = test.run(markdown_table)
     assert not result
 
 
 def test_no_tables_found():
     test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
-    result, explanation = test.run("This is plain text with no tables")
+    result, explanation, _ = test.run("This is plain text with no tables")
     assert not result
     assert explanation == "No HTML tables found in the content"
 
@@ -291,28 +291,28 @@ def test_fuzzy_matching(markdown_table):
         max_diffs=1,
     )
     misspelled_table = markdown_table.replace("Cell A2", "Cel A2")
-    result, _ = test.run(misspelled_table)
+    result, _, _ = test.run(misspelled_table)
     assert result
 
 
 def test_with_stripped_content(markdown_table):
     test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
     stripped_table = markdown_table.strip()
-    result, explanation = test.run(stripped_table)
+    result, explanation, _ = test.run(stripped_table)
     assert result, f"Table test failed with stripped content: {explanation}"
 
 
 def test_table_at_end_of_file(markdown_table):
     test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
     content_with_table_at_end = "Some text before the table.\n" + markdown_table.strip()
-    result, explanation = test.run(content_with_table_at_end)
+    result, explanation, _ = test.run(content_with_table_at_end)
     assert result, f"Table at end of file not detected: {explanation}"
 
 
 def test_table_at_end_with_no_trailing_newline(markdown_table):
     test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
     content_without_newline = markdown_table.rstrip()
-    result, explanation = test.run(content_without_newline)
+    result, explanation, _ = test.run(content_without_newline)
     assert result, f"Table without trailing newline not detected: {explanation}"
 
 
@@ -321,7 +321,7 @@ def test_table_at_end_with_extra_spaces(markdown_table):
     test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
     lines = markdown_table.split("\n")
     content_with_extra_spaces = "\n".join([line + "   " for line in lines])
-    result, explanation = test.run(content_with_extra_spaces)
+    result, explanation, _ = test.run(content_with_extra_spaces)
     assert result, f"Table with extra spaces not detected: {explanation}"
 
 
@@ -330,7 +330,7 @@ def test_table_at_end_with_mixed_whitespace(markdown_table):
     content_with_mixed_whitespace = (
         "Some text before the table.\n" + markdown_table.strip() + "  \t  "
     )
-    result, explanation = test.run(content_with_mixed_whitespace)
+    result, explanation, _ = test.run(content_with_mixed_whitespace)
     assert result, f"Table with mixed whitespace not detected: {explanation}"
 
 
@@ -344,7 +344,7 @@ def test_table_at_end_with_mixed_whitespace(markdown_table):
 # | -------- | -------- | --------
 # | Cell A1  | Cell A2  | Cell A3  |
 # | Cell B1  | Cell B2  | Cell B3"""
-#     result, explanation = test.run(malformed_table)
+#     result, explanation, _ = test.run(malformed_table)
 #     assert result, f"Malformed table at end not detected: {explanation}"
 
 
@@ -357,14 +357,14 @@ def test_table_at_end_with_mixed_whitespace(markdown_table):
 # | Header 1 | Header 2 | Header 3 |
 # | Cell A1  | Cell A2  | Cell A3  |
 # | Cell B1  | Cell B2  | Cell B3  |"""
-#     result, explanation = test.run(incomplete_table)
+#     result, explanation, _ = test.run(incomplete_table)
 #     assert result, f"Incomplete table at end not detected: {explanation}"
 
 
 def test_table_with_excessive_blank_lines_at_end(markdown_table):
     test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
     table_with_blanks = markdown_table + "\n\n\n\n\n\n\n\n\n\n"
-    result, explanation = test.run(table_with_blanks)
+    result, explanation, _ = test.run(table_with_blanks)
     assert result, f"Table with blank lines at end not detected: {explanation}"
 
 
@@ -372,7 +372,7 @@ def test_table_at_end_after_long_text(markdown_table):
     test = TableTest(pdf="test.pdf", page=1, id="test_id", type="table", cell="Cell A2")
     long_text = "Lorem ipsum dolor sit amet, " * 100
     content_with_long_text = long_text + "\n" + markdown_table.strip()
-    result, explanation = test.run(content_with_long_text)
+    result, explanation, _ = test.run(content_with_long_text)
     assert result, f"Table after long text not detected: {explanation}"
 
 
@@ -383,7 +383,7 @@ def test_valid_table_at_eof_without_newline():
 | -------- | -------- | -------- |
 | Cell A1  | Cell A2  | Cell A3  |
 | Cell B1  | Cell B2  | Cell B3  |""".strip()
-    result, explanation = test.run(valid_table_eof)
+    result, explanation, _ = test.run(valid_table_eof)
     assert result, f"Valid table at EOF without newline not detected: {explanation}"
 
 
@@ -407,7 +407,7 @@ def test_normalizing():
         cell="6%",
         top_heading="Business\nSample",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
 
@@ -421,7 +421,7 @@ def test_mathematical_minus():
     test = TableTest(
         pdf="test.pdf", page=1, id="test_id", type="table", cell="-.34 (.22)"
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
 
@@ -443,7 +443,7 @@ def test_markdown_marker():
         cell="9",
         up="POINTS EARNED",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
 
@@ -466,7 +466,7 @@ def test_diffs():
         left="Sustl Sie",
         max_diffs=2,
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert not result, explanation
 
     test = TableTest(
@@ -478,7 +478,7 @@ def test_diffs():
         left="Sustainable Site",
         max_diffs=2,
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
 
@@ -499,7 +499,7 @@ level | [CO]      | [SO2] | [NOx]    |
         cell="20 μM",
         up=".002 nM",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert not result, explanation
 
 
@@ -519,7 +519,7 @@ consignatiediensten | 19816 | 1,0     | 6,0     | 2,8        | 1,2 |
         cell="2,8",
         left_heading="Slaapkwaliteit tijdens\nconsignatiediensten",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert not result, explanation
 
 
@@ -597,7 +597,7 @@ def test_big_table():
         cell="Planning for and managing residential, commercial and industrial development",
         down="Environmental protection,\nsupport for green projects\n(e.g. green grants,\nbuilding retrofits programs,\nzero waste)",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
 
@@ -720,7 +720,7 @@ def test_html_rowspans_colspans():
         cell="Refrigerators",
         left="Home Appliances",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
     test = TableTest(
@@ -731,7 +731,7 @@ def test_html_rowspans_colspans():
         cell="Washing Machines",
         left="Home Appliances",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
     test = TableTest(
@@ -742,7 +742,7 @@ def test_html_rowspans_colspans():
         cell="Microwaves",
         left="Home Appliances",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
     test = TableTest(
@@ -753,7 +753,7 @@ def test_html_rowspans_colspans():
         cell="Sofas",
         top_heading="Product Subcategory",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
     test = TableTest(
@@ -764,7 +764,7 @@ def test_html_rowspans_colspans():
         cell="135",
         top_heading="Q3",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
     test = TableTest(
@@ -775,7 +775,7 @@ def test_html_rowspans_colspans():
         cell="135",
         top_heading="Quarterly Sales ($000s)",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
     test = TableTest(
@@ -786,7 +786,7 @@ def test_html_rowspans_colspans():
         cell="1,712",
         top_heading="Quarterly Sales ($000s)",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
     test = TableTest(
@@ -797,7 +797,7 @@ def test_html_rowspans_colspans():
         cell="135",
         top_heading="Q2",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert not result, explanation
 
     test = TableTest(
@@ -808,7 +808,7 @@ def test_html_rowspans_colspans():
         cell="135",
         top_heading="Q1",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert not result, explanation
 
     test = TableTest(
@@ -819,7 +819,7 @@ def test_html_rowspans_colspans():
         cell="135",
         top_heading="Q4",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert not result, explanation
 
     test = TableTest(
@@ -830,7 +830,7 @@ def test_html_rowspans_colspans():
         cell="Home Appliances",
         top_heading="Product Category",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
     test = TableTest(
@@ -841,7 +841,7 @@ def test_html_rowspans_colspans():
         cell="Washing Machines",
         top_heading="Product Category",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert not result, explanation
 
     test = TableTest(
@@ -852,7 +852,7 @@ def test_html_rowspans_colspans():
         cell="Washing Machines",
         top_heading="Q3",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert not result, explanation
 
     test = TableTest(
@@ -863,7 +863,7 @@ def test_html_rowspans_colspans():
         cell="Washing Machines",
         top_heading="Quarterly Sales ($000s)",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert not result, explanation
 
     test = TableTest(
@@ -874,7 +874,7 @@ def test_html_rowspans_colspans():
         cell="Electronics",
         right="Laptops",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
     test = TableTest(
@@ -885,7 +885,7 @@ def test_html_rowspans_colspans():
         cell="Electronics",
         right="Accessories",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
 
@@ -919,7 +919,7 @@ Some text between tables...
         cell="John",
         right="28",
     )
-    result, explanation = test.run(content)
+    result, explanation, _ = test.run(content)
     assert result, explanation
 
     test = TableTest(
@@ -930,7 +930,7 @@ Some text between tables...
         cell="32",
         left="Jane",
     )
-    result, explanation = test.run(content)
+    result, explanation, _ = test.run(content)
     assert result, explanation
 
     test = TableTest(
@@ -941,7 +941,7 @@ Some text between tables...
         cell="Engineering",
         right="1.2M",
     )
-    result, explanation = test.run(content)
+    result, explanation, _ = test.run(content)
     assert result, explanation
 
     test = TableTest(
@@ -952,7 +952,7 @@ Some text between tables...
         cell="12",
         left="1.5M",
     )
-    result, explanation = test.run(content)
+    result, explanation, _ = test.run(content)
     assert result, explanation
 
     test = TableTest(
@@ -963,7 +963,7 @@ Some text between tables...
         cell="Bob",
         top_heading="Name",
     )
-    result, explanation = test.run(content)
+    result, explanation, _ = test.run(content)
     assert result, explanation
 
     test = TableTest(
@@ -974,7 +974,7 @@ Some text between tables...
         cell="HR",
         top_heading="Department",
     )
-    result, explanation = test.run(content)
+    result, explanation, _ = test.run(content)
     assert result, explanation
 
 
@@ -1059,7 +1059,7 @@ def test_multiple_html_tables():
         cell="USA",
         right="Washington DC",
     )
-    result, explanation = test.run(content)
+    result, explanation, _ = test.run(content)
     assert result, explanation
 
     test = TableTest(
@@ -1070,7 +1070,7 @@ def test_multiple_html_tables():
         cell="126M",
         left="Tokyo",
     )
-    result, explanation = test.run(content)
+    result, explanation, _ = test.run(content)
     assert result, explanation
 
     test = TableTest(
@@ -1081,7 +1081,7 @@ def test_multiple_html_tables():
         cell="XYZ Inc",
         right="Healthcare",
     )
-    result, explanation = test.run(content)
+    result, explanation, _ = test.run(content)
     assert result, explanation
 
     test = TableTest(
@@ -1092,7 +1092,7 @@ def test_multiple_html_tables():
         cell="15,000",
         left="$1.8B",
     )
-    result, explanation = test.run(content)
+    result, explanation, _ = test.run(content)
     assert result, explanation
 
     test = TableTest(
@@ -1103,7 +1103,7 @@ def test_multiple_html_tables():
         cell="Tokyo",
         top_heading="Capital",
     )
-    result, explanation = test.run(content)
+    result, explanation, _ = test.run(content)
     assert result, explanation
 
     test = TableTest(
@@ -1114,7 +1114,7 @@ def test_multiple_html_tables():
         cell="Finance",
         top_heading="Industry",
     )
-    result, explanation = test.run(content)
+    result, explanation, _ = test.run(content)
     assert result, explanation
 
 
@@ -1166,7 +1166,7 @@ def test_mixed_markdown_and_html_tables():
         cell="Orange",
         right="$0.80",
     )
-    result, explanation = test.run(content)
+    result, explanation, _ = test.run(content)
     assert result, explanation
 
     test = TableTest(
@@ -1177,7 +1177,7 @@ def test_mixed_markdown_and_html_tables():
         cell="February",
         right="$12,000",
     )
-    result, explanation = test.run(content)
+    result, explanation, _ = test.run(content)
     assert result, explanation
 
     test = TableTest(
@@ -1188,7 +1188,7 @@ def test_mixed_markdown_and_html_tables():
         cell="100",
         top_heading="Quantity",
     )
-    result, explanation = test.run(content)
+    result, explanation, _ = test.run(content)
     assert result, explanation
 
     test = TableTest(
@@ -1199,7 +1199,7 @@ def test_mixed_markdown_and_html_tables():
         cell="$4,800",
         top_heading="Profit",
     )
-    result, explanation = test.run(content)
+    result, explanation, _ = test.run(content)
     assert result, explanation
 
 
@@ -1222,7 +1222,7 @@ def test_br_tags_replacement():
         type="table",
         cell="Line 1 Line 2 Line 3",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
 
@@ -1479,7 +1479,7 @@ def test_real_complicated_table():
         cell="4.39",
         top_heading="χ2",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
     test = TableTest(
@@ -1490,7 +1490,7 @@ def test_real_complicated_table():
         cell="12.88",
         top_heading="%",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
     test = TableTest(
@@ -1501,7 +1501,7 @@ def test_real_complicated_table():
         cell="12.88",
         top_heading="Participants with no suicide attempt (n = 132)a",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
 
     test = TableTest(
@@ -1512,5 +1512,5 @@ def test_real_complicated_table():
         cell="12.88",
         top_heading="Table 1    Differences in diagnoses, gender and family status for participants with a suicide attempt and those without a suicide attempt within the 12-month follow-up interval",
     )
-    result, explanation = test.run(table)
+    result, explanation, _ = test.run(table)
     assert result, explanation
