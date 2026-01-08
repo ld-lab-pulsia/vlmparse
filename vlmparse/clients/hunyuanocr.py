@@ -20,6 +20,7 @@ class HunyuanOCRDockerServerConfig(VLLMDockerServerConfig):
             "0.2",
         ]
     )
+    aliases: list[str] = Field(default_factory=lambda: ["hunyuanocr"])
 
     @property
     def client_config(self):
@@ -40,3 +41,4 @@ class HunyuanOCRConverterConfig(OpenAIConverterConfig):
     }
     max_image_size: int | None = 1540
     dpi: int = 200
+    aliases: list[str] = Field(default_factory=lambda: ["hunyuanocr"])

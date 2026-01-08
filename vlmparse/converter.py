@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Literal
 
 from loguru import logger
+from pydantic import Field
 
 from .base_model import VLMParseBaseModel
 from .build_doc import convert_specific_page_to_image, get_page_count, resize_image
@@ -13,6 +14,7 @@ from .data_model.document import Document, Page, ProcessingError
 
 
 class ConverterConfig(VLMParseBaseModel):
+    aliases: list[str] = Field(default_factory=list)
     dpi: int = 175
     max_image_size: int | None = 4000
 

@@ -21,6 +21,7 @@ class LightOnOCRDockerServerConfig(VLLMDockerServerConfig):
             "--async-scheduling",
         ]
     )
+    aliases: list[str] = Field(default_factory=lambda: ["lightonocr"])
 
     @property
     def client_config(self):
@@ -35,3 +36,4 @@ class LightOnOCRConverterConfig(OpenAIConverterConfig):
     completion_kwargs: dict | None = {"temperature": 0.2}
     max_image_size: int | None = 1540
     dpi: int = 200
+    aliases: list[str] = Field(default_factory=lambda: ["lightonocr"])

@@ -15,7 +15,6 @@ class GraniteDoclingDockerServerConfig(VLLMDockerServerConfig):
     """Configuration for Granite Docling model."""
 
     model_name: str = "ibm-granite/granite-docling-258M"
-    default_model_name: str = "granite-docling"
     command_args: list[str] = Field(
         default_factory=lambda: [
             "--revision",
@@ -25,6 +24,7 @@ class GraniteDoclingDockerServerConfig(VLLMDockerServerConfig):
             "--trust-remote-code",
         ]
     )
+    aliases: list[str] = Field(default_factory=lambda: ["granite-docling"])
 
     @property
     def client_config(self):
@@ -43,6 +43,7 @@ class GraniteDoclingConverterConfig(OpenAIConverterConfig):
             "skip_special_tokens": False,
         },
     }
+    aliases: list[str] = Field(default_factory=lambda: ["granite-docling"])
 
     def get_client(self, **kwargs) -> "GraniteDoclingConverter":
         return GraniteDoclingConverter(config=self, **kwargs)

@@ -1,3 +1,5 @@
+from pydantic import Field
+
 from vlmparse.clients.openai_converter import OpenAIConverterConfig
 from vlmparse.servers.docker_server import VLLMDockerServerConfig
 
@@ -6,6 +8,7 @@ class NanonetOCR2DockerServerConfig(VLLMDockerServerConfig):
     """Configuration for NanonetOCR2 model."""
 
     model_name: str = "nanonets/Nanonets-OCR2-3B"
+    aliases: list[str] = Field(default_factory=lambda: ["nanonetsocr2"])
 
     @property
     def client_config(self):
@@ -23,3 +26,4 @@ class NanonetOCR2ConverterConfig(OpenAIConverterConfig):
     completion_kwargs: dict | None = {"temperature": 0.0, "max_tokens": 15000}
     max_image_size: int | None = None
     dpi: int = 200
+    aliases: list[str] = Field(default_factory=lambda: ["nanonetsocr2"])

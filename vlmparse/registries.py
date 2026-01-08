@@ -33,34 +33,34 @@ from vlmparse.clients.paddleocrvl import (
 )
 from vlmparse.servers.docker_server import DEFAULT_MODEL_NAME, docker_config_registry
 
-docker_config_registry.register("chandra", lambda: ChandraDockerServerConfig())
-docker_config_registry.register(
-    "datalab-to/chandra", lambda: ChandraDockerServerConfig()
-)
-docker_config_registry.register("lightonocr", lambda: LightOnOCRDockerServerConfig())
-docker_config_registry.register("dotsocr", lambda: DotsOCRDockerServerConfig())
-docker_config_registry.register("paddleocrvl", lambda: PaddleOCRVLDockerServerConfig())
-docker_config_registry.register(
-    "nanonets/Nanonets-OCR2-3B", lambda: NanonetOCR2DockerServerConfig()
-)
-docker_config_registry.register(
-    "tencent/HunyuanOCR", lambda: HunyuanOCRDockerServerConfig()
-)
-docker_config_registry.register("hunyuanocr", lambda: HunyuanOCRDockerServerConfig())
-docker_config_registry.register("docling", lambda: DoclingDockerServerConfig())
-docker_config_registry.register(
-    "allenai/olmOCR-2-7B-1025-FP8", lambda: OlmOCRDockerServerConfig()
-)
-docker_config_registry.register("olmocr-2-fp8", lambda: OlmOCRDockerServerConfig())
 
-docker_config_registry.register("mineru25", lambda: MinerUDockerServerConfig())
-docker_config_registry.register("deepseekocr", lambda: DeepSeekOCRDockerServerConfig())
-docker_config_registry.register(
-    "granite-docling", lambda: GraniteDoclingDockerServerConfig()
-)
-docker_config_registry.register(
-    "ibm-granite/granite-docling-258M", lambda: GraniteDoclingDockerServerConfig()
-)
+def get_default(cls, field_name):
+    field_info = cls.model_fields.get(field_name)
+    if field_info is None:
+        return [] if field_name == "aliases" else None
+    if field_info.default_factory:
+        return field_info.default_factory()
+    return field_info.default
+
+
+for server_config_cls in [
+    ChandraDockerServerConfig,
+    LightOnOCRDockerServerConfig,
+    DotsOCRDockerServerConfig,
+    PaddleOCRVLDockerServerConfig,
+    NanonetOCR2DockerServerConfig,
+    HunyuanOCRDockerServerConfig,
+    DoclingDockerServerConfig,
+    OlmOCRDockerServerConfig,
+    MinerUDockerServerConfig,
+    DeepSeekOCRDockerServerConfig,
+    GraniteDoclingDockerServerConfig,
+]:
+    aliases = get_default(server_config_cls, "aliases") or []
+    model_name = get_default(server_config_cls, "model_name")
+    names = [n for n in aliases + [model_name] if isinstance(n, str)]
+    for name in names:
+        docker_config_registry.register(name, lambda cls=server_config_cls: cls())
 
 
 class ConverterConfigRegistry:
@@ -137,105 +137,38 @@ for openai_model in [
             )
         ),
     )
-converter_config_registry.register(
-    "chandra",
-    lambda uri=None: ChandraConverterConfig(
-        llm_params=LLMParams(
-            base_url=uri or "http://localhost:8000/v1",
-            model_name="chandra",
-            api_key="",
-        )
-    ),
-)
 
-converter_config_registry.register(
-    "lightonocr",
-    lambda uri=None: LightOnOCRConverterConfig(
-        llm_params=LLMParams(
-            base_url=uri or "http://localhost:8000/v1",
-            model_name=DEFAULT_MODEL_NAME,
-            api_key="",
+for converter_config_cls in [
+    ChandraConverterConfig,
+    LightOnOCRConverterConfig,
+    DotsOCRConverterConfig,
+    PaddleOCRVLConverterConfig,
+    NanonetOCR2ConverterConfig,
+    HunyuanOCRConverterConfig,
+    DeepSeekOCRConverterConfig,
+    GraniteDoclingConverterConfig,
+    OlmOCRConverterConfig,
+]:
+    aliases = get_default(converter_config_cls, "aliases") or []
+    model_name = get_default(converter_config_cls, "model_name")
+    names = [n for n in aliases + [model_name] if isinstance(n, str)]
+    for name in names:
+        converter_config_registry.register(
+            name,
+            lambda uri, cls=converter_config_cls: cls(
+                llm_params=LLMParams(
+                    base_url=uri,
+                    model_name=DEFAULT_MODEL_NAME,
+                    api_key="",
+                )
+            ),
         )
-    ),
-)
-converter_config_registry.register(
-    "dotsocr",
-    lambda uri=None: DotsOCRConverterConfig(
-        llm_params=LLMParams(
-            base_url=uri or "http://localhost:8000/v1",
-            model_name=DEFAULT_MODEL_NAME,
-            api_key="",
+for converter_config_cls in [MinerUConverterConfig, DoclingConverterConfig]:
+    aliases = get_default(converter_config_cls, "aliases") or []
+    model_name = get_default(converter_config_cls, "model_name")
+    names = [n for n in aliases + [model_name] if isinstance(n, str)]
+    for name in names:
+        converter_config_registry.register(
+            name,
+            lambda uri, cls=converter_config_cls: cls(api_url=uri),
         )
-    ),
-)
-converter_config_registry.register(
-    "paddleocrvl",
-    lambda uri=None: PaddleOCRVLConverterConfig(
-        llm_params=LLMParams(
-            base_url=uri or "http://localhost:8000/v1",
-            model_name=DEFAULT_MODEL_NAME,
-            api_key="",
-        )
-    ),
-)
-
-converter_config_registry.register(
-    "nanonets/Nanonets-OCR2-3B",
-    lambda uri=None: NanonetOCR2ConverterConfig(
-        llm_params=LLMParams(
-            base_url=uri or "http://localhost:8000/v1",
-            model_name=DEFAULT_MODEL_NAME,
-            api_key="",
-        )
-    ),
-)
-converter_config_registry.register(
-    "hunyuanocr",
-    lambda uri=None: HunyuanOCRConverterConfig(
-        llm_params=LLMParams(
-            base_url=uri or "http://localhost:8000/v1",
-            model_name=DEFAULT_MODEL_NAME,
-            api_key="",
-        )
-    ),
-)
-converter_config_registry.register(
-    "deepseekocr",
-    lambda uri=None: DeepSeekOCRConverterConfig(
-        llm_params=LLMParams(
-            base_url=uri or "http://localhost:8000/v1",
-            model_name=DEFAULT_MODEL_NAME,
-            api_key="",
-        )
-    ),
-)
-converter_config_registry.register(
-    "docling",
-    lambda uri=None: DoclingConverterConfig(base_url=uri or "http://localhost:5001"),
-)
-for name in ["granite-docling", "ibm-granite/granite-docling-258M"]:
-    converter_config_registry.register(
-        name,
-        lambda uri=None: GraniteDoclingConverterConfig(
-            llm_params=LLMParams(
-                base_url=uri or "http://localhost:8000/v1",
-                # Served model name from GraniteDoclingDockerServerConfig.default_model_name
-                model_name="granite-docling",
-                api_key="",
-            )
-        ),
-    )
-converter_config_registry.register(
-    "olmocr-2-fp8",
-    lambda uri=None: OlmOCRConverterConfig(
-        llm_params=LLMParams(
-            base_url=uri or "http://localhost:8000/v1",
-            model_name="olmocr",
-            api_key="",
-        )
-    ),
-)
-converter_config_registry.register(
-    "mineru25",
-    lambda uri=None: MinerUConverterConfig(api_url=uri or "http://localhost:4297"),
-)

@@ -203,6 +203,7 @@ class ChandraConverterConfig(OpenAIConverterConfig):
             "top_p": 0.1,
         }
     )
+    aliases: list[str] = Field(default_factory=lambda: ["chandra"])
 
     def get_client(self, **kwargs) -> "ChandraConverterClient":
         return ChandraConverterClient(config=self, **kwargs)
@@ -315,7 +316,7 @@ class ChandraDockerServerConfig(VLLMDockerServerConfig):
     """Configuration for Chandra Docker server."""
 
     model_name: str = "datalab-to/chandra"
-    default_model_name: str = "chandra"
+    aliases: list[str] = Field(default_factory=lambda: ["chandra"])
 
     @property
     def client_config(self):
