@@ -14,26 +14,23 @@ from vlmparse.clients.openai_converter import (
 from vlmparse.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_tables
 from vlmparse.clients.pipe_utils.utils import clean_response
 from vlmparse.data_model.document import BoundingBox, Item, Page
-from vlmparse.servers.docker_server import DEFAULT_MODEL_NAME, DockerServerConfig
+from vlmparse.servers.docker_server import DEFAULT_MODEL_NAME, VLLMDockerServerConfig
 from vlmparse.utils import to_base64
 
 DOCKERFILE_DIR = Path(__file__).parent.parent.parent / "docker_pipelines"
 
 
-class DotsOCRDockerServerConfig(DockerServerConfig):
+class DotsOCRDockerServerConfig(VLLMDockerServerConfig):
     """Configuration for DotsOCR model."""
 
     model_name: str = "rednote-hilab/dots.ocr"
-    docker_image: str = "dotsocr:latest"
-    dockerfile_dir: str = str(DOCKERFILE_DIR / "dotsocr")
+    docker_image: str = "vllm/vllm-openai:v0.11.0"
+    # dockerfile_dir: str = str(DOCKERFILE_DIR / "dotsocr")
     command_args: list[str] = Field(
         default_factory=lambda: [
-            "--tensor-parallel-size",
-            "1",
+            "--async-scheduling",
             "--gpu-memory-utilization",
-            "0.8",
-            "--chat-template-content-format",
-            "string",
+            "0.95",
             "--served-model-name",
             DEFAULT_MODEL_NAME,
             "--trust-remote-code",
@@ -44,7 +41,6 @@ class DotsOCRDockerServerConfig(DockerServerConfig):
             # "16384",
         ]
     )
-    add_model_key_to_server: bool = False
     aliases: list[str] = Field(default_factory=lambda: ["dotsocr"])
 
     @property
@@ -75,7 +71,6 @@ class DotsOCRConverter(OpenAIConverterClient):
     # Constants
     MIN_PIXELS: ClassVar[int] = 3136
     MAX_PIXELS: ClassVar[int] = 11289600
-    IMAGE_FACTOR: ClassVar[int] = 28
 
     # Prompts
     PROMPTS: ClassVar[dict] = {
@@ -100,50 +95,6 @@ class DotsOCRConverter(OpenAIConverterClient):
         "prompt_ocr": """Extract the text content from this image.""",
     }
 
-    @staticmethod
-    def round_by_factor(number: int, factor: int) -> int:
-        """Returns the closest integer to 'number' that is divisible by 'factor'."""
-        return round(number / factor) * factor
-
-    @staticmethod
-    def ceil_by_factor(number: int, factor: int) -> int:
-        """Returns the smallest integer greater than or equal to 'number' that is divisible by 'factor'."""
-        return math.ceil(number / factor) * factor
-
-    @staticmethod
-    def floor_by_factor(number: int, factor: int) -> int:
-        """Returns the largest integer less than or equal to 'number' that is divisible by 'factor'."""
-        return math.floor(number / factor) * factor
-
-    def smart_resize(
-        self,
-        height: int,
-        width: int,
-        factor: int = 28,
-        min_pixels: int = 3136,
-        max_pixels: int = 11289600,
-    ):
-        """Rescales image dimensions to meet factor, pixel range, and aspect ratio constraints."""
-        if max(height, width) / min(height, width) > 200:
-            raise ValueError(
-                f"absolute aspect ratio must be smaller than 200, got {max(height, width) / min(height, width)}"
-            )
-        h_bar = max(factor, self.round_by_factor(height, factor))
-        w_bar = max(factor, self.round_by_factor(width, factor))
-        if h_bar * w_bar > max_pixels:
-            beta = math.sqrt((height * width) / max_pixels)
-            h_bar = max(factor, self.floor_by_factor(height / beta, factor))
-            w_bar = max(factor, self.floor_by_factor(width / beta, factor))
-        elif h_bar * w_bar < min_pixels:
-            beta = math.sqrt(min_pixels / (height * width))
-            h_bar = self.ceil_by_factor(height * beta, factor)
-            w_bar = self.ceil_by_factor(width * beta, factor)
-            if h_bar * w_bar > max_pixels:
-                beta = math.sqrt((h_bar * w_bar) / max_pixels)
-                h_bar = max(factor, self.floor_by_factor(h_bar / beta, factor))
-                w_bar = max(factor, self.floor_by_factor(w_bar / beta, factor))
-        return h_bar, w_bar
-
     def fetch_image(
         self,
         image,
@@ -151,22 +102,15 @@ class DotsOCRConverter(OpenAIConverterClient):
         max_pixels=None,
     ) -> Image.Image:
         """Fetch and resize image."""
-        # Resize if needed
-        if min_pixels or max_pixels:
-            width, height = image.size
-            if not min_pixels:
-                min_pixels = self.MIN_PIXELS
-            if not max_pixels:
-                max_pixels = self.MAX_PIXELS
-            resized_height, resized_width = self.smart_resize(
-                height,
-                width,
-                factor=self.IMAGE_FACTOR,
-                min_pixels=min_pixels,
-                max_pixels=max_pixels,
-            )
-            assert resized_height > 0 and resized_width > 0
-            image = image.resize((resized_width, resized_height))
+        if not max_pixels:
+            max_pixels = self.MAX_PIXELS
+
+        w, h = image.size
+        if w * h > max_pixels:
+            ratio = math.sqrt(max_pixels / (w * h))
+            new_w = int(w * ratio)
+            new_h = int(h * ratio)
+            image = image.resize((new_w, new_h))
 
         return image
 
@@ -213,7 +157,7 @@ class DotsOCRConverter(OpenAIConverterClient):
                             "url": f"data:image/png;base64,{to_base64(image)}"
                         },
                     },
-                    {"type": "text", "text": f"<|img|><|imgpad|><|endofimg|>{prompt}"},
+                    {"type": "text", "text": prompt},
                 ],
             }
         ]
@@ -223,12 +167,12 @@ class DotsOCRConverter(OpenAIConverterClient):
     async def _parse_image_vllm(self, origin_image, prompt_mode="prompt_layout_all_en"):
         """Parse image using VLLM inference."""
 
-        image = self.fetch_image(
-            origin_image, min_pixels=self.MIN_PIXELS, max_pixels=self.MAX_PIXELS
-        )
+        # image = self.fetch_image(
+        #     origin_image, min_pixels=self.MIN_PIXELS, max_pixels=self.MAX_PIXELS
+        # )
         prompt = self.PROMPTS[prompt_mode]
 
-        response = await self._async_inference_with_vllm(image, prompt)
+        response = await self._async_inference_with_vllm(origin_image, prompt)
 
         if prompt_mode in ["prompt_layout_all_en"]:
             try:
@@ -236,8 +180,8 @@ class DotsOCRConverter(OpenAIConverterClient):
                 cells = self.post_process_cells(
                     origin_image,
                     cells,
-                    image.width,
-                    image.height,
+                    origin_image.width,
+                    origin_image.height,
                 )
                 return {}, cells, False
             except Exception as e:
