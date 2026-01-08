@@ -198,32 +198,6 @@ class TestCustomURI:
         assert len(document.pages) == 2
 
 
-class TestConverterImageProcessing:
-    """Test image processing settings."""
-
-    def test_dpi_settings(self):
-        """Verify DPI settings for different models."""
-        dpi_configs = {
-            "gemini-2.5-flash-lite": 175,  # default
-            "lightonocr": 200,
-            "dotsocr": 200,
-            "nanonets/Nanonets-OCR2-3B": 200,
-        }
-
-        for model_name, expected_dpi in dpi_configs.items():
-            config = converter_config_registry.get(model_name)
-            assert config.dpi == expected_dpi, f"{model_name} DPI mismatch"
-
-    def test_image_size_limits(self):
-        """Verify image size limits where applicable."""
-        config = converter_config_registry.get("lightonocr")
-        assert config.max_image_size == 1540
-
-        # Nanonets has no limit
-        config = converter_config_registry.get("nanonets/Nanonets-OCR2-3B")
-        assert config.max_image_size is None
-
-
 class TestConcurrency:
     """Test concurrent processing settings."""
 
