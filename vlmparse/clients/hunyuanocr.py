@@ -16,6 +16,7 @@ class HunyuanOCRDockerServerConfig(VLLMDockerServerConfig):
             "--no-enable-prefix-caching",
             "--mm-processor-cache-gb",
             "0",
+            # Default argument in the hunyuan model, not sure why it is set this low.
             "--gpu-memory-utilization",
             "0.2",
         ]
