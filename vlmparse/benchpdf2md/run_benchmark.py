@@ -118,7 +118,7 @@ def process_and_run_benchmark(
             save_folder = (
                 (
                     save_folder
-                    / model_folder
+                    / model_folder.split("/")[-1]
                     / (datetime.datetime.now().strftime("%Y-%m-%dT%Hh%Mm%Ss"))
                 )
                 if not retry

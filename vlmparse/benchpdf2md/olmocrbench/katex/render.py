@@ -412,6 +412,9 @@ def render_equation(
     This function uses a ThreadPoolExecutor with a fixed number of threads to prevent
     resource leaks from unbounded thread creation.
     """
+
+    equation = equation.replace(r"\_", "_").replace(r"\*", "*")
+
     # Calculate hash for caching.
     eq_hash = get_equation_hash(equation, bg_color, text_color, font_size)
 

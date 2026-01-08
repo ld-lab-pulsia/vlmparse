@@ -14,16 +14,16 @@ from vlmparse.clients.openai_converter import (
 from vlmparse.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_tables
 from vlmparse.clients.pipe_utils.utils import clean_response
 from vlmparse.data_model.document import BoundingBox, Item, Page
-from vlmparse.servers.docker_server import DEFAULT_MODEL_NAME, VLLMDockerServerConfig
+from vlmparse.servers.docker_server import DEFAULT_MODEL_NAME, DockerServerConfig
 from vlmparse.utils import to_base64
 
 DOCKERFILE_DIR = Path(__file__).parent.parent.parent / "docker_pipelines"
 
 
-class DotsOCRDockerServerConfig(VLLMDockerServerConfig):
+class DotsOCRDockerServerConfig(DockerServerConfig):
     """Configuration for DotsOCR model."""
 
-    model_name: str = "/workspace/weights/DotsOCR"
+    model_name: str = "rednote-hilab/dots.ocr"
     docker_image: str = "dotsocr:latest"
     dockerfile_dir: str = str(DOCKERFILE_DIR / "dotsocr")
     command_args: list[str] = Field(
@@ -37,6 +37,11 @@ class DotsOCRDockerServerConfig(VLLMDockerServerConfig):
             "--served-model-name",
             DEFAULT_MODEL_NAME,
             "--trust-remote-code",
+            # "--limit-mm-per-prompt",
+            # '{"image": 1}',
+            # "--no-enable-prefix-caching",
+            # "--max-model-len",
+            # "16384",
         ]
     )
     add_model_key_to_server: bool = False
@@ -48,6 +53,7 @@ class DotsOCRDockerServerConfig(VLLMDockerServerConfig):
 
 
 class DotsOCRConverterConfig(OpenAIConverterConfig):
+    model_name: str = "rednote-hilab/dots.ocr"
     preprompt: str | None = ""
     postprompt: str | None = None
     completion_kwargs: dict | None = {

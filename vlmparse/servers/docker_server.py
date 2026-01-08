@@ -69,7 +69,7 @@ class VLLMDockerServerConfig(DockerServerConfig):
     docker_image: str = "vllm/vllm-openai:latest"
     default_model_name: str = DEFAULT_MODEL_NAME
     hf_home_folder: str | None = os.getenv("HF_HOME", None)
-    add_model_key_to_server: bool = True
+    add_model_key_to_server: bool = False
     container_port: int = 8000
     aliases: list[str] = Field(default_factory=list)
 

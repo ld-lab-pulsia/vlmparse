@@ -12,13 +12,13 @@ class LightOnOCRDockerServerConfig(VLLMDockerServerConfig):
     """Configuration for LightOnOCR model."""
 
     model_name: str = "lightonai/LightOnOCR-1B-1025"
-    docker_image: str = "lightonocr:latest"
-    dockerfile_dir: str = str(DOCKERFILE_DIR / "lightonocr")
     command_args: list[str] = Field(
         default_factory=lambda: [
             "--limit-mm-per-prompt",
             '{"image": 1}',
-            "--async-scheduling",
+            "--mm-processor-cache-gb",
+            "0",
+            "--no-enable-prefix-caching",
         ]
     )
     aliases: list[str] = Field(default_factory=lambda: ["lightonocr"])
@@ -31,9 +31,13 @@ class LightOnOCRDockerServerConfig(VLLMDockerServerConfig):
 class LightOnOCRConverterConfig(OpenAIConverterConfig):
     """LightOnOCR converter - backward compatibility alias."""
 
+    model_name: str = "lightonai/LightOnOCR-1B-1025"
     preprompt: str | None = None
     postprompt: str | None = None
-    completion_kwargs: dict | None = {"temperature": 0.2}
-    max_image_size: int | None = 1540
+    completion_kwargs: dict | None = {
+        "temperature": 0.2,
+        "max_tokens": 4096,
+        "top_p": 0.9,
+    }
     dpi: int = 200
     aliases: list[str] = Field(default_factory=lambda: ["lightonocr"])
