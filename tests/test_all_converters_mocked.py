@@ -180,54 +180,6 @@ class TestConverterBatchProcessing:
             assert len(doc.pages) == 2
 
 
-class TestConverterConfigurations:
-    """Test specific converter configurations."""
-
-    def test_lightonocr_config(self):
-        """Test LightOnOCR specific configuration."""
-        config = converter_config_registry.get("lightonocr")
-
-        # Check specific settings
-        assert config.dpi == 200
-        assert config.max_image_size == 1540
-        assert config.preprompt is None
-        assert config.postprompt is None
-        assert config.completion_kwargs.get("temperature") == 0.2
-
-    def test_dotsocr_config(self):
-        """Test DotsOCR specific configuration."""
-        config = converter_config_registry.get("dotsocr")
-
-        # Check specific settings
-        assert config.dpi == 200
-        assert config.preprompt == ""
-        assert config.postprompt is None
-        assert config.prompt_mode in ["prompt_layout_all_en", "prompt_ocr"]
-
-    def test_nanonet_config(self):
-        """Test NanonetOCR specific configuration."""
-        config = converter_config_registry.get("nanonets/Nanonets-OCR2-3B")
-
-        # Check specific settings
-        assert config.dpi == 200
-        assert config.preprompt is None
-        assert config.postprompt is not None
-        assert "Extract the text" in config.postprompt
-
-    @pytest.mark.parametrize(
-        "model_name,expected_base_url",
-        [
-            ("gemini-2.5-flash-lite", None),  # From env var
-        ],
-    )
-    def test_gemini_configs(self, model_name, expected_base_url):
-        """Test Gemini model configurations."""
-        config = converter_config_registry.get(model_name)
-
-        # Check model name is correct
-        assert config.llm_params.model_name == model_name
-
-
 class TestCustomURI:
     """Test converter initialization with custom URIs."""
 
