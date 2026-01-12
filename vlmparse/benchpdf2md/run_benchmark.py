@@ -39,6 +39,7 @@ def process_and_run_benchmark(
     filter_category: str | list[str] | None = None,
     dpi: int | None = None,
     port: int | None = None,
+    with_vllm_server: bool = False,
 ):
     in_folder = os.getenv("IN_FOLDER_FR_BENCHMARK", "pulseia/fr-bench-pdf2md")
     save_folder = os.getenv("OUT_FOLDER_FR_BENCHMARK", ".")
@@ -113,7 +114,7 @@ def process_and_run_benchmark(
                 model=model,
                 uri=uri,
                 gpus=str(gpu),
-                with_vllm_server=True,
+                with_vllm_server=with_vllm_server,
                 concurrency=concurrency,
                 port=port,
             )
