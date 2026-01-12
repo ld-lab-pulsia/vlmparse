@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 
 import numpy as np
 import PIL
@@ -64,7 +65,10 @@ def resize_image(image, max_image_size):
 
 
 def get_page_count(file_path):
-    pdf = pdfium.PdfDocument(file_path)
-    count = len(pdf)
-    pdf.close()
-    return count
+    if Path(file_path).suffix.lower() == "pdf":
+        pdf = pdfium.PdfDocument(file_path)
+        count = len(pdf)
+        pdf.close()
+        return count
+    else:
+        return 1

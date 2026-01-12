@@ -106,6 +106,31 @@ class TestConverterConfigs:
         # Verify API was called
         assert mock_openai_client.chat.completions.create.call_count == 2
 
+    def test_converter_image_processing(self, datadir, mock_openai_client):
+        """Test processing of a single image file."""
+        model_name = "gemini-2.5-flash-lite"
+        image_path = datadir / "page_with_formula.png"
+
+        config = converter_config_registry.get(model_name)
+        converter = config.get_client()
+
+        # Process image
+        document = converter(image_path)
+
+        # Verify document structure
+        assert isinstance(document, Document)
+        assert document.file_path == str(image_path)
+        assert len(document.pages) == 1, f"Expected 1 page, got {len(document.pages)}"
+
+        # Verify page
+        page = document.pages[0]
+        assert isinstance(page, Page)
+        assert page.text is not None
+        assert len(page.text) > 0
+
+        # Verify API was called once
+        assert mock_openai_client.chat.completions.create.call_count == 1
+
     def test_dotsocr_ocr_mode(self, file_path, dotsocr_mock_client):
         """Test DotsOCR converter in OCR mode."""
         config = converter_config_registry.get("dotsocr")
