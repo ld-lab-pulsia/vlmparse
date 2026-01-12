@@ -116,4 +116,4 @@ class ConverterWithServer:
         else:
             logger.info(f"Processed {len(file_paths)} documents to {out_folder}")
 
-        return documents
+        return out_folder

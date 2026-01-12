@@ -41,8 +41,13 @@ def process_and_run_benchmark(
     port: int | None = None,
     with_vllm_server: bool = False,
 ):
-    in_folder = os.getenv("IN_FOLDER_FR_BENCHMARK", "pulseia/fr-bench-pdf2md")
-    save_folder = os.getenv("OUT_FOLDER_FR_BENCHMARK", ".")
+    if in_folder is None:
+        in_folder = os.getenv("IN_FOLDER_FR_BENCHMARK", "pulseia/fr-bench-pdf2md")
+    if save_folder is None:
+        save_folder = os.getenv("OUT_FOLDER_FR_BENCHMARK", ".")
+
+    in_folder = Path(in_folder)
+    save_folder = Path(save_folder)
 
     if uri is not None:
         model = get_model_from_uri(uri)
@@ -131,7 +136,7 @@ def process_and_run_benchmark(
                 )
 
             tic = time.perf_counter()
-            batch_parser.parse(
+            save_folder = batch_parser.parse(
                 files,
                 out_folder=str(save_folder),
                 mode="document",
