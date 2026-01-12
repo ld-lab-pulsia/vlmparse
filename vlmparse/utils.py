@@ -28,12 +28,12 @@ def get_file_paths(inputs: str | list[str]):
         if "*" in pattern or "?" in pattern:
             file_paths.extend(glob(pattern, recursive=True))
         elif os.path.isdir(pattern):
-            file_paths.extend(glob(os.path.join(pattern, "*.pdf"), recursive=True))
+            file_paths.extend(glob(os.path.join(pattern, "*.*"), recursive=True))
         elif os.path.isfile(pattern):
             file_paths.append(pattern)
         else:
             logger.error(f"Invalid input: {pattern}")
-    file_paths = [f for f in file_paths if os.path.exists(f) and f.endswith(".pdf")]
+    file_paths = [f for f in file_paths if os.path.exists(f) and os.path.isfile(f)]
 
     if not file_paths:
         logger.error("No PDF files found matching the inputs patterns")
