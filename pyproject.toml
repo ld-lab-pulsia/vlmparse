@@ -8,7 +8,7 @@ version = "0.1.0"
 
 [project]
 name = "vlmparse"
-version = "0.1.1"
+version = "0.1.2"
 authors = []
 description = ""
 readme = "README.md"
