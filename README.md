@@ -11,7 +11,8 @@ Features:
 
 Supported Converters:
 
-- **Open Source Small VLMs**: `lightonocr`, `dotsocr`, `nanonets/Nanonets-OCR2-3B`
+- **Open Source Small VLMs**: `lightonocr`, `mineru2.5`, `hunyuanocr`, `paddleocrvl`, `granite-docling`, `olmocr2-fp8`, `dotsocr`, `chandra`, `deepseekocr`, `nanonets/Nanonets-OCR2-3B`
+- **Open Source Generalist VLMs**: such as the Qwen family.
 - **Pipelines**: `docling`
 - **Proprietary LLMs**: `gemini`, `gpt`
 

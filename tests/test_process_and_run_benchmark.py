@@ -93,26 +93,28 @@ def test_process_and_run_benchmark_end2end(test_data_dir, output_dir):
     )
 
     # Verify that outputs were created
-    model_dirs = list(output_dir.glob("gemini-2.5-flash-lite/*"))
+    model_dirs = list(output_dir.glob("gemini-2.5-flash-lite/**/results"))
     assert len(model_dirs) >= 1, "Expected at least one timestamp directory"
 
     latest_run = sorted(model_dirs)[-1]
 
     # Check that results directory exists
-    results_dir = latest_run / "results"
+    results_dir = latest_run
     assert results_dir.exists(), "Results directory should exist"
 
     # Check that zip file was created
     zip_files = list(results_dir.rglob("*.zip"))
     assert len(zip_files) >= 1, "Expected at least one zip file"
 
+    # metrics_results = list(latest_run.parent.glob("test_results/**")).glob("metrics.json"))
+
     # Check that test_results.parquet was created
-    test_results = list(latest_run.rglob("test_results.parquet"))
+    test_results = list(latest_run.parent.rglob("test_results.parquet"))
     assert len(test_results) == 1, "test_results.parquet should exist"
     test_results = test_results[0]
 
     # Check that by_type.xlsx was created
-    by_type_xlsx = list(latest_run.rglob("by_type.xlsx"))
+    by_type_xlsx = list(latest_run.parent.rglob("by_type.xlsx"))
     assert len(by_type_xlsx) == 1, "by_type.xlsx should exist"
     by_type_xlsx = by_type_xlsx[0]
     assert by_type_xlsx.exists(), "by_type.xlsx should exist"

@@ -30,6 +30,8 @@ class DeepSeekOCRDockerServerConfig(VLLMDockerServerConfig):
 class DeepSeekOCRConverterConfig(OpenAIConverterConfig):
     """DeepSeekOCR converter - backward compatibility alias."""
 
+    model_name: str = "deepseek-ai/DeepSeek-OCR"
+    aliases: list[str] = Field(default_factory=lambda: ["deepseekocr"])
     preprompt: str | None = None
     postprompt: str | None = "<|grounding|>Convert the document to markdown."
     completion_kwargs: dict | None = {

@@ -1,5 +1,3 @@
-import os
-from glob import glob
 from typing import Literal
 
 from loguru import logger
@@ -49,7 +47,7 @@ class DParseCLI:
         self,
         inputs: str | list[str],
         out_folder: str = ".",
-        model: str = "lightonocr",
+        model: str | None = None,
         uri: str | None = None,
         gpus: str | None = None,
         mode: Literal["document", "md", "md_page"] = "document",
@@ -63,102 +61,115 @@ class DParseCLI:
             inputs: List of folders to process
             out_folder: Output folder for parsed documents
             pipe: Converter type ("vllm", "openai", or "lightonocr", default: "vllm")
-            model: Model name (required for vllm, optional for others)
+            model: Model name. If not specified, the model will be inferred from the URI.
             uri: URI of the server, if not specified and the pipe is vllm, a local server will be deployed
             gpus: Comma-separated GPU device IDs (e.g., "0" or "0,1,2"). If not specified, all GPUs will be used.
             mode: Output mode - "document" (save as JSON zip), "md" (save as markdown file), "md_page" (save as folder of markdown pages)
             with_vllm_server: If True, a local VLLM server will be deployed if the model is not found in the registry. Note that if the model is in the registry and the uri is None, the server will be anyway deployed.
             dpi: DPI to use for the conversion. If not specified, the default DPI will be used.
         """
-        from vlmparse.registries import converter_config_registry
+        from vlmparse.converter_with_server import ConverterWithServer
 
-        # Infer model from URI if provided
-        if uri is not None and model is None:
-            import docker
+        converter_with_server = ConverterWithServer(
+            model=model,
+            uri=uri,
+            gpus=gpus,
+            with_vllm_server=with_vllm_server,
+            concurrency=concurrency,
+        )
 
-            try:
-                docker_client = docker.from_env()
-                containers = docker_client.containers.list()
-                for container in containers:
-                    # Check both exact match and match with/without trailing slash
-                    container_uri = container.labels.get("vlmparse_uri", "")
-                    if container_uri and (
-                        container_uri == uri
-                        or container_uri.rstrip("/") == uri.rstrip("/")
-                    ):
-                        inferred_model = container.labels.get("vlmparse_model_name")
-                        if inferred_model:
-                            logger.info(
-                                f"Inferred model {inferred_model} from URI {uri}"
-                            )
-                            model = inferred_model
-                            break
-            except Exception:
-                # If Docker is not available or fails, just proceed with provided arguments
-                pass
+        return converter_with_server.parse(
+            inputs=inputs, out_folder=out_folder, mode=mode, dpi=dpi
+        )
+        # from vlmparse.registries import converter_config_registry
 
-        if mode not in ["document", "md", "md_page"]:
-            logger.error(f"Invalid mode: {mode}. Must be one of: document, md, md_page")
-            return
+        # # Infer model from URI if provided
+        # if uri is not None and model is None:
+        #     import docker
 
-        # Expand file paths from glob patterns
-        file_paths = []
-        if isinstance(inputs, str):
-            inputs = [inputs]
-        for pattern in inputs:
-            if "*" in pattern or "?" in pattern:
-                file_paths.extend(glob(pattern, recursive=True))
-            elif os.path.isdir(pattern):
-                file_paths.extend(glob(os.path.join(pattern, "*.pdf"), recursive=True))
-            elif os.path.isfile(pattern):
-                file_paths.append(pattern)
-            else:
-                logger.error(f"Invalid input: {pattern}")
+        #     try:
+        #         docker_client = docker.from_env()
+        #         containers = docker_client.containers.list()
+        #         for container in containers:
+        #             # Check both exact match and match with/without trailing slash
+        #             container_uri = container.labels.get("vlmparse_uri", "")
+        #             if container_uri and (
+        #                 container_uri == uri
+        #                 or container_uri.rstrip("/") == uri.rstrip("/")
+        #             ):
+        #                 inferred_model = container.labels.get("vlmparse_model_name")
+        #                 if inferred_model:
+        #                     logger.info(
+        #                         f"Inferred model {inferred_model} from URI {uri}"
+        #                     )
+        #                     model = inferred_model
+        #                     break
+        #     except Exception:
+        #         # If Docker is not available or fails, just proceed with provided arguments
+        #         pass
 
-        # Filter to only existing PDF files
-        file_paths = [f for f in file_paths if os.path.exists(f) and f.endswith(".pdf")]
+        # if mode not in ["document", "md", "md_page"]:
+        #     logger.error(f"Invalid mode: {mode}. Must be one of: document, md, md_page")
+        #     return
 
-        if not file_paths:
-            logger.error("No PDF files found matching the inputs patterns")
-            return
+        # # Expand file paths from glob patterns
+        # file_paths = []
+        # if isinstance(inputs, str):
+        #     inputs = [inputs]
+        # for pattern in inputs:
+        #     if "*" in pattern or "?" in pattern:
+        #         file_paths.extend(glob(pattern, recursive=True))
+        #     elif os.path.isdir(pattern):
+        #         file_paths.extend(glob(os.path.join(pattern, "*.pdf"), recursive=True))
+        #     elif os.path.isfile(pattern):
+        #         file_paths.append(pattern)
+        #     else:
+        #         logger.error(f"Invalid input: {pattern}")
 
-        logger.info(f"Processing {len(file_paths)} files with {model} converter")
+        # # Filter to only existing PDF files
+        # file_paths = [f for f in file_paths if os.path.exists(f) and f.endswith(".pdf")]
 
-        gpu_device_ids = None
-        if gpus is not None:
-            gpu_device_ids = [g.strip() for g in gpus.split(",")]
+        # if not file_paths:
+        #     logger.error("No PDF files found matching the inputs patterns")
+        #     return
 
-        if uri is None:
-            from vlmparse.registries import docker_config_registry
+        # logger.info(f"Processing {len(file_paths)} files with {model} converter")
 
-            docker_config = docker_config_registry.get(model, default=with_vllm_server)
+        # gpu_device_ids = None
+        # if gpus is not None:
+        #     gpu_device_ids = [g.strip() for g in gpus.split(",")]
 
-            if docker_config is not None:
-                docker_config.gpu_device_ids = gpu_device_ids
-                server = docker_config.get_server(auto_stop=True)
-                server.start()
+        # if uri is None:
+        #     from vlmparse.registries import docker_config_registry
 
-                client = docker_config.get_client(
-                    save_folder=out_folder, save_mode=mode
-                )
-            else:
-                client = converter_config_registry.get(model).get_client(
-                    save_folder=out_folder, save_mode=mode
-                )
+        #     docker_config = docker_config_registry.get(model, default=with_vllm_server)
 
-        else:
-            client_config = converter_config_registry.get(model, uri=uri)
-            client = client_config.get_client(save_folder=out_folder, save_mode=mode)
-        client.num_concurrent_files = concurrency
-        client.num_concurrent_pages = concurrency
-        if dpi is not None:
-            client.config.dpi = int(dpi)
-        documents = client.batch(file_paths)
+        #     if docker_config is not None:
+        #         docker_config.gpu_device_ids = gpu_device_ids
+        #         server = docker_config.get_server(auto_stop=True)
+        #         server.start()
 
-        if documents is not None:
-            logger.info(f"Processed {len(documents)} documents to {out_folder}")
-        else:
-            logger.info(f"Processed {len(file_paths)} documents to {out_folder}")
+        #         client = docker_config.get_client(
+        #             save_folder=out_folder, save_mode=mode
+        #         )
+        #     else:
+        #         client = converter_config_registry.get(model).get_client(
+        #             save_folder=out_folder, save_mode=mode
+        #         )
+
+        # else:
+        #     client_config = converter_config_registry.get(model, uri=uri)
+        #     client = client_config.get_client(save_folder=out_folder, save_mode=mode)
+        # client.num_concurrent_files = concurrency
+        # client.num_concurrent_pages = concurrency
+        # if dpi is not None:
+        #     client.config.dpi = int(dpi)
+        # documents = client.batch(file_paths)
+
+        # if documents is not None:
+        #     logger.info(f"Processed {len(documents)} documents to {out_folder}")
+        # else:
+        #     logger.info(f"Processed {len(file_paths)} documents to {out_folder}")
 
     def list(self):
         """List all containers whose name begins with vlmparse."""

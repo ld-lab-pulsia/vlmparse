@@ -42,7 +42,6 @@ The Streamlit app provides:
    - Show only unverified tests
 
 2. **Interactive Test Review**:
-   - View converted markdown with syntax highlighting
    - View original PDF page image
    - Toggle layout visualization
    - Compare expected vs. actual text with diff highlighting
@@ -53,19 +52,15 @@ The Streamlit app provides:
    - Edit test parameters
    - Run tests manually
 
-4. **Navigation**:
-   - Browse through test results
-   - Download PDF pages for reference
-   - View test explanations and failure reasons
-
 ## Procedure of benchmark creation
 
 ### Opinionated choices
 
 - We focused on french documents.
-- We did not include mathematical equations in the benchmark as these are language agnostic and not specific to french documents.
+- We did not include mathematical equations in the benchmark as these are language agnostic and already heavily tested in other benchmarks.
 - We focused on difficult pages, such that the benchmark is difficult even for state of the art VLMs.
-- We reduced strictness of the tests compared to the Olmocr benchmark to ensure that failure indicates a real problem with the transcription.
+- We reduced strictness of the tests compared to the Olmocr benchmark to ensure that failure indicates a real problem with the transcription instead of a different choice of formatting.
+- We included tests of graphics description even though most small VLM were not trained to do this as we believe this is a crucial missing capability.
 
 ### Document collection
 We collected ~60000 french documents from the CCPDF dataset. Then we selected the most difficult pages to create the benchmark by doing the transcription with two VLMs and comparing the results (the largest edit distances were considered as the most difficult pages).
@@ -77,6 +72,8 @@ This led us to select these categories of pages:
 - Pages with manuscript text:
   - Some pages were downloaded from Gallica
   - Some pages were generated from French forms (such as CERFA): a filled form was generated from en empty one using the OpenAI image generation API.
+- Forms filled with handwritten text.
+- Pages with graphics from scientific papers or theses.
 
 ### Test generation
 Different catagories of tests were generated with prompts specifically adapted to each category (using the scripts in the `scripts/generation_scripts` folder).
