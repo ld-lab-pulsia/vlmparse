@@ -129,3 +129,13 @@ server.start()
 
 server.stop()
 ```
+
+
+Converter with automatic server deployment:
+
+```python
+from vlmparse.converter_with_server import ConverterWithServer
+
+converter_with_server = ConverterWithServer(model="mineru2.5")
+documents = converter_with_server.parse(inputs=["file1.pdf", "file2.pdf"], out_folder="./output")
+```
