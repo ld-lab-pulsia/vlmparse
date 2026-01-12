@@ -9,6 +9,7 @@ from vlmparse.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_ta
 from vlmparse.clients.pipe_utils.utils import clean_response
 from vlmparse.converter import BaseConverter, ConverterConfig
 from vlmparse.data_model.document import Page
+from vlmparse.servers.docker_server import DEFAULT_MODEL_NAME
 from vlmparse.utils import to_base64
 
 from .prompts import PDF2MD_PROMPT
@@ -17,11 +18,9 @@ GOOGLE_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 
 class LLMParams(VLMParseBaseModel):
-    api_key: str = os.getenv("GOOGLE_API_KEY")
-    base_url: str | None = "https://generativelanguage.googleapis.com/v1beta/openai/"
-    model_name: str = (
-        "gemini-2.5-flash-lite"  # "gemini-2.5-flash-lite" #"gemini-2.5-flash"
-    )
+    api_key: str = ""
+    base_url: str | None = None
+    model_name: str = DEFAULT_MODEL_NAME
     timeout: int | None = 500
     max_retries: int = 1
 

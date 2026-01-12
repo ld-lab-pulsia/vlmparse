@@ -17,8 +17,8 @@ from vlmparse.benchpdf2md.bench_tests.benchmark_tsts import (
 )
 from vlmparse.benchpdf2md.create_dataset import create_dataset
 from vlmparse.benchpdf2md.utils import bootstrap_and_format_results
+from vlmparse.converter_with_server import ConverterWithServer
 from vlmparse.data_model.document import Document
-from vlmparse.registries import converter_config_registry, docker_config_registry
 from vlmparse.servers.utils import get_model_from_uri
 
 IN_FOLDER = Path(
@@ -75,6 +75,7 @@ def process_and_run_benchmark(
         if isinstance(filter_type, str):
             filter_type = [filter_type]
         ds = ds[ds.type.isin(filter_type)]
+
     if filter_category is not None:
         assert (
             filter_category in ds.category.unique()
@@ -82,6 +83,7 @@ def process_and_run_benchmark(
         if isinstance(filter_category, str):
             filter_category = [filter_category]
         ds = ds[ds.category.isin(filter_category)]
+
     try:
         if retrylast:
             retry = save_folder / (model + "_" + str(dpi) if dpi is not None else model)
@@ -115,47 +117,74 @@ def process_and_run_benchmark(
             model_folder = model
             if dpi is not None:
                 model_folder = model + "_" + str(dpi)
-            save_folder = (
-                (
-                    save_folder
-                    / model_folder.split("/")[-1]
-                    / (datetime.datetime.now().strftime("%Y-%m-%dT%Hh%Mm%Ss"))
-                )
-                if not retry
-                else retry
+            save_folder = save_folder / model_folder
+            # save_folder = (
+            #     (
+            #         save_folder
+            #         / model_folder.split("/")[-1]
+            #         / (datetime.datetime.now().strftime("%Y-%m-%dT%Hh%Mm%Ss"))
+            #     )
+            #     if not retry
+            #     else retry
+            # )
+            # save_folder.mkdir(parents=True, exist_ok=True)
+
+            batch_parser = ConverterWithServer(
+                model=model,
+                uri=uri,
+                gpus=str(gpu),
+                with_vllm_server=True,
+                concurrency=concurrency,
+                port=port,
             )
-            save_folder.mkdir(parents=True, exist_ok=True)
 
-            if uri is None:
-                docker_config = docker_config_registry.get(model)
+            # if uri is None:
+            #     docker_config = docker_config_registry.get(model)
 
-                if docker_config is not None:
-                    docker_config.gpu_device_ids = [str(gpu)]
-                    docker_config.docker_port = port
-                    server = docker_config.get_server(auto_stop=True)
-                    server.start()
-                    client = docker_config.get_client()
-                else:
-                    client = converter_config_registry.get(model).get_client()
-            else:
-                client = converter_config_registry.get(model, uri=uri).get_client()
-            client.num_concurrent_pages = concurrency if not debug else 1
-            client.num_concurrent_files = concurrency if not debug else 1
-            if dpi is not None:
-                client.config.dpi = int(dpi)
-            else:
-                dpi = client.config.dpi
+            #     if docker_config is not None:
+            #         docker_config.gpu_device_ids = [str(gpu)]
+            #         docker_config.docker_port = port
+            #         server = docker_config.get_server(auto_stop=True)
+            #         server.start()
+            #         client = docker_config.get_client()
+            #     else:
+            #         client = converter_config_registry.get(model).get_client()
+            # else:
+            #     client = converter_config_registry.get(model, uri=uri).get_client()
+            # client.num_concurrent_pages = concurrency if not debug else 1
+            # client.num_concurrent_files = concurrency if not debug else 1
+            # if dpi is not None:
+            #     client.config.dpi = int(dpi)
+            # else:
+            #     dpi = client.config.dpi
 
-            client.debug = debug
+            # client.debug = debug
 
             if dry_run:
-                client.save_folder = None
                 logger.info("Dry run, converting first 3 files")
-                client.batch(files[:3])
+                batch_parser.parse(
+                    files[:3],
+                    save_folder=None,
+                    mode="document",
+                    dpi=dpi,
+                    debug=debug,
+                    retrylast=retrylast,
+                )
+                # client.save_folder = None
+                # logger.info("Dry run, converting first 3 files")
+                # client.batch(files[:3])
 
-            client.save_folder = str(save_folder)
+            # client.save_folder = str(save_folder)
             tic = time.perf_counter()
-            client.batch(files)
+            batch_parser.parse(
+                files,
+                save_folder=str(save_folder),
+                mode="document",
+                dpi=dpi,
+                debug=debug,
+                retrylast=retrylast,
+            )
+            # client.batch(files)
             total_time = time.perf_counter() - tic
             logger.info(
                 f"Time taken to convert {len(files)} files: {total_time:.2f} seconds"

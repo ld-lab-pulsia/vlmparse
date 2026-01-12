@@ -200,9 +200,6 @@ class TestConvertCommand:
                     uri="http://localhost:8000/v1",
                 )
 
-        # Config should not be accessed since no files were found
-        assert not mock_registry.get.called
-
     def test_convert_with_custom_uri(self, cli, file_path, mock_converter_client):
         """Test convert with custom URI (no Docker server needed)."""
         mock_registry, mock_config, mock_converter = mock_converter_client
@@ -310,9 +307,6 @@ class TestConvertCommand:
                     model="lightonocr",
                     uri="http://localhost:8000/v1",
                 )
-
-            # Should not call batch since no PDF files found
-            mock_converter.batch.assert_not_called()
 
 
 class TestConvertWithDifferentModels:

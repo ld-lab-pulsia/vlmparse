@@ -12,6 +12,9 @@ from .base_model import VLMParseBaseModel
 from .build_doc import convert_specific_page_to_image, get_page_count, resize_image
 from .data_model.document import Document, Page, ProcessingError
 
+# Add a lock to ensure PDFium is accessed by only one thread/task at a time
+PDFIUM_LOCK = threading.Lock()
+
 
 class ConverterConfig(VLMParseBaseModel):
     aliases: list[str] = Field(default_factory=list)
@@ -42,14 +45,12 @@ class BaseConverter:
         self.debug = debug
         self.return_documents_in_batch_mode = return_documents_in_batch_mode
         self.save_page_images = save_page_images
-        # Add a lock to ensure PDFium is accessed by only one thread/task at a time
-        self._render_lock = threading.Lock()
 
     async def async_call_inside_page(self, page: Page) -> Page:
         raise NotImplementedError
 
     def add_page_image(self, page: Page, file_path, page_idx):
-        with self._render_lock:
+        with PDFIUM_LOCK:
             image = convert_specific_page_to_image(
                 file_path,
                 page_idx,
