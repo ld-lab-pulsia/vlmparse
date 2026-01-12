@@ -136,7 +136,7 @@ def process_and_run_benchmark(
                 )
 
             tic = time.perf_counter()
-            save_folder = batch_parser.parse(
+            batch_parser.parse(
                 files,
                 out_folder=str(save_folder),
                 mode="document",
@@ -144,6 +144,7 @@ def process_and_run_benchmark(
                 debug=debug,
                 retrylast=retrylast,
             )
+            save_folder = batch_parser.get_out_folder()
 
             total_time = time.perf_counter() - tic
             logger.info(
