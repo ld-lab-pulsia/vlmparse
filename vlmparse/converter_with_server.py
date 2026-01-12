@@ -68,11 +68,10 @@ class ConverterWithServer:
         retrylast: bool = False,
     ):
         file_paths = get_file_paths(inputs)
-
+        assert (
+            out_folder is not None
+        ), "out_folder must be provided if retrylast is True"
         if retrylast:
-            assert (
-                out_folder is not None
-            ), "out_folder must be provided if retrylast is True"
             retry = Path(out_folder)
             previous_runs = sorted(os.listdir(retry))
             if len(previous_runs) > 0:

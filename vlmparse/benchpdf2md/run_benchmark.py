@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import tempfile
 import time
 from pathlib import Path
 
@@ -21,17 +22,6 @@ from vlmparse.converter_with_server import ConverterWithServer
 from vlmparse.data_model.document import Document
 from vlmparse.servers.utils import get_model_from_uri
 
-IN_FOLDER = Path(
-    "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/select_difficult_pdf/validated_tests/tiny_test_tests_first_batch/tests/tiny_text_long_text/"
-)
-
-OUT_FOLDER = Path(
-    os.getenv(
-        "OUT_FOLDER_FR_BENCHMARK",
-        "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/fr-bench-pdf2md-preds3",
-    )
-)
-
 
 def process_and_run_benchmark(
     model: str | None = None,
@@ -41,9 +31,8 @@ def process_and_run_benchmark(
     debug: bool = False,
     gpu: int = 2,
     regenerate: bool = False,
-    in_folder: Path
-    | str = "/mnt/projects/rag-pretraitement/data/docparser/benchmarks/fr-bench-pdf2md",
-    save_folder: Path | str = OUT_FOLDER,
+    in_folder: Path | str | None = None,
+    save_folder: Path | str | None = None,
     retrylast: bool = False,
     dry_run: bool = True,
     filter_type: str | list[str] | None = None,
@@ -51,20 +40,21 @@ def process_and_run_benchmark(
     dpi: int | None = None,
     port: int | None = None,
 ):
-    # Infer model and URI from Docker if URI is provided
+    in_folder = os.getenv("IN_FOLDER_FR_BENCHMARK", "pulseia/fr-bench-pdf2md")
+    save_folder = os.getenv("OUT_FOLDER_FR_BENCHMARK", ".")
+
     if uri is not None:
         model = get_model_from_uri(uri)
 
     if model is None:
         model = "gemini-2.5-flash-lite"
 
-    # in_folder = Path(in_folder)
     save_folder = Path(save_folder)
 
-    if in_folder == "pulseia/fr-bench-pdf2md" or in_folder == "allenai/olmOCR-bench":
+    if in_folder == "pulseia/fr-bench-pdf2md":
         local_folder_path = snapshot_download(
             repo_id=in_folder,
-            repo_type="dataset",  # Use "model" or "space" for other types
+            repo_type="dataset",
         )
         in_folder = local_folder_path
     logger.info(f"In folder: {in_folder}")
@@ -118,16 +108,6 @@ def process_and_run_benchmark(
             if dpi is not None:
                 model_folder = model + "_" + str(dpi)
             save_folder = save_folder / model_folder
-            # save_folder = (
-            #     (
-            #         save_folder
-            #         / model_folder.split("/")[-1]
-            #         / (datetime.datetime.now().strftime("%Y-%m-%dT%Hh%Mm%Ss"))
-            #     )
-            #     if not retry
-            #     else retry
-            # )
-            # save_folder.mkdir(parents=True, exist_ok=True)
 
             batch_parser = ConverterWithServer(
                 model=model,
@@ -138,53 +118,27 @@ def process_and_run_benchmark(
                 port=port,
             )
 
-            # if uri is None:
-            #     docker_config = docker_config_registry.get(model)
-
-            #     if docker_config is not None:
-            #         docker_config.gpu_device_ids = [str(gpu)]
-            #         docker_config.docker_port = port
-            #         server = docker_config.get_server(auto_stop=True)
-            #         server.start()
-            #         client = docker_config.get_client()
-            #     else:
-            #         client = converter_config_registry.get(model).get_client()
-            # else:
-            #     client = converter_config_registry.get(model, uri=uri).get_client()
-            # client.num_concurrent_pages = concurrency if not debug else 1
-            # client.num_concurrent_files = concurrency if not debug else 1
-            # if dpi is not None:
-            #     client.config.dpi = int(dpi)
-            # else:
-            #     dpi = client.config.dpi
-
-            # client.debug = debug
-
             if dry_run:
                 logger.info("Dry run, converting first 3 files")
                 batch_parser.parse(
                     files[:3],
-                    save_folder=None,
+                    out_folder=tempfile.mkdtemp(),
                     mode="document",
                     dpi=dpi,
                     debug=debug,
                     retrylast=retrylast,
                 )
-                # client.save_folder = None
-                # logger.info("Dry run, converting first 3 files")
-                # client.batch(files[:3])
 
-            # client.save_folder = str(save_folder)
             tic = time.perf_counter()
             batch_parser.parse(
                 files,
-                save_folder=str(save_folder),
+                out_folder=str(save_folder),
                 mode="document",
                 dpi=dpi,
                 debug=debug,
                 retrylast=retrylast,
             )
-            # client.batch(files)
+
             total_time = time.perf_counter() - tic
             logger.info(
                 f"Time taken to convert {len(files)} files: {total_time:.2f} seconds"
