@@ -54,6 +54,7 @@ class DParseCLI:
         with_vllm_server: bool = False,
         concurrency: int = 10,
         dpi: int | None = None,
+        prompt_mode: Literal["layout", "ocr", "image_description"] = "ocr",
     ):
         """Parse PDF documents and save results.
 
@@ -67,6 +68,7 @@ class DParseCLI:
             mode: Output mode - "document" (save as JSON zip), "md" (save as markdown file), "md_page" (save as folder of markdown pages)
             with_vllm_server: If True, a local VLLM server will be deployed if the model is not found in the registry. Note that if the model is in the registry and the uri is None, the server will be anyway deployed.
             dpi: DPI to use for the conversion. If not specified, the default DPI will be used.
+            prompt_mode: Prompt mode to use for the conversion.
         """
         from vlmparse.converter_with_server import ConverterWithServer
 
@@ -79,7 +81,11 @@ class DParseCLI:
         )
 
         return converter_with_server.parse(
-            inputs=inputs, out_folder=out_folder, mode=mode, dpi=dpi
+            inputs=inputs,
+            out_folder=out_folder,
+            mode=mode,
+            dpi=dpi,
+            prompt_mode=prompt_mode,
         )
         # from vlmparse.registries import converter_config_registry
 

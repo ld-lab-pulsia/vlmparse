@@ -66,22 +66,25 @@ class ConverterWithServer:
         dpi: int | None = None,
         debug: bool = False,
         retrylast: bool = False,
+        prompt_mode: Literal["layout", "ocr", "image_description"] = "ocr",
     ):
         file_paths = get_file_paths(inputs)
         assert (
             out_folder is not None
         ), "out_folder must be provided if retrylast is True"
+
         if retrylast:
             retry = Path(out_folder)
             previous_runs = sorted(os.listdir(retry))
+
             if len(previous_runs) > 0:
-                retry = retry / previous_runs[-1]
+                out_folder = retry / previous_runs[-1]
             else:
                 raise ValueError(
                     "No previous runs found, do not use the retrylast flag"
                 )
             already_processed = [
-                f.removesuffix(".zip") for f in os.listdir(retry / "results")
+                f.removesuffix(".zip") for f in os.listdir(out_folder / "results")
             ]
             file_paths = [
                 f
@@ -106,6 +109,7 @@ class ConverterWithServer:
         self.client.save_mode = mode
         self.client.num_concurrent_files = self.concurrency if not debug else 1
         self.client.num_concurrent_pages = self.concurrency if not debug else 1
+        self.client.set_prompt_mode(prompt_mode)
 
         logger.info(f"Processing {len(file_paths)} files with {self.model} converter")
 

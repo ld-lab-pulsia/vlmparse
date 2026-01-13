@@ -177,3 +177,8 @@ class BaseConverter:
     def batch(self, file_paths: list[str | Path]) -> list[Document] | None:
         """Synchronous wrapper for async_batch."""
         return asyncio.run(self.async_batch(file_paths))
+
+    def set_prompt_mode(self, prompt_mode: str):
+        if prompt_mode not in ["ocr"]:
+            raise ValueError(f"Invalid prompt mode for this model: {prompt_mode}")
+        self.prompt_mode = prompt_mode
