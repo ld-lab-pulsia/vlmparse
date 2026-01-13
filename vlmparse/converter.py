@@ -11,13 +11,11 @@ from pydantic import Field
 
 from .base_model import VLMParseBaseModel
 from .build_doc import convert_specific_page_to_image, get_page_count, resize_image
+from .constants import IMAGE_EXTENSIONS, PDF_EXTENSION
 from .data_model.document import Document, Page, ProcessingError
 
 # Add a lock to ensure PDFium is accessed by only one thread/task at a time
 PDFIUM_LOCK = threading.Lock()
-
-IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp", ".gif", ".webp"]
-PDF_EXTENSION = ".pdf"
 
 
 class ConverterConfig(VLMParseBaseModel):

@@ -6,6 +6,8 @@ import PIL
 import pypdfium2 as pdfium
 from loguru import logger
 
+from .constants import PDF_EXTENSION
+
 
 def convert_pdfium(file_path, dpi):
     pdf = pdfium.PdfDocument(file_path)
@@ -65,7 +67,7 @@ def resize_image(image, max_image_size):
 
 
 def get_page_count(file_path):
-    if Path(file_path).suffix.lower() == "pdf":
+    if Path(file_path).suffix.lower() == PDF_EXTENSION:
         pdf = pdfium.PdfDocument(file_path)
         count = len(pdf)
         pdf.close()
