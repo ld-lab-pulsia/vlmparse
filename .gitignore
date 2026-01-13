@@ -222,7 +222,6 @@ mnist/
 # *[Dd][Ee][Bb][Uu][Gg]*.yaml
 
 *.ttf
-*.png
 paddle_models/
 debug_*
 *.pt
