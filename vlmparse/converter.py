@@ -6,10 +6,12 @@ from pathlib import Path
 from typing import Literal
 
 from loguru import logger
+from PIL import Image
 from pydantic import Field
 
 from .base_model import VLMParseBaseModel
 from .build_doc import convert_specific_page_to_image, get_page_count, resize_image
+from .constants import IMAGE_EXTENSIONS, PDF_EXTENSION
 from .data_model.document import Document, Page, ProcessingError
 
 # Add a lock to ensure PDFium is accessed by only one thread/task at a time
@@ -50,12 +52,24 @@ class BaseConverter:
         raise NotImplementedError
 
     def add_page_image(self, page: Page, file_path, page_idx):
-        with PDFIUM_LOCK:
-            image = convert_specific_page_to_image(
-                file_path,
-                page_idx,
-                dpi=self.config.dpi,
+        if Path(file_path).suffix.lower() in IMAGE_EXTENSIONS:
+            image = Image.open(file_path)
+            if image.mode != "RGB":
+                image = image.convert("L").convert("RGB")
+
+        elif Path(file_path).suffix.lower() == PDF_EXTENSION:
+            with PDFIUM_LOCK:
+                image = convert_specific_page_to_image(
+                    file_path,
+                    page_idx,
+                    dpi=self.config.dpi,
+                )
+
+        else:
+            raise ValueError(
+                f"Unsupported file extension: {Path(file_path).suffix.lower()}"
             )
+
         image = resize_image(image, self.config.max_image_size)
         page.buffer_image = image
         return page
