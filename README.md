@@ -18,6 +18,19 @@ Supported Converters:
 
 ## Installation
 
+Simplest solution with only the cli: 
+
+```bash
+uv tool install vlmparse
+```
+
+If you want to run the granite-docling model or use the streamlit viewing app:
+
+```bash
+uv tool install vlmparse[docling_core,st_app]
+```
+
+If you prefer cloning the repository and using the local version:
 ```bash
 uv sync
 ```
@@ -32,9 +45,10 @@ Activate the virtual environment:
 ```bash
 source .venv/bin/activate
 ```
-Other solution: append uv run to all the commands below.
 
 ## CLI Usage
+
+Note that you can bypass the previous installation step and just add uvx before each of the commands below.
 
 ### Convert PDFs
 

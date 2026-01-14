@@ -2,10 +2,6 @@
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[metadata]
-name = "vlmparse"
-version = "0.1.0"
-
 [project]
 name = "vlmparse"
 version = "0.1.4"
