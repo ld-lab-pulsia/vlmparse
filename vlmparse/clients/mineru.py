@@ -1,6 +1,5 @@
 import asyncio
 import io
-import os
 
 import orjson
 from loguru import logger
@@ -20,18 +19,21 @@ class MinerUDockerServerConfig(DockerServerConfig):
     docker_image: str = "pulsia/mineru25apipulsia:latest"
     docker_port: int = 4299
     container_port: int = 8000
+    server_ready_indicators: list[str] = Field(
+        default_factory=lambda: ["Uvicorn running"]
+    )
 
     @property
     def client_config(self):
-        return MinerUConverterConfig(api_url=f"http://localhost:{self.docker_port}")
+        return MinerUConverterConfig(base_url=f"http://localhost:{self.docker_port}")
 
 
 class MinerUConverterConfig(ConverterConfig):
     """Configuration for MinerU API converter."""
 
-    base_url: str = Field(
-        default_factory=lambda: os.getenv("MINERU_API_URL", "http://localhost:4299")
-    )
+    base_url: str
+    model_name: str = "opendatalab/MinerU2.5-2509-1.2B"
+    aliases: list[str] = Field(default_factory=lambda: ["mineru25"])
     timeout: int = 600
 
     def get_client(self, **kwargs) -> "MinerUConverter":
@@ -54,13 +56,12 @@ class MinerUConverter(BaseConverter):
         super().__init__(config=config, **kwargs)
         from httpx import AsyncClient
 
-        self.client = AsyncClient(base_url=config.api_url, timeout=config.timeout)
+        self.client = AsyncClient(base_url=config.base_url, timeout=config.timeout)
 
     async def _async_inference_with_api(self, image) -> list:
         """Run async inference with MinerU API."""
 
         img_byte_arr = await asyncio.to_thread(to_bytes_io, image)
-
         response = await self.client.post(
             "process-image",
             files={"image": ("image.png", img_byte_arr, "image/png")},

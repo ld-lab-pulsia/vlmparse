@@ -78,7 +78,7 @@ class VLLMDockerServerConfig(DockerServerConfig):
         from vlmparse.clients.openai_converter import LLMParams
 
         return LLMParams(
-            base_url=f"http://localhost:{self.docker_port}/v1",
+            base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
             model_name=self.default_model_name,
         )
 

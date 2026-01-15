@@ -62,8 +62,8 @@ class DoclingDockerServerConfig(DockerServerConfig):
 class DoclingConverterConfig(ConverterConfig):
     """Configuration for Docling converter client."""
 
+    base_url: str
     model_name: str = "docling"
-    base_url: str = "http://localhost:5001"
     timeout: int = 300
     api_kwargs: dict = {"output_format": "markdown", "image_export_mode": "referenced"}
 

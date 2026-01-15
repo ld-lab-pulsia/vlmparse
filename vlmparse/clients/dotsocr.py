@@ -8,6 +8,7 @@ from PIL import Image
 from pydantic import Field
 
 from vlmparse.clients.openai_converter import (
+    LLMParams,
     OpenAIConverterClient,
     OpenAIConverterConfig,
 )
@@ -28,6 +29,7 @@ class DotsOCRDockerServerConfig(DockerServerConfig):
     dockerfile_dir: str = str(DOCKERFILE_DIR / "dotsocr")
     command_args: list[str] = Field(
         default_factory=lambda: [
+            "/workspace/weights/DotsOCR",
             "--tensor-parallel-size",
             "1",
             "--gpu-memory-utilization",
@@ -44,12 +46,19 @@ class DotsOCRDockerServerConfig(DockerServerConfig):
             # "16384",
         ]
     )
-    add_model_key_to_server: bool = False
+    add_model_key_to_server: bool = True
     aliases: list[str] = Field(default_factory=lambda: ["dotsocr"])
 
     @property
     def client_config(self):
-        return DotsOCRConverterConfig(llm_params=self.llm_params)
+        return DotsOCRConverterConfig(
+            llm_params=LLMParams(
+                base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
+            )
+        )
+
+    def get_base_url_suffix(self) -> str:
+        return "/v1"
 
 
 class DotsOCRConverterConfig(OpenAIConverterConfig):
