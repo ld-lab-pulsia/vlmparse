@@ -42,13 +42,13 @@ class ConverterWithServer:
             docker_config = docker_config_registry.get(
                 self.model, default=self.with_vllm_server
             )
-            if self.port is not None:
-                docker_config.docker_port = self.port
 
             if docker_config is not None:
+                if self.port is not None:
+                    docker_config.docker_port = self.port
                 docker_config.gpu_device_ids = gpu_device_ids
-                server = docker_config.get_server(auto_stop=True)
-                server.start()
+                self.server = docker_config.get_server(auto_stop=True)
+                self.server.start()
 
                 self.client = docker_config.get_client()
             else:
@@ -56,6 +56,7 @@ class ConverterWithServer:
 
         else:
             client_config = converter_config_registry.get(self.model, uri=self.uri)
+
             self.client = client_config.get_client()
 
     def parse(

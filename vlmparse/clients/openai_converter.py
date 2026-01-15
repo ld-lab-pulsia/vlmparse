@@ -92,6 +92,7 @@ class OpenAIConverterClient(BaseConverter):
             base_url=self.config.llm_params.base_url,
             api_key=self.config.llm_params.api_key,
             timeout=self.config.llm_params.timeout,
+            max_retries=self.config.llm_params.max_retries,
         )
 
     async def _get_chat_completion(

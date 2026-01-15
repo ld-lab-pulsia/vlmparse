@@ -64,3 +64,48 @@ def test_convert_with_docker(file_path, model):
     assert doc.pages[1].text is not None
 
     # Server will be automatically stopped due to auto_stop=True
+    server.stop()
+
+
+# @pytest.mark.skipif(
+#     "RUN_DEPLOYMENT_VLLM" not in os.environ
+#     or os.environ["RUN_DEPLOYMENT_VLLM"] == "false"
+#     or "GPU_TEST_VLMPARSE" not in os.environ,
+#     reason="Skipping because RUN_DEPLOYMENT_VLLM is not set or is false or GPU_TEST is not set",
+# )
+# @pytest.mark.parametrize(
+#     "model",
+#     [
+#         "docling",
+#         "lightonocr",
+#         "dotsocr",
+#         "nanonets/Nanonets-OCR2-3B",
+#         "hunyuanocr",
+#         "olmocr-2-fp8",
+#         "paddleocrvl",
+#         "mineru25",
+#         "chandra",
+#         "deepseekocr",
+#         "granite-docling",
+#     ],
+# )
+# def test_converter_with_server_with_docker(file_path, model):
+#     """Test conversion with automatic Docker deployment (requires GPU due to vllm limitations)."""
+
+#     from vlmparse.converter_with_server import ConverterWithServer
+#     converter_with_server = ConverterWithServer(
+#         model=model,
+#         uri=None,
+#         gpus=os.environ["GPU_TEST_VLMPARSE"],
+#         with_vllm_server=True,
+#         concurrency=10,
+#     )
+
+#     docs = converter_with_server.parse([file_path])
+
+#     # Assertions
+#     assert len(docs) == 1
+#     doc = docs[0]
+#     assert len(doc.pages) == 2
+#     assert doc.pages[0].text is not None
+#     assert doc.pages[1].text is not None

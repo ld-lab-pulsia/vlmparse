@@ -229,6 +229,8 @@ def get_model_from_uri(uri: str) -> str:
     for container in containers:
         c_uri = container.labels.get("vlmparse_uri")
         c_model = container.labels.get("vlmparse_model_name")
+        if c_uri is not None:
+            c_uri = c_uri.replace("localhost", "0.0.0.0")
 
         # Check if user URI matches container URI (ignoring /v1 suffix if missing)
         if c_uri and (
