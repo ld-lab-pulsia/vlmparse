@@ -34,7 +34,7 @@ class DoclingDockerServerConfig(DockerServerConfig):
             "LOG_LEVEL": "DEBUG",  # Enable verbose logging
             # Performance Tuning
             # "UVICORN_WORKERS": "4",  # Increase web server workers (Default: 1)
-            # "DOCLING_SERVE_ENG_LOC_NUM_WORKERS": "4",  # Increase processing workers (Default: 2)
+            "DOCLING_SERVE_ENG_LOC_NUM_WORKERS": "16",  # Increase processing workers (Default: 2)
             "DOCLING_NUM_THREADS": "32",  # Increase torch threads (Default: 4)
         }
     )

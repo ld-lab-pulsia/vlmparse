@@ -121,15 +121,9 @@ for gemini_model in [
         ),
     )
 for openai_model in [
-    "gpt-5.1",
-    "gpt-5.1-mini",
-    "gpt-5.1-nano",
     "gpt-5.2",
-    "gpt-5.2-mini",
-    "gpt-5.2-nano",
     "gpt-5",
     "gpt-5-mini",
-    "gpt-5-nano",
 ]:
     converter_config_registry.register(
         openai_model,

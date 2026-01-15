@@ -47,8 +47,8 @@ class ConverterWithServer:
                 if self.port is not None:
                     docker_config.docker_port = self.port
                 docker_config.gpu_device_ids = gpu_device_ids
-                server = docker_config.get_server(auto_stop=True)
-                server.start()
+                self.server = docker_config.get_server(auto_stop=True)
+                self.server.start()
 
                 self.client = docker_config.get_client()
             else:
