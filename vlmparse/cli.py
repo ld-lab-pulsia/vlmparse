@@ -70,6 +70,7 @@ class DParseCLI:
         concurrency: int = 10,
         dpi: int | None = None,
         vllm_kwargs: dict | None = None,
+        debug: bool = False,
     ):
         """Parse PDF documents and save results.
 
@@ -84,6 +85,7 @@ class DParseCLI:
             with_vllm_server: If True, a local VLLM server will be deployed if the model is not found in the registry. Note that if the model is in the registry and the uri is None, the server will be anyway deployed.
             dpi: DPI to use for the conversion. If not specified, the default DPI will be used.
             vllm_kwargs: Additional keyword arguments to pass to the VLLM server.
+            debug: If True, run in debug mode (single-threaded, no concurrency)
         """
         from vlmparse.converter_with_server import ConverterWithServer
 
@@ -96,7 +98,7 @@ class DParseCLI:
             vllm_kwargs=vllm_kwargs,
         ) as converter_with_server:
             return converter_with_server.parse(
-                inputs=inputs, out_folder=out_folder, mode=mode, dpi=dpi
+                inputs=inputs, out_folder=out_folder, mode=mode, dpi=dpi, debug=debug
             )
 
     def list(self):

@@ -27,6 +27,10 @@ def mock_openai_client():
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
         mock_response.choices[0].message.content = MOCK_RESPONSES["default"]
+        mock_response.usage = MagicMock()
+        mock_response.usage.prompt_tokens = 50
+        mock_response.usage.completion_tokens = 150
+        mock_response.usage.reasoning_tokens = 30
 
         # Configure the async method
         mock_instance = MagicMock()
@@ -43,7 +47,10 @@ def dotsocr_mock_client():
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
         mock_response.choices[0].message.content = MOCK_RESPONSES["dotsocr_ocr"]
-
+        mock_response.usage = MagicMock()
+        mock_response.usage.prompt_tokens = 40
+        mock_response.usage.completion_tokens = 160
+        mock_response.usage.reasoning_tokens = 20
         mock_instance = MagicMock()
         mock_instance.chat.completions.create = AsyncMock(return_value=mock_response)
         mock_client.return_value = mock_instance
@@ -88,7 +95,7 @@ class TestConverterConfigs:
     ):
         """Test basic document processing for OpenAI-compatible converters."""
         config = converter_config_registry.get(model_name)
-        converter = config.get_client(num_concurrent_pages=2)
+        converter = config.get_client(num_concurrent_pages=2, debug=True)
 
         # Process document
         document = converter(file_path)
@@ -113,7 +120,7 @@ class TestConverterConfigs:
         image_path = datadir / "page_with_formula.png"
 
         config = converter_config_registry.get(model_name)
-        converter = config.get_client()
+        converter = config.get_client(debug=True)
 
         # Process image
         document = converter(image_path)
@@ -135,7 +142,7 @@ class TestConverterConfigs:
     def test_dotsocr_ocr_mode(self, file_path, dotsocr_mock_client):
         """Test DotsOCR converter in OCR mode."""
         config = converter_config_registry.get("dotsocr")
-        converter = config.get_client(num_concurrent_pages=2)
+        converter = config.get_client(num_concurrent_pages=2, debug=True)
 
         # Process document
         document = converter(file_path)
@@ -193,6 +200,7 @@ class TestConverterBatchProcessing:
             num_concurrent_files=2,
             num_concurrent_pages=2,
             return_documents_in_batch_mode=True,
+            debug=True,
         )
 
         # Process multiple files (same file for testing)
@@ -212,6 +220,8 @@ def mineru_mock_httpx_client():
     with patch("httpx.AsyncClient") as mock_async_client:
         mock_client = MagicMock()
         mock_async_client.return_value = mock_client
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
 
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
@@ -240,7 +250,7 @@ class TestMinerUConverterMockedApi:
         from vlmparse.clients.mineru import MinerUConverterConfig
 
         config = MinerUConverterConfig(base_url="http://mineru.test")
-        converter = config.get_client(num_concurrent_pages=2)
+        converter = config.get_client(num_concurrent_pages=2, debug=True)
 
         with (
             patch("vlmparse.clients.mineru.clean_response", lambda x: x),
@@ -274,6 +284,7 @@ class TestMinerUConverterMockedApi:
             num_concurrent_files=2,
             num_concurrent_pages=2,
             return_documents_in_batch_mode=True,
+            debug=True,
         )
 
         with (
@@ -303,7 +314,7 @@ class TestCustomURI:
         assert config.llm_params.base_url == custom_uri
 
         # Test it works
-        converter = config.get_client()
+        converter = config.get_client(debug=True)
         document = converter(file_path)
 
         assert isinstance(document, Document)
@@ -319,7 +330,7 @@ class TestConcurrency:
     ):
         """Test that concurrent page processing limits are respected."""
         config = converter_config_registry.get(model_name)
-        converter = config.get_client(num_concurrent_pages=1)
+        converter = config.get_client(num_concurrent_pages=1, debug=True)
 
         document = converter(file_path)
 

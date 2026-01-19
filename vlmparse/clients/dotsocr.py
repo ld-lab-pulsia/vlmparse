@@ -237,7 +237,7 @@ class DotsOCRConverter(OpenAIConverterClient):
         )
         prompt = self.PROMPTS[prompt_mode]
 
-        response = await self._async_inference_with_vllm(image, prompt)
+        response, usage = await self._async_inference_with_vllm(image, prompt)
 
         if prompt_mode in ["prompt_layout_all_en"]:
             try:
@@ -248,17 +248,17 @@ class DotsOCRConverter(OpenAIConverterClient):
                     image.width,
                     image.height,
                 )
-                return {}, cells, False
+                return {}, cells, False, usage
             except Exception as e:
                 logger.warning(f"cells post process error: {e}, returning raw response")
-                return {}, response, True
+                return {}, response, True, usage
         else:
-            return {}, response, None
+            return {}, response, None, usage
 
     async def async_call_inside_page(self, page: Page) -> Page:
         image = page.image
 
-        _, response, _ = await self._parse_image_vllm(
+        _, response, _, usage = await self._parse_image_vllm(
             image, prompt_mode=self.config.prompt_mode
         )
         logger.info("Response: " + str(response))
@@ -283,4 +283,8 @@ class DotsOCRConverter(OpenAIConverterClient):
         text = clean_response(response)
         text = html_to_md_keep_tables(text)
         page.text = text
+
+        page.completion_tokens = usage.completion_tokens
+        page.prompt_tokens = usage.prompt_tokens
+        page.reasoning_tokens = usage.reasoning_tokens
         return page

@@ -5,7 +5,6 @@ from typing import Literal
 
 from loguru import logger
 
-from vlmparse.registries import converter_config_registry, docker_config_registry
 from vlmparse.servers.utils import get_model_from_uri
 from vlmparse.utils import get_file_paths
 
@@ -20,6 +19,7 @@ class ConverterWithServer:
         with_vllm_server: bool = False,
         concurrency: int = 10,
         vllm_kwargs: dict | None = None,
+        forget_predefined_vllm_kwargs: bool = False,
     ):
         self.model = model
         self.uri = uri
@@ -28,6 +28,7 @@ class ConverterWithServer:
         self.with_vllm_server = with_vllm_server
         self.concurrency = concurrency
         self.vllm_kwargs = vllm_kwargs
+        self.forget_predefined_vllm_kwargs = forget_predefined_vllm_kwargs
         self.server = None
         self.client = None
 
@@ -35,6 +36,11 @@ class ConverterWithServer:
             self.model = get_model_from_uri(self.uri)
 
     def start_server_and_client(self):
+        from vlmparse.registries import (
+            converter_config_registry,
+            docker_config_registry,
+        )
+
         gpu_device_ids = None
         if self.gpus is not None:
             gpu_device_ids = [g.strip() for g in self.gpus.split(",")]
@@ -48,7 +54,10 @@ class ConverterWithServer:
                 if self.port is not None:
                     docker_config.docker_port = self.port
                 docker_config.gpu_device_ids = gpu_device_ids
-                docker_config.update_command_args(self.vllm_kwargs)
+                docker_config.update_command_args(
+                    self.vllm_kwargs,
+                    forget_predefined_vllm_kwargs=self.forget_predefined_vllm_kwargs,
+                )
                 self.server = docker_config.get_server(auto_stop=True)
 
                 self.server.start()

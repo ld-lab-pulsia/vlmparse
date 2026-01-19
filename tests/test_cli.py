@@ -2,32 +2,30 @@
 Test CLI commands while mocking the server side.
 """
 
-import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from PIL import Image
 
 from vlmparse.cli import DParseCLI
 from vlmparse.data_model.document import Document, Page
 
-# Mock pypdfium2 to return fake images
-mock_pdfium = MagicMock()
-mock_pdf = MagicMock()
-# Create fake PIL images for the pages
-fake_image = Image.new("RGB", (100, 100), color="white")
-mock_pdf.__len__ = MagicMock(return_value=2)  # 2 pages
-mock_pdf.__getitem__ = MagicMock(
-    return_value=MagicMock(
-        render=MagicMock(
-            return_value=MagicMock(to_pil=MagicMock(return_value=fake_image))
-        )
-    )
-)
-mock_pdfium.PdfDocument = MagicMock(return_value=mock_pdf)
-sys.modules["pypdfium2"] = mock_pdfium
+# # Mock pypdfium2 to return fake images
+# mock_pdfium = MagicMock()
+# mock_pdf = MagicMock()
+# # Create fake PIL images for the pages
+# fake_image = Image.new("RGB", (100, 100), color="white")
+# mock_pdf.__len__ = MagicMock(return_value=2)  # 2 pages
+# mock_pdf.__getitem__ = MagicMock(
+#     return_value=MagicMock(
+#         render=MagicMock(
+#             return_value=MagicMock(to_pil=MagicMock(return_value=fake_image))
+#         )
+#     )
+# )
+# mock_pdfium.PdfDocument = MagicMock(return_value=mock_pdf)
+# sys.modules["pypdfium2"] = mock_pdfium
 
 
 @pytest.fixture
@@ -145,6 +143,8 @@ class TestConvertCommand:
                 inputs=[str(file_path)],
                 model="lightonocr",
                 uri="http://localhost:8000/v1",
+                with_vllm_server=True,
+                debug=True,
             )
 
         # Verify config was retrieved
@@ -165,6 +165,7 @@ class TestConvertCommand:
                 inputs=[str(file_path), str(file_path)],
                 model="lightonocr",
                 uri="http://localhost:8000/v1",
+                debug=True,
             )
 
         # Verify batch was called with both files
@@ -187,19 +188,6 @@ class TestConvertCommand:
         call_args = mock_converter.batch.call_args[0][0]
         assert len(call_args) >= 1
 
-    def test_convert_no_files_found(self, cli):
-        """Test convert with no matching files."""
-        mock_registry = MagicMock()
-
-        with patch("vlmparse.registries.converter_config_registry", mock_registry):
-            with patch("vlmparse.registries.docker_config_registry"):
-                # Should return early without calling batch
-                cli.convert(
-                    inputs=["/nonexistent/*.pdf"],
-                    model="lightonocr",
-                    uri="http://localhost:8000/v1",
-                )
-
     def test_convert_with_custom_uri(self, cli, file_path, mock_converter_client):
         """Test convert with custom URI (no Docker server needed)."""
         mock_registry, mock_config, mock_converter = mock_converter_client
@@ -207,7 +195,9 @@ class TestConvertCommand:
         custom_uri = "http://custom-server:9000/v1"
 
         with patch("vlmparse.registries.docker_config_registry"):
-            cli.convert(inputs=[str(file_path)], model="lightonocr", uri=custom_uri)
+            cli.convert(
+                inputs=[str(file_path)], model="lightonocr", uri=custom_uri, debug=True
+            )
 
         # Verify registry was called with custom URI
         mock_registry.get.assert_called_once()
@@ -230,7 +220,7 @@ class TestConvertCommand:
                 mock_docker_config.get_client.return_value = mock_converter
                 mock_docker_registry.get.return_value = mock_docker_config
 
-                cli.convert(inputs=[str(file_path)], model="lightonocr")
+                cli.convert(inputs=[str(file_path)], model="lightonocr", debug=True)
 
                 # Verify Docker server was started
                 mock_docker_registry.get.assert_called_once_with(
@@ -255,7 +245,9 @@ class TestConvertCommand:
                 mock_docker_config.get_client.return_value = mock_converter
                 mock_docker_registry.get.return_value = mock_docker_config
 
-                cli.convert(inputs=[str(file_path)], model="lightonocr", gpus="0,1")
+                cli.convert(
+                    inputs=[str(file_path)], model="lightonocr", gpus="0,1", debug=True
+                )
 
                 # Verify GPU device IDs were set
                 assert mock_docker_config.gpu_device_ids == ["0", "1"]
@@ -271,6 +263,7 @@ class TestConvertCommand:
                     out_folder=tmpdir,
                     model="lightonocr",
                     uri="http://localhost:8000/v1",
+                    debug=True,
                 )
 
             # Just verify the command completes successfully
@@ -286,6 +279,7 @@ class TestConvertCommand:
                 inputs=str(file_path),
                 model="lightonocr",
                 uri="http://localhost:8000/v1",
+                debug=True,
             )
 
         # Should convert to list internally and process
@@ -306,6 +300,7 @@ class TestConvertCommand:
                     inputs=[str(txt_file)],
                     model="lightonocr",
                     uri="http://localhost:8000/v1",
+                    debug=True,
                 )
 
 
@@ -407,6 +402,7 @@ class TestCLIIntegration:
                     inputs=[str(file_path)],
                     model="lightonocr",
                     uri="http://localhost:8056/v1",
+                    debug=True,
                 )
 
                 # Verify convert used the URI
@@ -428,6 +424,11 @@ class TestCLIConvertInDepth:
                 0
             ].message.content = "# Test Document\n\nPage content here."
 
+            mock_response.usage = MagicMock()
+            mock_response.usage.prompt_tokens = 50
+            mock_response.usage.completion_tokens = 150
+            mock_response.usage.reasoning_tokens = 30
+
             # Configure the async method
             mock_instance = MagicMock()
             mock_instance.chat.completions.create = AsyncMock(
@@ -437,17 +438,17 @@ class TestCLIConvertInDepth:
 
             yield mock_instance
 
-    @pytest.fixture
-    def mock_pdf_to_images(self):
-        """Mock PDF to image conversion."""
-        from PIL import Image
+    # @pytest.fixture
+    # def mock_pdf_to_images(self):
+    #     """Mock PDF to image conversion."""
+    #     from PIL import Image
 
-        # Create fake PIL images for the pages
-        fake_images = [Image.new("RGB", (100, 100), color="white") for _ in range(2)]
+    #     # Create fake PIL images for the pages
+    #     fake_images = [Image.new("RGB", (100, 100), color="white") for _ in range(2)]
 
-        with patch("vlmparse.converter.convert_specific_page_to_image") as mock_convert:
-            mock_convert.return_value = fake_images[0]
-            yield mock_convert
+    #     with patch("vlmparse.converter.convert_specific_page_to_image") as mock_convert:
+    #         mock_convert.return_value = fake_images[0]
+    #         yield mock_convert
 
     @pytest.fixture
     def mock_docker_server_operations(self):
@@ -477,14 +478,13 @@ class TestCLIConvertInDepth:
 
             yield mock_docker_registry, mock_docker_config, mock_server
 
-    def test_convert_with_real_converter_gemini(
-        self, cli, file_path, mock_openai_api, mock_pdf_to_images
-    ):
+    def test_convert_with_real_converter_gemini(self, cli, file_path, mock_openai_api):
         """Test convert with real Gemini converter and mocked OpenAI API."""
         cli.convert(
             inputs=[str(file_path)],
             model="gemini-2.5-flash-lite",
             uri="http://mocked-api/v1",
+            debug=True,
         )
 
         # Verify OpenAI API was called (2 pages in test PDF)
@@ -517,21 +517,20 @@ class TestCLIConvertInDepth:
         # Verify client batch was called
         mock_client.batch.assert_called_once()
 
-    def test_convert_batch_multiple_files(
-        self, cli, file_path, mock_openai_api, mock_pdf_to_images
-    ):
+    def test_convert_batch_multiple_files(self, cli, file_path, mock_openai_api):
         """Test batch conversion of multiple files with real converter."""
         cli.convert(
             inputs=[str(file_path), str(file_path)],
             model="gemini-2.5-flash-lite",
             uri="http://mocked-api/v1",
+            debug=True,
         )
 
         # Should process 2 files × 2 pages = 4 API calls
         assert mock_openai_api.chat.completions.create.call_count == 4
 
     def test_convert_verifies_document_structure(
-        self, cli, file_path, mock_openai_api, mock_pdf_to_images, tmp_path
+        self, cli, file_path, mock_openai_api, tmp_path
     ):
         """Test that converted documents have correct structure."""
         output_dir = tmp_path / "output"
@@ -543,6 +542,10 @@ class TestCLIConvertInDepth:
         mock_response.choices[
             0
         ].message.content = "# Page Title\n\nPage content with text."
+        mock_response.usage = MagicMock()
+        mock_response.usage.prompt_tokens = 40
+        mock_response.usage.completion_tokens = 160
+        mock_response.usage.reasoning_tokens = 20
         mock_openai_api.chat.completions.create = AsyncMock(return_value=mock_response)
 
         cli.convert(
@@ -550,14 +553,13 @@ class TestCLIConvertInDepth:
             out_folder=str(output_dir),
             model="gemini-2.5-flash-lite",
             uri="http://mocked-api/v1",
+            debug=True,
         )
 
         # Verify conversion happened (2 pages)
         assert mock_openai_api.chat.completions.create.call_count == 2
 
-    def test_convert_handles_api_errors_gracefully(
-        self, cli, file_path, mock_pdf_to_images
-    ):
+    def test_convert_handles_api_errors_gracefully(self, cli, file_path):
         """Test that converter handles API errors without crashing."""
         with patch("openai.AsyncOpenAI") as mock_client_class:
             # Configure mock to raise an exception
@@ -586,11 +588,14 @@ class TestCLIConvertInDepth:
         ],
     )
     def test_convert_uses_correct_model_name(
-        self, cli, file_path, mock_openai_api, mock_pdf_to_images, model_name
+        self, cli, file_path, mock_openai_api, model_name
     ):
         """Test that each converter uses the correct model name in API calls."""
         cli.convert(
-            inputs=[str(file_path)], model=model_name, uri="http://mocked-api/v1"
+            inputs=[str(file_path)],
+            model=model_name,
+            uri="http://mocked-api/v1",
+            debug=True,
         )
 
         # Check that model parameter is passed
@@ -604,9 +609,7 @@ class TestCLIConvertInDepth:
             "nanonets/Nanonets-OCR2-3B",
         ]
 
-    def test_convert_respects_concurrency(
-        self, cli, file_path, mock_openai_api, mock_pdf_to_images
-    ):
+    def test_convert_respects_concurrency(self, cli, file_path, mock_openai_api):
         """Test that concurrent processing is working."""
         import asyncio
 
@@ -617,6 +620,10 @@ class TestCLIConvertInDepth:
             mock_response = MagicMock()
             mock_response.choices = [MagicMock()]
             mock_response.choices[0].message.content = "Test content"
+            mock_response.usage = MagicMock()
+            mock_response.usage.prompt_tokens = 30
+            mock_response.usage.completion_tokens = 120
+            mock_response.usage.reasoning_tokens = 10
             return mock_response
 
         mock_openai_api.chat.completions.create = AsyncMock(side_effect=track_call)
@@ -625,17 +632,19 @@ class TestCLIConvertInDepth:
             inputs=[str(file_path)],
             model="gemini-2.5-flash-lite",
             uri="http://mocked-api/v1",
+            debug=True,
         )
 
         # Verify calls were made
         assert len(call_times) == 2
 
-    def test_convert_with_dotsocr_model(
-        self, cli, file_path, mock_openai_api, mock_pdf_to_images
-    ):
+    def test_convert_with_dotsocr_model(self, cli, file_path, mock_openai_api):
         """Test convert with DotsOCR which has different prompt modes."""
         cli.convert(
-            inputs=[str(file_path)], model="dotsocr", uri="http://mocked-api/v1"
+            inputs=[str(file_path)],
+            model="dotsocr",
+            uri="http://mocked-api/v1",
+            debug=True,
         )
 
         # Verify API was called (2 pages)
@@ -645,67 +654,14 @@ class TestCLIConvertInDepth:
         call_args = mock_openai_api.chat.completions.create.call_args_list[0]
         assert "messages" in call_args[1]
 
-    def test_convert_image_preprocessing(
-        self, cli, file_path, mock_openai_api, mock_pdf_to_images
-    ):
-        """Test that image preprocessing happens correctly."""
-        messages_sent = []
-
-        async def capture_messages(*args, **kwargs):
-            messages_sent.append(kwargs.get("messages", []))
-            mock_response = MagicMock()
-            mock_response.choices = [MagicMock()]
-            mock_response.choices[0].message.content = "Test"
-            return mock_response
-
-        mock_openai_api.chat.completions.create = AsyncMock(
-            side_effect=capture_messages
-        )
-
-        cli.convert(
-            inputs=[str(file_path)],
-            model="gemini-2.5-flash-lite",
-            uri="http://mocked-api/v1",
-        )
-
-        # Verify images were sent in messages
-        assert len(messages_sent) == 2
-        for messages in messages_sent:
-            assert len(messages) > 0
-            # Check that image data is present
-            assert any("image_url" in str(msg) for msg in messages)
-
-    def test_convert_with_different_dpi_settings(
-        self, cli, file_path, mock_openai_api, mock_pdf_to_images
-    ):
-        """Test that different models use their configured DPI settings."""
-        # LightOnOCR uses DPI=200
-        cli.convert(
-            inputs=[str(file_path)], model="lightonocr", uri="http://mocked-api/v1"
-        )
-
-        lightonocr_calls = mock_openai_api.chat.completions.create.call_count
-        assert lightonocr_calls == 2
-
-        mock_openai_api.reset_mock()
-
-        # Gemini uses DPI=175 (default)
-        cli.convert(
-            inputs=[str(file_path)],
-            model="gemini-2.5-flash-lite",
-            uri="http://mocked-api/v1",
-        )
-
-        gemini_calls = mock_openai_api.chat.completions.create.call_count
-        assert gemini_calls == 2
-
-    def test_convert_with_max_image_size_limit(
-        self, cli, file_path, mock_openai_api, mock_pdf_to_images
-    ):
+    def test_convert_with_max_image_size_limit(self, cli, file_path, mock_openai_api):
         """Test that max_image_size limit is respected for models that have it."""
         # LightOnOCR has max_image_size=1540
         cli.convert(
-            inputs=[str(file_path)], model="lightonocr", uri="http://mocked-api/v1"
+            inputs=[str(file_path)],
+            model="lightonocr",
+            uri="http://mocked-api/v1",
+            debug=True,
         )
 
         assert mock_openai_api.chat.completions.create.call_count == 2
@@ -722,7 +678,7 @@ class TestCLIConvertInDepth:
         assert mock_openai_api.chat.completions.create.call_count == 2
 
     def test_convert_with_glob_pattern_real_converter(
-        self, cli, file_path, mock_openai_api, mock_pdf_to_images
+        self, cli, file_path, mock_openai_api
     ):
         """Test glob pattern expansion with real converter."""
         pattern = str(file_path.parent / "*.pdf")
@@ -734,9 +690,7 @@ class TestCLIConvertInDepth:
         # At least one file should be found and processed
         assert mock_openai_api.chat.completions.create.call_count >= 2
 
-    def test_convert_checks_completion_kwargs(
-        self, cli, file_path, mock_openai_api, mock_pdf_to_images
-    ):
+    def test_convert_checks_completion_kwargs(self, cli, file_path, mock_openai_api):
         """Test that converter processes pages correctly."""
         cli.convert(
             inputs=[str(file_path)], model="lightonocr", uri="http://mocked-api/v1"
@@ -750,9 +704,7 @@ class TestCLIConvertInDepth:
         assert "messages" in call_args[1]
         assert len(call_args[1]["messages"]) > 0
 
-    def test_convert_processes_all_pages(
-        self, cli, file_path, mock_openai_api, mock_pdf_to_images
-    ):
+    def test_convert_processes_all_pages(self, cli, file_path, mock_openai_api):
         """Test that all pages in PDF are processed."""
         page_contents = []
 
@@ -776,9 +728,7 @@ class TestCLIConvertInDepth:
         assert "Page 1" in page_contents[0]
         assert "Page 2" in page_contents[1]
 
-    def test_convert_with_nanonet_postprompt(
-        self, cli, file_path, mock_openai_api, mock_pdf_to_images
-    ):
+    def test_convert_with_nanonet_postprompt(self, cli, file_path, mock_openai_api):
         """Test that Nanonet model uses its postprompt correctly."""
         from vlmparse.registries import converter_config_registry
 

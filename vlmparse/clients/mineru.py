@@ -2,7 +2,6 @@ import asyncio
 import io
 
 import orjson
-from httpx import AsyncClient
 from loguru import logger
 from pydantic import Field
 
@@ -55,6 +54,7 @@ class MinerUConverter(BaseConverter):
 
     async def _async_inference_with_api(self, image) -> list:
         """Run async inference with MinerU API."""
+        from httpx import AsyncClient
 
         async with AsyncClient(
             base_url=self.config.base_url, timeout=self.config.timeout

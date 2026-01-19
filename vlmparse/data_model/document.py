@@ -41,6 +41,10 @@ class Page(VLMParseBaseModel):
     buffer_image: Optional[Image.Image | str | dict] = None
     latency: Optional[float] = None
     """Time taken to process the page in seconds."""
+    prompt_tokens: Optional[int] = None
+    completion_tokens: Optional[int] = None
+    """Include reasoning tokens"""
+    reasoning_tokens: Optional[int] = None
 
     @property
     def image(self):
