@@ -40,6 +40,8 @@ def get_llm_params(model_name: str, uri: str | None = None):
     ]:
         base_url = None
         api_key = os.getenv("OPENAI_API_KEY")
+        if api_key is None:
+            raise ValueError("OPENAI_API_KEY environment variable not set")
     else:
         if model_name in [
             "gemini-2.5-flash-lite",
@@ -48,6 +50,8 @@ def get_llm_params(model_name: str, uri: str | None = None):
         ]:
             base_url = GOOGLE_API_BASE_URL
             api_key = os.getenv("GOOGLE_API_KEY")
+            if api_key is None:
+                raise ValueError("GOOGLE_API_KEY environment variable not set")
         else:
             return None
     return LLMParams(base_url=base_url, model_name=model_name, api_key=api_key)

@@ -42,7 +42,8 @@ class PaddleOCRVLConverterConfig(OpenAIConverterConfig):
     postprompt: str | None = TASKS["ocr"]
     completion_kwargs: dict | None = {
         "temperature": 0.0,
+        "max_completion_tokens": 16384,
     }
-    max_image_size: int | None = 1540
     dpi: int = 200
     aliases: list[str] = Field(default_factory=lambda: ["paddleocrvl"])
+    stream: bool = True

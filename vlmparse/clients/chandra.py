@@ -194,7 +194,7 @@ class ChandraConverterConfig(OpenAIConverterConfig):
     model_name: str = "datalab-to/chandra"
     prompt_type: str = "ocr"  # Default prompt type
     bbox_scale: int = 1024
-    max_retries: int = 6
+    max_retries: int = 0
     max_failure_retries: int = None
     completion_kwargs: dict = Field(
         default_factory=lambda: {
