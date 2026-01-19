@@ -4,13 +4,24 @@ from loguru import logger
 
 
 class DParseCLI:
-    def serve(self, model: str, port: int | None = None, gpus: str | None = None):
+    """Parsing of pdf to text using VLMs: typ in vlmparse to get the command lists, then `vlmparse <command> --help` to get help on a specific command."""
+
+    def serve(
+        self,
+        model: str,
+        port: int | None = None,
+        gpus: str | None = None,
+        vllm_kwargs: dict | None = None,
+        forget_predefined_vllm_kwargs: bool = False,
+    ):
         """Deploy a VLLM server in a Docker container.
 
         Args:
             model: Model name
             port: VLLM server port (default: 8056)
             gpus: Comma-separated GPU device IDs (e.g., "0" or "0,1,2"). If not specified, all GPUs will be used.
+            vllm_kwargs: Additional keyword arguments to pass to the VLLM server.
+            forget_predefined_vllm_kwargs: If True, the predefined VLLM kwargs from the docker config will be replaced by vllm_kwargs otherwise the predefined kwargs will be updated with vllm_kwargs with a risk of collision of argument names.
         """
         if port is None:
             port = 8056
@@ -31,6 +42,10 @@ class DParseCLI:
         if gpus is not None:
             docker_config.gpu_device_ids = [g.strip() for g in str(gpus).split(",")]
         server = docker_config.get_server(auto_stop=False)
+
+        if server is None:
+            logger.error(f"Model server not found for model: {model}")
+            return
 
         # Deploy server and leave it running (cleanup=False)
         logger.info(
@@ -54,6 +69,7 @@ class DParseCLI:
         with_vllm_server: bool = False,
         concurrency: int = 10,
         dpi: int | None = None,
+        vllm_kwargs: dict | None = None,
     ):
         """Parse PDF documents and save results.
 
@@ -67,109 +83,21 @@ class DParseCLI:
             mode: Output mode - "document" (save as JSON zip), "md" (save as markdown file), "md_page" (save as folder of markdown pages)
             with_vllm_server: If True, a local VLLM server will be deployed if the model is not found in the registry. Note that if the model is in the registry and the uri is None, the server will be anyway deployed.
             dpi: DPI to use for the conversion. If not specified, the default DPI will be used.
+            vllm_kwargs: Additional keyword arguments to pass to the VLLM server.
         """
         from vlmparse.converter_with_server import ConverterWithServer
 
-        converter_with_server = ConverterWithServer(
+        with ConverterWithServer(
             model=model,
             uri=uri,
             gpus=gpus,
             with_vllm_server=with_vllm_server,
             concurrency=concurrency,
-        )
-
-        return converter_with_server.parse(
-            inputs=inputs, out_folder=out_folder, mode=mode, dpi=dpi
-        )
-        # from vlmparse.registries import converter_config_registry
-
-        # # Infer model from URI if provided
-        # if uri is not None and model is None:
-        #     import docker
-
-        #     try:
-        #         docker_client = docker.from_env()
-        #         containers = docker_client.containers.list()
-        #         for container in containers:
-        #             # Check both exact match and match with/without trailing slash
-        #             container_uri = container.labels.get("vlmparse_uri", "")
-        #             if container_uri and (
-        #                 container_uri == uri
-        #                 or container_uri.rstrip("/") == uri.rstrip("/")
-        #             ):
-        #                 inferred_model = container.labels.get("vlmparse_model_name")
-        #                 if inferred_model:
-        #                     logger.info(
-        #                         f"Inferred model {inferred_model} from URI {uri}"
-        #                     )
-        #                     model = inferred_model
-        #                     break
-        #     except Exception:
-        #         # If Docker is not available or fails, just proceed with provided arguments
-        #         pass
-
-        # if mode not in ["document", "md", "md_page"]:
-        #     logger.error(f"Invalid mode: {mode}. Must be one of: document, md, md_page")
-        #     return
-
-        # # Expand file paths from glob patterns
-        # file_paths = []
-        # if isinstance(inputs, str):
-        #     inputs = [inputs]
-        # for pattern in inputs:
-        #     if "*" in pattern or "?" in pattern:
-        #         file_paths.extend(glob(pattern, recursive=True))
-        #     elif os.path.isdir(pattern):
-        #         file_paths.extend(glob(os.path.join(pattern, "*.pdf"), recursive=True))
-        #     elif os.path.isfile(pattern):
-        #         file_paths.append(pattern)
-        #     else:
-        #         logger.error(f"Invalid input: {pattern}")
-
-        # # Filter to only existing PDF files
-        # file_paths = [f for f in file_paths if os.path.exists(f) and f.endswith(".pdf")]
-
-        # if not file_paths:
-        #     logger.error("No PDF files found matching the inputs patterns")
-        #     return
-
-        # logger.info(f"Processing {len(file_paths)} files with {model} converter")
-
-        # gpu_device_ids = None
-        # if gpus is not None:
-        #     gpu_device_ids = [g.strip() for g in gpus.split(",")]
-
-        # if uri is None:
-        #     from vlmparse.registries import docker_config_registry
-
-        #     docker_config = docker_config_registry.get(model, default=with_vllm_server)
-
-        #     if docker_config is not None:
-        #         docker_config.gpu_device_ids = gpu_device_ids
-        #         server = docker_config.get_server(auto_stop=True)
-        #         server.start()
-
-        #         client = docker_config.get_client(
-        #             save_folder=out_folder, save_mode=mode
-        #         )
-        #     else:
-        #         client = converter_config_registry.get(model).get_client(
-        #             save_folder=out_folder, save_mode=mode
-        #         )
-
-        # else:
-        #     client_config = converter_config_registry.get(model, uri=uri)
-        #     client = client_config.get_client(save_folder=out_folder, save_mode=mode)
-        # client.num_concurrent_files = concurrency
-        # client.num_concurrent_pages = concurrency
-        # if dpi is not None:
-        #     client.config.dpi = int(dpi)
-        # documents = client.batch(file_paths)
-
-        # if documents is not None:
-        #     logger.info(f"Processed {len(documents)} documents to {out_folder}")
-        # else:
-        #     logger.info(f"Processed {len(file_paths)} documents to {out_folder}")
+            vllm_kwargs=vllm_kwargs,
+        ) as converter_with_server:
+            return converter_with_server.parse(
+                inputs=inputs, out_folder=out_folder, mode=mode, dpi=dpi
+            )
 
     def list(self):
         """List all containers whose name begins with vlmparse."""

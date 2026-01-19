@@ -5,6 +5,7 @@ from typing import Literal
 
 from loguru import logger
 
+from vlmparse.registries import converter_config_registry, docker_config_registry
 from vlmparse.servers.utils import get_model_from_uri
 from vlmparse.utils import get_file_paths
 
@@ -12,28 +13,28 @@ from vlmparse.utils import get_file_paths
 class ConverterWithServer:
     def __init__(
         self,
-        model: str,
+        model: str | None = None,
         uri: str | None = None,
         gpus: str | None = None,
         port: int | None = None,
         with_vllm_server: bool = False,
         concurrency: int = 10,
+        vllm_kwargs: dict | None = None,
     ):
-        from vlmparse.registries import (
-            converter_config_registry,
-            docker_config_registry,
-        )
-
         self.model = model
         self.uri = uri
         self.port = port
         self.gpus = gpus
         self.with_vllm_server = with_vllm_server
         self.concurrency = concurrency
+        self.vllm_kwargs = vllm_kwargs
+        self.server = None
+        self.client = None
 
         if self.uri is not None and self.model is None:
             self.model = get_model_from_uri(self.uri)
 
+    def start_server_and_client(self):
         gpu_device_ids = None
         if self.gpus is not None:
             gpu_device_ids = [g.strip() for g in self.gpus.split(",")]
@@ -47,7 +48,9 @@ class ConverterWithServer:
                 if self.port is not None:
                     docker_config.docker_port = self.port
                 docker_config.gpu_device_ids = gpu_device_ids
+                docker_config.update_command_args(self.vllm_kwargs)
                 self.server = docker_config.get_server(auto_stop=True)
+
                 self.server.start()
 
                 self.client = docker_config.get_client()
@@ -59,6 +62,17 @@ class ConverterWithServer:
 
             self.client = client_config.get_client()
 
+    def stop_server(self):
+        if self.server is not None and self.server.auto_stop:
+            self.server.stop()
+
+    def __enter__(self):
+        self.start_server_and_client()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.stop_server()
+
     def parse(
         self,
         inputs: str | list[str],
@@ -68,6 +82,9 @@ class ConverterWithServer:
         debug: bool = False,
         retrylast: bool = False,
     ):
+        assert (
+            self.client is not None
+        ), "Client not initialized. Call start_server_and_client() first."
         file_paths = get_file_paths(inputs)
         assert (
             out_folder is not None
@@ -119,5 +136,5 @@ class ConverterWithServer:
 
         return documents
 
-    def get_out_folder(self) -> Path:
+    def get_out_folder(self) -> str | None:
         return self.client.save_folder
