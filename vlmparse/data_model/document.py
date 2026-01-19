@@ -66,7 +66,7 @@ class Page(VLMParseBaseModel):
 
         image = self.image
 
-        if layout:
+        if layout and image is not None:
             if self.items is None:
                 return image
             items = self.items
@@ -84,6 +84,9 @@ class Page(VLMParseBaseModel):
                     image, box.l, box.t, item.category, font_size=40
                 )
         return image
+
+    def to_markdown(self, **kwargs):
+        return self.text if self.text is not None else ""
 
 
 class Document(VLMParseBaseModel):
@@ -103,6 +106,9 @@ class Document(VLMParseBaseModel):
         return self.error is not None or any(
             page.error is not None for page in self.pages
         )
+
+    def to_markdown(self, **kwargs):
+        return "\n\n".join([page.to_markdown(**kwargs) for page in self.pages])
 
     def to_zip(
         self,
