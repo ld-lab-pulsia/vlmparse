@@ -41,6 +41,6 @@ class OlmOCRConverterConfig(OpenAIConverterConfig):
         "temperature": 0.1,
         "max_tokens": 8000,
     }
-    max_image_size: int | None = 1288
+    # max_image_size: int | None = 1288
     dpi: int = 200
     aliases: list[str] = Field(default_factory=lambda: ["olmocr-2-fp8"])

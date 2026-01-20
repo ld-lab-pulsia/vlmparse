@@ -15,6 +15,57 @@ from vlmparse.servers.docker_server import VLLMDockerServerConfig
 from vlmparse.utils import to_base64
 
 
+class DeepSeekOCRDockerServerConfig(VLLMDockerServerConfig):
+    """Configuration for DeepSeekOCR model."""
+
+    model_name: str = "deepseek-ai/DeepSeek-OCR"
+    command_args: list[str] = Field(
+        default_factory=lambda: [
+            "--limit-mm-per-prompt",
+            '{"image": 1}',
+            "--async-scheduling",
+            "--logits_processors",
+            "vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor",
+            "--no-enable-prefix-caching",
+            "--mm-processor-cache-gb",
+            "0",
+        ]
+    )
+    aliases: list[str] = Field(default_factory=lambda: ["deepseekocr"])
+
+    @property
+    def client_config(self):
+        return DeepSeekOCRConverterConfig(llm_params=self.llm_params)
+
+
+class DeepSeekOCRConverterConfig(OpenAIConverterConfig):
+    """DeepSeekOCR converter - backward compatibility alias."""
+
+    model_name: str = "deepseek-ai/DeepSeek-OCR"
+    aliases: list[str] = Field(default_factory=lambda: ["deepseekocr"])
+
+    prompt_mode: Literal["layout", "ocr"] = "ocr"
+    completion_kwargs: dict | None = {
+        "temperature": 0.0,
+        "max_tokens": 8181,
+        "extra_body": {
+            "skip_special_tokens": False,
+            # args used to control custom logits processor
+            "vllm_xargs": {
+                "ngram_size": 30,
+                "window_size": 90,
+                # whitelist: <td>, </td>
+                "whitelist_token_ids": [128821, 128822],
+            },
+        },
+    }
+    dpi: int = 200
+    aliases: list[str] = Field(default_factory=lambda: ["deepseekocr"])
+
+    def get_client(self, **kwargs) -> "DeepSeekOCRConverterClient":
+        return DeepSeekOCRConverterClient(config=self, **kwargs)
+
+
 def re_match(text):
     pattern = r"(<\|ref\|>(.*?)<\|/ref\|><\|det\|>(.*?)<\|/det\|>)"
     matches = re.findall(pattern, text, re.DOTALL)
@@ -150,54 +201,3 @@ class DeepSeekOCRConverterClient(OpenAIConverterClient):
         logger.debug(page.text)
 
         return page
-
-
-class DeepSeekOCRDockerServerConfig(VLLMDockerServerConfig):
-    """Configuration for DeepSeekOCR model."""
-
-    model_name: str = "deepseek-ai/DeepSeek-OCR"
-    command_args: list[str] = Field(
-        default_factory=lambda: [
-            "--limit-mm-per-prompt",
-            '{"image": 1}',
-            "--async-scheduling",
-            "--logits_processors",
-            "vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor",
-            "--no-enable-prefix-caching",
-            "--mm-processor-cache-gb",
-            "0",
-        ]
-    )
-    aliases: list[str] = Field(default_factory=lambda: ["deepseekocr"])
-
-    @property
-    def client_config(self):
-        return DeepSeekOCRConverterConfig(llm_params=self.llm_params)
-
-
-class DeepSeekOCRConverterConfig(OpenAIConverterConfig):
-    """DeepSeekOCR converter - backward compatibility alias."""
-
-    model_name: str = "deepseek-ai/DeepSeek-OCR"
-    aliases: list[str] = Field(default_factory=lambda: ["deepseekocr"])
-
-    prompt_mode: Literal["layout", "ocr"] = "ocr"
-    completion_kwargs: dict | None = {
-        "temperature": 0.0,
-        "max_tokens": 8181,
-        "extra_body": {
-            "skip_special_tokens": False,
-            # args used to control custom logits processor
-            "vllm_xargs": {
-                "ngram_size": 30,
-                "window_size": 90,
-                # whitelist: <td>, </td>
-                "whitelist_token_ids": [128821, 128822],
-            },
-        },
-    }
-    dpi: int = 200
-    aliases: list[str] = Field(default_factory=lambda: ["deepseekocr"])
-
-    def get_client(self, **kwargs) -> "DeepSeekOCRConverterClient":
-        return DeepSeekOCRConverterClient(config=self, **kwargs)

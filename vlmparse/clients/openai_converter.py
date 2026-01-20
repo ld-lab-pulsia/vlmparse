@@ -40,6 +40,8 @@ def get_llm_params(model_name: str, uri: str | None = None):
     ]:
         base_url = None
         api_key = os.getenv("OPENAI_API_KEY")
+        if api_key is None:
+            raise ValueError("OPENAI_API_KEY environment variable not set")
     else:
         if model_name in [
             "gemini-2.5-flash-lite",
@@ -48,6 +50,8 @@ def get_llm_params(model_name: str, uri: str | None = None):
         ]:
             base_url = GOOGLE_API_BASE_URL
             api_key = os.getenv("GOOGLE_API_KEY")
+            if api_key is None:
+                raise ValueError("GOOGLE_API_KEY environment variable not set")
         else:
             return None
     return LLMParams(base_url=base_url, model_name=model_name, api_key=api_key)
@@ -97,7 +101,7 @@ class OpenAIConverterClient(BaseConverter):
 
     async def _get_chat_completion(
         self, messages: list[dict], completion_kwargs: dict | None = None
-    ) -> str:
+    ) -> tuple[str, "CompletionUsage"]:  # noqa: F821
         """Helper to handle chat completion with optional streaming."""
         if completion_kwargs is None:
             completion_kwargs = self.config.completion_kwargs
@@ -126,7 +130,8 @@ class OpenAIConverterClient(BaseConverter):
                     "Response is None, finish reason: "
                     + response_obj.choices[0].finish_reason
                 )
-            return response_obj.choices[0].message.content
+
+            return response_obj.choices[0].message.content, response_obj.usage
 
     async def async_call_inside_page(self, page: Page) -> Page:
         """Process a single page using OpenAI-compatible API."""
@@ -163,12 +168,16 @@ class OpenAIConverterClient(BaseConverter):
             },
         ]
 
-        response = await self._get_chat_completion(messages)
-        logger.info("Response: " + str(response))
+        response, usage = await self._get_chat_completion(messages)
+        logger.debug("Response: " + str(response))
         page.raw_response = response
         text = clean_response(response)
 
         text = html_to_md_keep_tables(text)
         page.text = text
+        page.prompt_tokens = usage.prompt_tokens
+        page.completion_tokens = usage.completion_tokens
+        if hasattr(usage, "reasoning_tokens"):
+            page.reasoning_tokens = usage.reasoning_tokens
 
         return page

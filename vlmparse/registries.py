@@ -77,9 +77,7 @@ class ConverterConfigRegistry:
         """Register a config factory for a model name."""
         self._registry[model_name] = config_factory
 
-    def get(
-        self, model_name: str, uri: str | None = None
-    ) -> OpenAIConverterConfig | None:
+    def get(self, model_name: str, uri: str | None = None) -> OpenAIConverterConfig:
         """Get config for a model name. Returns default if not registered."""
         if model_name in self._registry:
             return self._registry[model_name](uri=uri)

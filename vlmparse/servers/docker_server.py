@@ -47,6 +47,20 @@ class DockerServerConfig(BaseModel):
         """Build command for container. Override in subclasses for specific logic."""
         return self.command_args if self.command_args else None
 
+    def update_command_args(
+        self,
+        vllm_kwargs: dict | None = None,
+        forget_predefined_vllm_kwargs: bool = False,
+    ) -> list[str]:
+        if vllm_kwargs is not None:
+            new_kwargs = [f"--{k}={v}" for k, v in vllm_kwargs.items()]
+            if forget_predefined_vllm_kwargs:
+                self.command_args = new_kwargs
+            else:
+                self.command_args.extend(new_kwargs)
+
+        return self.command_args
+
     def get_volumes(self) -> dict | None:
         """Setup volumes for container. Override in subclasses for specific logic."""
         return self.volumes
@@ -144,7 +158,7 @@ class ConverterServer:
         """Start the Docker server."""
         if self._server_context is not None:
             logger.warning("Server already started")
-            return self.base_url
+            return self.base_url, self._container
 
         # Use the generic docker_server for all server types
         self._server_context = docker_server(config=self.config, cleanup=self.auto_stop)

@@ -52,24 +52,22 @@ class MinerUConverter(BaseConverter):
 
     config: MinerUConverterConfig
 
-    def __init__(self, config: MinerUConverterConfig, **kwargs):
-        super().__init__(config=config, **kwargs)
-        from httpx import AsyncClient
-
-        self.client = AsyncClient(base_url=config.base_url, timeout=config.timeout)
-
     async def _async_inference_with_api(self, image) -> list:
         """Run async inference with MinerU API."""
+        from httpx import AsyncClient
 
-        img_byte_arr = await asyncio.to_thread(to_bytes_io, image)
-        response = await self.client.post(
-            "process-image",
-            files={"image": ("image.png", img_byte_arr, "image/png")},
-        )
+        async with AsyncClient(
+            base_url=self.config.base_url, timeout=self.config.timeout
+        ) as client:
+            img_byte_arr = await asyncio.to_thread(to_bytes_io, image)
+            response = await client.post(
+                "process-image",
+                files={"image": ("image.png", img_byte_arr, "image/png")},
+            )
 
-        response.raise_for_status()
+            response.raise_for_status()
 
-        res = orjson.loads(response.content)
+            res = orjson.loads(response.content)
 
         return res
 

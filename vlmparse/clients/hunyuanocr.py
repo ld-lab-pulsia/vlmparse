@@ -39,7 +39,8 @@ class HunyuanOCRConverterConfig(OpenAIConverterConfig):
     completion_kwargs: dict | None = {
         "temperature": 0.0,
         "extra_body": {"top_k": 1, "repetition_penalty": 1.0},
+        "max_completion_tokens": 16384,  # max token len used in training according to the technical report is 32000, but in practice the model breaks earlier
     }
-    max_image_size: int | None = 1540
     dpi: int = 200
     aliases: list[str] = Field(default_factory=lambda: ["hunyuanocr"])
+    stream: bool = True
