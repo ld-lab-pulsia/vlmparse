@@ -36,7 +36,7 @@ def start_server(
 
     gpu_device_ids = None
     if gpus is not None:
-        gpu_device_ids = [g.strip() for g in gpus.split(",")]
+        gpu_device_ids = [g.strip() for g in str(gpus).split(",")]
 
     if docker_config is not None:
         if port is not None:
