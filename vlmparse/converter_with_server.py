@@ -5,8 +5,59 @@ from typing import Literal
 
 from loguru import logger
 
+from vlmparse.constants import DEFAULT_SERVER_PORT
 from vlmparse.servers.utils import get_model_from_uri
 from vlmparse.utils import get_file_paths
+
+
+def start_server(
+    model: str,
+    gpus: str,
+    port: None | int = None,
+    with_vllm_server: bool = True,
+    vllm_args: list[str] = {},
+    forget_predefined_vllm_args: bool = False,
+    auto_stop: bool = False,
+):
+    from vlmparse.registries import docker_config_registry
+
+    base_url = ""
+    container = None
+    docker_config = docker_config_registry.get(model, default=with_vllm_server)
+
+    if port is None:
+        port = DEFAULT_SERVER_PORT
+
+    if docker_config is None:
+        logger.warning(
+            f"No Docker configuration found for model: {model}, using default configuration"
+        )
+        return "", container, None, docker_config
+
+    gpu_device_ids = None
+    if gpus is not None:
+        gpu_device_ids = [g.strip() for g in gpus.split(",")]
+
+    if docker_config is not None:
+        if port is not None:
+            docker_config.docker_port = port
+        docker_config.gpu_device_ids = gpu_device_ids
+        docker_config.update_command_args(
+            vllm_args,
+            forget_predefined_vllm_args=forget_predefined_vllm_args,
+        )
+
+        logger.info(
+            f"Deploying VLLM server for {docker_config.model_name} on port {port}..."
+        )
+        server = docker_config.get_server(auto_stop=auto_stop)
+        if server is None:
+            logger.error(f"Model server not found for model: {model}")
+            return "", container, None, docker_config
+
+        base_url, container = server.start()
+
+    return base_url, container, server, docker_config
 
 
 class ConverterWithServer:
@@ -18,8 +69,8 @@ class ConverterWithServer:
         port: int | None = None,
         with_vllm_server: bool = False,
         concurrency: int = 10,
-        vllm_kwargs: dict | None = None,
-        forget_predefined_vllm_kwargs: bool = False,
+        vllm_args: dict | None = None,
+        forget_predefined_vllm_args: bool = False,
     ):
         self.model = model
         self.uri = uri
@@ -27,8 +78,8 @@ class ConverterWithServer:
         self.gpus = gpus
         self.with_vllm_server = with_vllm_server
         self.concurrency = concurrency
-        self.vllm_kwargs = vllm_kwargs
-        self.forget_predefined_vllm_kwargs = forget_predefined_vllm_kwargs
+        self.vllm_args = vllm_args
+        self.forget_predefined_vllm_args = forget_predefined_vllm_args
         self.server = None
         self.client = None
 
@@ -36,32 +87,20 @@ class ConverterWithServer:
             self.model = get_model_from_uri(self.uri)
 
     def start_server_and_client(self):
-        from vlmparse.registries import (
-            converter_config_registry,
-            docker_config_registry,
-        )
-
-        gpu_device_ids = None
-        if self.gpus is not None:
-            gpu_device_ids = [g.strip() for g in self.gpus.split(",")]
+        from vlmparse.registries import converter_config_registry
 
         if self.uri is None:
-            docker_config = docker_config_registry.get(
-                self.model, default=self.with_vllm_server
+            _, _, self.server, docker_config = start_server(
+                model=self.model,
+                gpus=self.gpus,
+                port=self.port,
+                with_vllm_server=self.with_vllm_server,
+                vllm_args=self.vllm_args,
+                forget_predefined_vllm_args=self.forget_predefined_vllm_args,
+                auto_stop=True,
             )
 
             if docker_config is not None:
-                if self.port is not None:
-                    docker_config.docker_port = self.port
-                docker_config.gpu_device_ids = gpu_device_ids
-                docker_config.update_command_args(
-                    self.vllm_kwargs,
-                    forget_predefined_vllm_kwargs=self.forget_predefined_vllm_kwargs,
-                )
-                self.server = docker_config.get_server(auto_stop=True)
-
-                self.server.start()
-
                 self.client = docker_config.get_client()
             else:
                 self.client = converter_config_registry.get(self.model).get_client()

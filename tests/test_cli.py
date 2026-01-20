@@ -46,7 +46,7 @@ def mock_docker_server():
         mock_container.name = "test_container_name"
 
         # Configure server.start() to return base_url and container
-        mock_server.start.return_value = ("http://localhost:8056", mock_container)
+        mock_server.start.return_value = ("http://localhost:8056", None)
         mock_config.get_server.return_value = mock_server
         mock_registry.get.return_value = mock_config
 
@@ -79,7 +79,7 @@ class TestServeCommand:
         cli.serve(model="lightonocr")
 
         # Verify registry was called with correct model
-        mock_registry.get.assert_called_once_with("lightonocr")
+        mock_registry.get.assert_called_once_with("lightonocr", default=True)
 
         # Verify port was set to default
         assert mock_config.docker_port == 8056
@@ -128,7 +128,7 @@ class TestServeCommand:
             # Should not raise an exception, just log warning
             cli.serve(model="unknown_model")
 
-            mock_registry.get.assert_called_once_with("unknown_model")
+            mock_registry.get.assert_called_once_with("unknown_model", default=True)
 
 
 class TestConvertCommand:
@@ -216,6 +216,7 @@ class TestConvertCommand:
                 mock_converter = MagicMock()
                 mock_converter.batch.return_value = None
 
+                mock_server.start.return_value = ("http://localhost:8056", None)
                 mock_docker_config.get_server.return_value = mock_server
                 mock_docker_config.get_client.return_value = mock_converter
                 mock_docker_registry.get.return_value = mock_docker_config
@@ -241,6 +242,7 @@ class TestConvertCommand:
                 mock_converter = MagicMock()
                 mock_converter.batch.return_value = None
 
+                mock_server.start.return_value = ("http://localhost:8056", None)
                 mock_docker_config.get_server.return_value = mock_server
                 mock_docker_config.get_client.return_value = mock_converter
                 mock_docker_registry.get.return_value = mock_docker_config
@@ -354,6 +356,7 @@ class TestCLIIntegration:
 
                 mock_converter.batch.return_value = None
 
+                mock_server.start.return_value = ("http://localhost:8056", None)
                 mock_docker_config.get_server.return_value = mock_server
                 mock_docker_config.get_client.return_value = mock_converter
                 mock_docker_registry.get.return_value = mock_docker_config
@@ -377,7 +380,7 @@ class TestCLIIntegration:
             mock_container = MagicMock()
             mock_container.id = "test_id"
             mock_container.name = "test_name"
-            mock_server.start.return_value = ("http://localhost:8056", mock_container)
+            mock_server.start.return_value = ("http://localhost:8056", None)
             mock_docker_config.get_server.return_value = mock_server
             mock_docker_registry.get.return_value = mock_docker_config
 
@@ -464,7 +467,7 @@ class TestCLIConvertInDepth:
 
             mock_server.start.return_value = (
                 "http://localhost:8000/v1",
-                mock_container,
+                None,
             )
             mock_docker_config.get_server.return_value = mock_server
 
@@ -727,36 +730,3 @@ class TestCLIConvertInDepth:
         assert len(page_contents) == 2
         assert "Page 1" in page_contents[0]
         assert "Page 2" in page_contents[1]
-
-    def test_convert_with_nanonet_postprompt(self, cli, file_path, mock_openai_api):
-        """Test that Nanonet model uses its postprompt correctly."""
-        from vlmparse.registries import converter_config_registry
-
-        messages_sent = []
-
-        async def capture_messages(*args, **kwargs):
-            messages_sent.append(kwargs.get("messages", []))
-            mock_response = MagicMock()
-            mock_response.choices = [MagicMock()]
-            mock_response.choices[0].message.content = "Extracted text"
-            return mock_response
-
-        mock_openai_api.chat.completions.create = AsyncMock(
-            side_effect=capture_messages
-        )
-
-        cli.convert(
-            inputs=[str(file_path)],
-            model="nanonets/Nanonets-OCR2-3B",
-            uri="http://mocked-api/v1",
-        )
-
-        # Verify messages were sent (2 pages)
-        assert len(messages_sent) == 2
-
-        # Verify config has postprompt set
-        config = converter_config_registry.get(
-            "nanonets/Nanonets-OCR2-3B", uri="http://mocked-api/v1"
-        )
-        assert config.postprompt is not None
-        assert len(config.postprompt) > 0

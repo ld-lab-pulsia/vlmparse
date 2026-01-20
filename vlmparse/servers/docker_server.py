@@ -49,15 +49,14 @@ class DockerServerConfig(BaseModel):
 
     def update_command_args(
         self,
-        vllm_kwargs: dict | None = None,
-        forget_predefined_vllm_kwargs: bool = False,
+        vllm_args: dict | None = None,
+        forget_predefined_vllm_args: bool = False,
     ) -> list[str]:
-        if vllm_kwargs is not None:
-            new_kwargs = [f"--{k}={v}" for k, v in vllm_kwargs.items()]
-            if forget_predefined_vllm_kwargs:
-                self.command_args = new_kwargs
+        if vllm_args is not None:
+            if forget_predefined_vllm_args:
+                self.command_args = vllm_args
             else:
-                self.command_args.extend(new_kwargs)
+                self.command_args.extend(vllm_args)
 
         return self.command_args
 

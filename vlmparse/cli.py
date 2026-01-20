@@ -11,8 +11,8 @@ class DParseCLI:
         model: str,
         port: int | None = None,
         gpus: str | None = None,
-        vllm_kwargs: dict | None = None,
-        forget_predefined_vllm_kwargs: bool = False,
+        vllm_args: list[str] | None = None,
+        forget_predefined_vllm_args: bool = False,
     ):
         """Deploy a VLLM server in a Docker container.
 
@@ -20,43 +20,26 @@ class DParseCLI:
             model: Model name
             port: VLLM server port (default: 8056)
             gpus: Comma-separated GPU device IDs (e.g., "0" or "0,1,2"). If not specified, all GPUs will be used.
-            vllm_kwargs: Additional keyword arguments to pass to the VLLM server.
-            forget_predefined_vllm_kwargs: If True, the predefined VLLM kwargs from the docker config will be replaced by vllm_kwargs otherwise the predefined kwargs will be updated with vllm_kwargs with a risk of collision of argument names.
+            vllm_args: Additional keyword arguments to pass to the VLLM server.
+            forget_predefined_vllm_args: If True, the predefined VLLM kwargs from the docker config will be replaced by vllm_args otherwise the predefined kwargs will be updated with vllm_args with a risk of collision of argument names.
         """
-        if port is None:
-            port = 8056
 
-        from vlmparse.registries import docker_config_registry
+        from vlmparse.converter_with_server import start_server
 
-        docker_config = docker_config_registry.get(model)
-        if docker_config is None:
-            logger.warning(
-                f"No Docker configuration found for model: {model}, using default configuration"
-            )
-            return
-
-        docker_config.docker_port = port
-
-        # Only override GPU configuration if explicitly specified
-        # This preserves CPU-only settings from the config
-        if gpus is not None:
-            docker_config.gpu_device_ids = [g.strip() for g in str(gpus).split(",")]
-        server = docker_config.get_server(auto_stop=False)
-
-        if server is None:
-            logger.error(f"Model server not found for model: {model}")
-            return
-
-        # Deploy server and leave it running (cleanup=False)
-        logger.info(
-            f"Deploying VLLM server for {docker_config.model_name} on port {port}..."
+        base_url, container, _, _ = start_server(
+            model=model,
+            gpus=gpus,
+            port=port,
+            with_vllm_server=True,
+            vllm_args=vllm_args,
+            forget_predefined_vllm_args=forget_predefined_vllm_args,
+            auto_stop=False,
         )
 
-        base_url, container = server.start()
-
         logger.info(f"✓ VLLM server ready at {base_url}")
-        logger.info(f"✓ Container ID: {container.id}")
-        logger.info(f"✓ Container name: {container.name}")
+        if container is not None:
+            logger.info(f"✓ Container ID: {container.id}")
+            logger.info(f"✓ Container name: {container.name}")
 
     def convert(
         self,
@@ -69,7 +52,6 @@ class DParseCLI:
         with_vllm_server: bool = False,
         concurrency: int = 10,
         dpi: int | None = None,
-        vllm_kwargs: dict | None = None,
         debug: bool = False,
     ):
         """Parse PDF documents and save results.
@@ -84,7 +66,6 @@ class DParseCLI:
             mode: Output mode - "document" (save as JSON zip), "md" (save as markdown file), "md_page" (save as folder of markdown pages)
             with_vllm_server: If True, a local VLLM server will be deployed if the model is not found in the registry. Note that if the model is in the registry and the uri is None, the server will be anyway deployed.
             dpi: DPI to use for the conversion. If not specified, the default DPI will be used.
-            vllm_kwargs: Additional keyword arguments to pass to the VLLM server.
             debug: If True, run in debug mode (single-threaded, no concurrency)
         """
         from vlmparse.converter_with_server import ConverterWithServer
@@ -95,7 +76,6 @@ class DParseCLI:
             gpus=gpus,
             with_vllm_server=with_vllm_server,
             concurrency=concurrency,
-            vllm_kwargs=vllm_kwargs,
         ) as converter_with_server:
             return converter_with_server.parse(
                 inputs=inputs, out_folder=out_folder, mode=mode, dpi=dpi, debug=debug
