@@ -1,5 +1,5 @@
 import os
-from typing import Literal
+from typing import Literal, Optional
 
 from loguru import logger
 from pydantic import Field
@@ -101,7 +101,7 @@ class OpenAIConverterClient(BaseConverter):
 
     async def _get_chat_completion(
         self, messages: list[dict], completion_kwargs: dict | None = None
-    ) -> tuple[str, "CompletionUsage"]:  # noqa: F821
+    ) -> tuple[str, Optional["CompletionUsage"]]:  # noqa: F821
         """Helper to handle chat completion with optional streaming."""
         if completion_kwargs is None:
             completion_kwargs = self.config.completion_kwargs
@@ -117,7 +117,8 @@ class OpenAIConverterClient(BaseConverter):
             async for chunk in response_stream:
                 if chunk.choices and chunk.choices[0].delta.content:
                     response_parts.append(chunk.choices[0].delta.content)
-            return "".join(response_parts)
+
+            return "".join(response_parts), None
         else:
             response_obj = await self.model.chat.completions.create(
                 model=self.config.llm_params.model_name,
@@ -175,9 +176,10 @@ class OpenAIConverterClient(BaseConverter):
 
         text = html_to_md_keep_tables(text)
         page.text = text
-        page.prompt_tokens = usage.prompt_tokens
-        page.completion_tokens = usage.completion_tokens
-        if hasattr(usage, "reasoning_tokens"):
-            page.reasoning_tokens = usage.reasoning_tokens
+        if usage is not None:
+            page.prompt_tokens = usage.prompt_tokens
+            page.completion_tokens = usage.completion_tokens
+            if hasattr(usage, "reasoning_tokens"):
+                page.reasoning_tokens = usage.reasoning_tokens
 
         return page
