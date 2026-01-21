@@ -41,3 +41,13 @@ class LightOnOCRConverterConfig(OpenAIConverterConfig):
     }
     dpi: int = 200
     aliases: list[str] = Field(default_factory=lambda: ["lightonocr"])
+
+
+class LightonOCR21BServerConfig(LightOnOCRDockerServerConfig):
+    model_name: str = "lightonai/LightOnOCR-2-1B"
+    aliases: list[str] = Field(default_factory=lambda: ["lightonocr2"])
+
+
+class LightonOCR21BConverterConfig(LightOnOCRConverterConfig):
+    model_name: str = "lightonai/LightOnOCR-2-1B"
+    aliases: list[str] = Field(default_factory=lambda: ["lightonocr2"])

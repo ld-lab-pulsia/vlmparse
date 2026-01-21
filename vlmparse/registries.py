@@ -17,6 +17,8 @@ from vlmparse.clients.hunyuanocr import (
     HunyuanOCRDockerServerConfig,
 )
 from vlmparse.clients.lightonocr import (
+    LightonOCR21BConverterConfig,
+    LightonOCR21BServerConfig,
     LightOnOCRConverterConfig,
     LightOnOCRDockerServerConfig,
 )
@@ -55,6 +57,7 @@ for server_config_cls in [
     MinerUDockerServerConfig,
     DeepSeekOCRDockerServerConfig,
     GraniteDoclingDockerServerConfig,
+    LightonOCR21BServerConfig,
 ]:
     aliases = get_default(server_config_cls, "aliases") or []
     model_name = get_default(server_config_cls, "model_name")
@@ -144,6 +147,7 @@ for converter_config_cls in [
     DeepSeekOCRConverterConfig,
     GraniteDoclingConverterConfig,
     OlmOCRConverterConfig,
+    LightonOCR21BConverterConfig,
 ]:
     aliases = get_default(converter_config_cls, "aliases") or []
     model_name = get_default(converter_config_cls, "model_name")
