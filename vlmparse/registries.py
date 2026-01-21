@@ -139,7 +139,6 @@ for mistral_model in ["mistral-ocr-latest", "mistral-ocr"]:
     converter_config_registry.register(
         mistral_model,
         lambda uri=None, model=mistral_model: MistralOCRConverterConfig(
-            model_name=model,
             base_url="https://api.mistral.ai/v1" if uri is None else uri,
             api_key=os.getenv("MISTRAL_API_KEY"),
         ),
