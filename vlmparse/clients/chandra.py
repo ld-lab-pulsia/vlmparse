@@ -255,7 +255,7 @@ class ChandraConverterClient(OpenAIConverterClient):
                 if retries > 0:
                     completion_kwargs["top_p"] = 0.95
 
-                result_content = await self._get_chat_completion(
+                result_content, usage = await self._get_chat_completion(
                     messages, completion_kwargs=completion_kwargs
                 )
                 error_occurred = False
@@ -308,6 +308,10 @@ class ChandraConverterClient(OpenAIConverterClient):
         # Convert HTML to MD
         text = html_to_md_keep_tables(text)
         page.text = text
+
+        if usage is not None:
+            page.prompt_tokens = usage.prompt_tokens
+            page.completion_tokens = usage.completion_tokens
 
         return page
 

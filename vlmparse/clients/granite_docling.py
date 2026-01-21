@@ -70,13 +70,16 @@ class GraniteDoclingConverter(OpenAIConverterClient):
             }
         ]
 
-        doctags = await self._get_chat_completion_adaptive(
+        doctags, usage = await self._get_chat_completion_adaptive(
             messages, completion_kwargs=self.config.completion_kwargs
         )
         doctags = clean_response(doctags)
 
         page.raw_response = doctags
         page.text = _doctags_to_markdown(doctags, image)
+        if usage is not None:
+            page.prompt_tokens = usage.prompt_tokens
+            page.completion_tokens = usage.completion_tokens
         return page
 
     async def _get_chat_completion_adaptive(
