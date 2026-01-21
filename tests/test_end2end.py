@@ -21,6 +21,7 @@ def test_convert(file_path, model):
         assert doc.pages[0].prompt_tokens > 0
 
 
+@pytest.mark.skip(reason="Disabled to avoid excessive API calls")
 @pytest.mark.parametrize("model", ["mistral-ocr"])
 def test_convert_mistral_ocr(file_path, model):
     config = converter_config_registry.get(model)
