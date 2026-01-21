@@ -34,6 +34,8 @@ class TestBatchParser:
         mock_server = MagicMock()
         mock_client = MagicMock()
 
+        mock_server.start.return_value = ("http://localhost:8056", None)
+
         mock_config.get_server.return_value = mock_server
         mock_config.get_client.return_value = mock_client
         mock_docker_registry.get.return_value = mock_config
@@ -87,7 +89,11 @@ class TestBatchParser:
         """Test that parse method updates client configuration and calls batch."""
         # Setup mocks
         mock_config = MagicMock()
+        mock_server = MagicMock()
         mock_client = MagicMock()
+
+        mock_server.start.return_value = ("http://localhost:8056", None)
+        mock_config.get_server.return_value = mock_server
         mock_config.get_client.return_value = mock_client
         mock_docker_registry.get.return_value = mock_config
 
@@ -136,7 +142,11 @@ class TestBatchParser:
 
         # Setup mocks
         mock_config = MagicMock()
+        mock_server = MagicMock()
         mock_client = MagicMock()
+
+        mock_server.start.return_value = ("http://localhost:8056", None)
+        mock_config.get_server.return_value = mock_server
         mock_config.get_client.return_value = mock_client
         mock_docker_registry.get.return_value = mock_config
 
@@ -161,7 +171,11 @@ class TestBatchParser:
     ):
         """Test that retrylast raises ValueError if no previous runs found."""
         mock_config = MagicMock()
+        mock_server = MagicMock()
         mock_client = MagicMock()
+
+        mock_server.start.return_value = ("http://localhost:8056", None)
+        mock_config.get_server.return_value = mock_server
         mock_config.get_client.return_value = mock_client
         mock_docker_registry.get.return_value = mock_config
 

@@ -34,6 +34,7 @@ class GraniteDoclingDockerServerConfig(VLLMDockerServerConfig):
 class GraniteDoclingConverterConfig(OpenAIConverterConfig):
     """Granite Docling converter configuration."""
 
+    model_name: str = "ibm-granite/granite-docling-258M"
     preprompt: str | None = None
     postprompt: str | None = "Convert this page to docling."
     completion_kwargs: dict | None = {
