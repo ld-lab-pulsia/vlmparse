@@ -40,6 +40,7 @@ def test_convert(file_path, model):
         "chandra",
         "deepseekocr",
         "granite-docling",
+        "lightonocr2",
     ],
 )
 def test_converter_with_server_with_docker(file_path, model):
