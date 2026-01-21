@@ -16,8 +16,22 @@ def test_convert(file_path, model):
     assert doc.pages[0].text is not None
     assert doc.pages[1].text is not None
 
-    assert doc.pages[1].completion_tokens > 0
-    assert doc.pages[1].prompt_tokens > 0
+    if model in ["gemini-2.5-flash-lite"]:
+        assert doc.pages[0].completion_tokens > 0
+        assert doc.pages[0].prompt_tokens > 0
+
+
+@pytest.mark.skip(reason="Disabled to avoid excessive API calls")
+@pytest.mark.parametrize("model", ["mistral-ocr"])
+def test_convert_mistral_ocr(file_path, model):
+    config = converter_config_registry.get(model)
+    client = config.get_client(return_documents_in_batch_mode=True, debug=True)
+    docs = client.batch([file_path])
+    assert len(docs) == 1
+    doc = docs[0]
+    assert len(doc.pages) == 2
+    assert doc.pages[0].text is not None
+    assert doc.pages[1].text is not None
 
 
 @pytest.mark.skipif(

@@ -21,6 +21,7 @@ from vlmparse.clients.lightonocr import (
     LightOnOCRDockerServerConfig,
 )
 from vlmparse.clients.mineru import MinerUConverterConfig, MinerUDockerServerConfig
+from vlmparse.clients.mistral_converter import MistralOCRConverterConfig
 from vlmparse.clients.nanonetocr import (
     NanonetOCR2ConverterConfig,
     NanonetOCR2DockerServerConfig,
@@ -131,6 +132,15 @@ for openai_model in [
                 base_url=None,
                 api_key=os.getenv("OPENAI_API_KEY"),
             )
+        ),
+    )
+
+for mistral_model in ["mistral-ocr-latest", "mistral-ocr"]:
+    converter_config_registry.register(
+        mistral_model,
+        lambda uri=None, model=mistral_model: MistralOCRConverterConfig(
+            base_url="https://api.mistral.ai/v1" if uri is None else uri,
+            api_key=os.getenv("MISTRAL_API_KEY"),
         ),
     )
 
