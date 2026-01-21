@@ -74,10 +74,10 @@ Deployment (requires a gpu + docker installation):
 vlmparse serve --model lightonocr --port 8000 --gpus 1
 ```
 
-then convert:
+then convert (the correct client is inferred from the docker metadata):
 
 ```bash
-vlmparse convert --input "*.pdf" --out_folder ./output --model lightonocr --uri http://localhost:8000/v1
+vlmparse convert --input "*.pdf" --out_folder ./output --uri http://localhost:8000/v1
 ```
 
 You can also list all running servers:
@@ -96,6 +96,11 @@ Stop a server (if only one server is running, the container name is not needed):
 vlmparse stop <container_name>
 ```
 
+List available models:
+```bash
+vlmparse list_register
+```
+
 ### View conversion results with Streamlit
 
 ```bash
@@ -112,7 +117,20 @@ export OPENAI_API_KEY="your-key"
 ```
 
 ## Python API
+### High level API:
+Converter with automatic server management:
 
+```python
+from vlmparse.converter_with_server import ConverterWithServer
+
+with ConverterWithServer(model="mineru2.5") as converter_with_server:
+    documents = converter_with_server.parse(inputs=["file1.pdf", "file2.pdf"], out_folder="./output")
+```
+
+Note that if you pass an uri of a vllm server to `ConverterWithServer`, the model name is inferred automatically and no server is started.
+
+
+## Low level API:
 Client interface:
 
 ```python
@@ -143,15 +161,3 @@ server.start()
 
 server.stop()
 ```
-
-
-Converter with automatic server management:
-
-```python
-from vlmparse.converter_with_server import ConverterWithServer
-
-with ConverterWithServer(model="mineru2.5") as converter_with_server:
-    documents = converter_with_server.parse(inputs=["file1.pdf", "file2.pdf"], out_folder="./output")
-```
-
-Note that if you pass an uri of a vllm server to `ConverterWithServer`, the model name is inferred automatically and no server is started.
