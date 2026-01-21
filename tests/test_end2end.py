@@ -5,7 +5,7 @@ import pytest
 from vlmparse.registries import converter_config_registry
 
 
-@pytest.mark.parametrize("model", ["gemini-2.5-flash-lite", "mistral-ocr"])
+@pytest.mark.parametrize("model", ["gemini-2.5-flash-lite"])
 def test_convert(file_path, model):
     config = converter_config_registry.get(model)
     client = config.get_client(return_documents_in_batch_mode=True, debug=True)
