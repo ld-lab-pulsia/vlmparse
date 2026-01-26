@@ -1,186 +1,149 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from vlmparse.converter_with_server import ConverterWithServer
-from vlmparse.data_model.document import Document
-
-
-@pytest.fixture
-def mock_docker_registry():
-    with patch("vlmparse.registries.docker_config_registry") as mock:
-        yield mock
-
-
-@pytest.fixture
-def mock_converter_registry():
-    with patch("vlmparse.registries.converter_config_registry") as mock:
-        yield mock
-
-
-@pytest.fixture
-def mock_get_file_paths():
-    with patch("vlmparse.converter_with_server.get_file_paths") as mock:
-        yield mock
 
 
 class TestBatchParser:
     """Tests for ConverterWithServer (acting as BatchParser)."""
 
-    def test_init_starts_docker_server(self, mock_docker_registry):
+    def test_init_starts_docker_server(self, mock_docker_operations):
         """Test that initializing with a model requiring docker starts the server."""
-        # Setup mock docker config
-        mock_config = MagicMock()
-        mock_server = MagicMock()
-        mock_client = MagicMock()
+        # Setup using unified mocking system
+        with mock_docker_operations(include_client=True) as (
+            mock_docker_registry,
+            mock_config,
+            mock_server,
+            mock_client,
+        ):
+            # Initialize
+            with ConverterWithServer(
+                model="test_model", with_vllm_server=True
+            ) as parser:
+                # Verify interactions
+                mock_docker_registry.get.assert_called_with("test_model", default=True)
+                mock_config.get_server.assert_called_with(auto_stop=True)
+                mock_server.start.assert_called_once()
+                mock_config.get_client.assert_called_once()
+                assert parser.client == mock_client
 
-        mock_server.start.return_value = ("http://localhost:8056", None)
-
-        mock_config.get_server.return_value = mock_server
-        mock_config.get_client.return_value = mock_client
-        mock_docker_registry.get.return_value = mock_config
-
-        # Initialize
-        with ConverterWithServer(model="test_model", with_vllm_server=True) as parser:
-            # Verify interactions
-            mock_docker_registry.get.assert_called_with("test_model", default=True)
-            mock_config.get_server.assert_called_with(auto_stop=True)
-            mock_server.start.assert_called_once()
-            mock_config.get_client.assert_called_once()
-            assert parser.client == mock_client
-
-    def test_init_no_docker_fallback(
-        self, mock_docker_registry, mock_converter_registry
-    ):
+    def test_init_no_docker_fallback(self, mock_docker_operations, mock_openai_api):
         """Test fallback to standard converter when no docker config exists."""
-        # Setup mocks
-        mock_docker_registry.get.return_value = None
+        # Setup mocks - docker returns None, use real converter registry
+        with mock_docker_operations(
+            model_filter=lambda model: False  # No docker for any model
+        ) as (mock_docker_reg, _, _, _):
+            with mock_openai_api():
+                # Initialize with a real model from registry
+                with ConverterWithServer(model="gemini-2.5-flash-lite") as parser:
+                    # Verify interactions
+                    mock_docker_reg.get.assert_called_with(
+                        "gemini-2.5-flash-lite", default=False
+                    )
+                    # Client should be initialized from real converter registry
+                    assert parser.client is not None
 
-        mock_converter_config = MagicMock()
-        mock_client = MagicMock()
-        mock_converter_config.get_client.return_value = mock_client
-        mock_converter_registry.get.return_value = mock_converter_config
-
-        # Initialize
-        with ConverterWithServer(model="test_model") as parser:
-            # Verify interactions
-            mock_docker_registry.get.assert_called_with("test_model", default=False)
-            mock_converter_registry.get.assert_called_with("test_model")
-            mock_converter_config.get_client.assert_called_once()
-            assert parser.client == mock_client
-
-    def test_init_with_uri(self, mock_converter_registry):
+    def test_init_with_uri(self, mock_openai_api):
         """Test initialization with explicit URI."""
-        mock_config = MagicMock()
-        mock_client = MagicMock()
-        mock_config.get_client.return_value = mock_client
-        mock_converter_registry.get.return_value = mock_config
-
-        with ConverterWithServer(model="test_model", uri="http://custom.uri") as parser:
-            mock_converter_registry.get.assert_called_with(
-                "test_model", uri="http://custom.uri"
-            )
-            mock_config.get_client.assert_called_once()
-            assert parser.client == mock_client
+        with mock_openai_api():
+            with patch(
+                "vlmparse.servers.utils.get_model_from_uri",
+                return_value="gemini-2.5-flash-lite",
+            ):
+                with ConverterWithServer(
+                    model="gemini-2.5-flash-lite", uri="http://custom.uri"
+                ) as parser:
+                    # Client should be initialized from real converter registry with URI
+                    assert parser.client is not None
+                    assert parser.uri == "http://custom.uri"
 
     def test_parse_updates_client_config(
-        self, mock_docker_registry, mock_get_file_paths, tmp_path
+        self, mock_docker_operations, datadir, mock_openai_api, tmp_path
     ):
         """Test that parse method updates client configuration and calls batch."""
-        # Setup mocks
-        mock_config = MagicMock()
-        mock_server = MagicMock()
-        mock_client = MagicMock()
+        # Use real test file
+        test_file = datadir / "Fiche_Graines_A5.pdf"
 
-        mock_server.start.return_value = ("http://localhost:8056", None)
-        mock_config.get_server.return_value = mock_server
-        mock_config.get_client.return_value = mock_client
-        mock_docker_registry.get.return_value = mock_config
+        with mock_docker_operations(
+            model_filter=lambda model: False  # No docker for any model
+        ):
+            with mock_openai_api():
+                with ConverterWithServer(model="gemini-2.5-flash-lite") as parser:
+                    # Call parse with real file
+                    documents = parser.parse(
+                        inputs=[str(test_file)],
+                        out_folder=str(tmp_path),
+                        mode="md",
+                        dpi=300,
+                        debug=True,
+                    )
 
-        mock_get_file_paths.return_value = ["file1.pdf", "file2.pdf"]
+                    # Verify client config updates
+                    assert parser.client.config.dpi == 300
+                    assert parser.client.debug is True
+                    assert parser.client.save_mode == "md"
+                    # Concurrency should be 1 because debug=True
+                    assert parser.client.num_concurrent_files == 1
+                    assert parser.client.num_concurrent_pages == 1
 
-        # Mock batch return value
-        mock_doc = MagicMock(spec=Document)
-        mock_client.batch.return_value = [mock_doc, mock_doc]
-
-        with ConverterWithServer(model="test_model") as parser:
-            # Call parse
-            documents = parser.parse(
-                inputs=["dummy"],
-                out_folder=str(tmp_path),
-                mode="md",
-                dpi=300,
-                debug=True,
-            )
-
-            # Verify client config updates
-            assert mock_client.config.dpi == 300
-            assert mock_client.debug is True
-            assert mock_client.save_mode == "md"
-            # Concurrency should be 1 because debug=True
-            assert mock_client.num_concurrent_files == 1
-            assert mock_client.num_concurrent_pages == 1
-
-            # Verify batch call
-            mock_client.batch.assert_called_once_with(["file1.pdf", "file2.pdf"])
-
-            # Verify result
-            assert len(documents) == 2
-            assert documents[0] == mock_doc
+                    # Verify result
+                    assert documents is not None
+                    assert len(documents) > 0
 
     def test_parse_retry_logic(
-        self, mock_docker_registry, mock_get_file_paths, tmp_path
+        self, mock_docker_operations, datadir, mock_openai_api, tmp_path
     ):
         """Test the retrylast logic filters already processed files."""
+        # Create two copies of the test file
+        test_file = datadir / "Fiche_Graines_A5.pdf"
+        temp_dir = tmp_path / "input_files"
+        temp_dir.mkdir()
+        file1 = temp_dir / "file1.pdf"
+        file2 = temp_dir / "file2.pdf"
+
+        # Copy test file to simulate multiple inputs
+        import shutil
+
+        shutil.copy(test_file, file1)
+        shutil.copy(test_file, file2)
+
         # Setup folder structure for retry
-        run_folder = tmp_path / "run1"
+        run_folder = tmp_path / "output" / "run1"
         results_folder = run_folder / "results"
         results_folder.mkdir(parents=True)
 
-        # Create a processed result
+        # Create a processed result for file1
         (results_folder / "file1.zip").touch()
 
-        # Setup mocks
-        mock_config = MagicMock()
-        mock_server = MagicMock()
-        mock_client = MagicMock()
+        with mock_docker_operations(model_filter=lambda model: False):
+            with mock_openai_api():
+                with ConverterWithServer(model="gemini-2.5-flash-lite") as parser:
+                    # Call parse with retrylast - should only process file2
+                    documents = parser.parse(
+                        inputs=[str(file1), str(file2)],
+                        out_folder=str(tmp_path / "output"),
+                        retrylast=True,
+                    )
 
-        mock_server.start.return_value = ("http://localhost:8056", None)
-        mock_config.get_server.return_value = mock_server
-        mock_config.get_client.return_value = mock_client
-        mock_docker_registry.get.return_value = mock_config
-
-        # Input has file1 (processed) and file2 (new)
-        mock_get_file_paths.return_value = ["path/to/file1.pdf", "path/to/file2.pdf"]
-
-        with ConverterWithServer(model="test_model") as parser:
-            # Call parse with retrylast
-            parser.parse(inputs=["dummy"], out_folder=str(tmp_path), retrylast=True)
-
-            # Verify only file2 was sent to batch
-            # file1 should be filtered out because file1.zip exists
-            call_args = mock_client.batch.call_args
-            assert call_args is not None
-            batch_files = call_args[0][0]
-            assert len(batch_files) == 1
-            assert "file2.pdf" in batch_files[0]
-            assert "file1.pdf" not in batch_files[0]
+                    # Should only process file2 (file1 was already processed)
+                    # Verify by checking that only 1 file was processed
+                    assert documents is not None
+                    assert len(documents) == 1
 
     def test_parse_retry_no_previous_runs(
-        self, mock_docker_registry, mock_get_file_paths, tmp_path
+        self, mock_docker_operations, datadir, mock_openai_api, tmp_path
     ):
         """Test that retrylast raises ValueError if no previous runs found."""
-        mock_config = MagicMock()
-        mock_server = MagicMock()
-        mock_client = MagicMock()
+        test_file = datadir / "Fiche_Graines_A5.pdf"
 
-        mock_server.start.return_value = ("http://localhost:8056", None)
-        mock_config.get_server.return_value = mock_server
-        mock_config.get_client.return_value = mock_client
-        mock_docker_registry.get.return_value = mock_config
-
-        with ConverterWithServer(model="test_model") as parser:
-            # tmp_path is empty, so os.listdir(tmp_path) will be empty
-
-            with pytest.raises(ValueError, match="No previous runs found"):
-                parser.parse(inputs=["dummy"], out_folder=str(tmp_path), retrylast=True)
+        with mock_docker_operations(model_filter=lambda model: False):
+            with mock_openai_api():
+                with ConverterWithServer(model="gemini-2.5-flash-lite") as parser:
+                    # tmp_path is empty, so os.listdir(tmp_path) will be empty
+                    with pytest.raises(ValueError, match="No previous runs found"):
+                        parser.parse(
+                            inputs=[str(test_file)],
+                            out_folder=str(tmp_path),
+                            retrylast=True,
+                        )

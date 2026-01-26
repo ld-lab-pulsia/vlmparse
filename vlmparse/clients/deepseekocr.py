@@ -169,7 +169,7 @@ class DeepSeekOCRConverterClient(OpenAIConverterClient):
         ]
 
         # Get raw response using parent's method
-        response = await self._get_chat_completion(messages)
+        response, usage = await self._get_chat_completion(messages)
         logger.info("Response length: " + str(len(response)))
         page.raw_response = response
 
@@ -199,5 +199,8 @@ class DeepSeekOCRConverterClient(OpenAIConverterClient):
 
         page.text = outputs.strip()
         logger.debug(page.text)
+        if usage is not None:
+            page.prompt_tokens = usage.prompt_tokens
+            page.completion_tokens = usage.completion_tokens
 
         return page

@@ -27,7 +27,7 @@ from vlmparse.clients.nanonetocr import (
     NanonetOCR2DockerServerConfig,
 )
 from vlmparse.clients.olmocr import OlmOCRConverterConfig, OlmOCRDockerServerConfig
-from vlmparse.clients.openai_converter import LLMParams, OpenAIConverterConfig
+from vlmparse.clients.openai_converter import OpenAIConverterConfig
 from vlmparse.clients.paddleocrvl import (
     PaddleOCRVLConverterConfig,
     PaddleOCRVLDockerServerConfig,
@@ -84,10 +84,8 @@ class ConverterConfigRegistry:
             return self._registry[model_name](uri=uri)
         # Fallback to OpenAIConverterConfig for unregistered models
         if uri is not None:
-            return OpenAIConverterConfig(
-                llm_params=LLMParams(base_url=uri, model_name=model_name)
-            )
-        return OpenAIConverterConfig(llm_params=LLMParams(model_name=model_name))
+            return OpenAIConverterConfig(base_url=uri)
+        return OpenAIConverterConfig(model_name=model_name)
 
     def list_models(self) -> list[str]:
         """List all registered model names."""
@@ -112,11 +110,9 @@ for gemini_model in [
     converter_config_registry.register(
         gemini_model,
         lambda uri=None, model=gemini_model: OpenAIConverterConfig(
-            llm_params=LLMParams(
-                model_name=model,
-                base_url=GOOGLE_API_BASE_URL if uri is None else uri,
-                api_key=os.getenv("GOOGLE_API_KEY"),
-            )
+            model_name=model,
+            base_url=GOOGLE_API_BASE_URL if uri is None else uri,
+            api_key=os.getenv("GOOGLE_API_KEY"),
         ),
     )
 for openai_model in [
@@ -127,11 +123,9 @@ for openai_model in [
     converter_config_registry.register(
         openai_model,
         lambda uri=None, model=openai_model: OpenAIConverterConfig(
-            llm_params=LLMParams(
-                model_name=model,
-                base_url=None,
-                api_key=os.getenv("OPENAI_API_KEY"),
-            )
+            model_name=model,
+            base_url=None,
+            api_key=os.getenv("OPENAI_API_KEY"),
         ),
     )
 
@@ -162,11 +156,9 @@ for converter_config_cls in [
         converter_config_registry.register(
             name,
             lambda uri, cls=converter_config_cls: cls(
-                llm_params=LLMParams(
-                    base_url=uri,
-                    model_name=DEFAULT_MODEL_NAME,
-                    api_key="",
-                )
+                base_url=uri,
+                model_name=DEFAULT_MODEL_NAME,
+                api_key="",
             ),
         )
 for converter_config_cls in [MinerUConverterConfig, DoclingConverterConfig]:

@@ -286,5 +286,4 @@ class DotsOCRConverter(OpenAIConverterClient):
 
         page.completion_tokens = usage.completion_tokens
         page.prompt_tokens = usage.prompt_tokens
-        page.reasoning_tokens = usage.reasoning_tokens
         return page

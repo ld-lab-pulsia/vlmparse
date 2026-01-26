@@ -199,7 +199,9 @@ class DockerConfigRegistry:
         """Get config for a model name. Returns default if not registered."""
         if model_name not in self._registry:
             if default:
-                return VLLMDockerServerConfig(model_name=model_name)
+                return VLLMDockerServerConfig(
+                    model_name=model_name, default_model_name=model_name
+                )
             return None
         return self._registry[model_name]()
 

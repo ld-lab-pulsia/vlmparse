@@ -83,7 +83,7 @@ class ConverterWithServer:
         self.server = None
         self.client = None
 
-        if self.uri is not None and self.model is None:
+        if self.uri is not None:
             self.model = get_model_from_uri(self.uri)
 
     def start_server_and_client(self):

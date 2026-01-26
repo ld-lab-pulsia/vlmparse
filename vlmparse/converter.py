@@ -9,6 +9,8 @@ from loguru import logger
 from PIL import Image
 from pydantic import Field
 
+from vlmparse.servers.docker_server import DEFAULT_MODEL_NAME
+
 from .base_model import VLMParseBaseModel
 from .build_doc import convert_specific_page_to_image, get_page_count, resize_image
 from .constants import IMAGE_EXTENSIONS, PDF_EXTENSION
@@ -22,6 +24,8 @@ class ConverterConfig(VLMParseBaseModel):
     aliases: list[str] = Field(default_factory=list)
     dpi: int = 175
     max_image_size: int | None = 4000
+    base_url: str | None = None
+    model_name: str = DEFAULT_MODEL_NAME
 
     def get_client(self, **kwargs) -> "BaseConverter":
         return BaseConverter(config=self, **kwargs)

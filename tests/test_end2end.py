@@ -54,6 +54,7 @@ def test_convert_mistral_ocr(file_path, model):
         "chandra",
         "deepseekocr",
         "granite-docling",
+        "Qwen/Qwen3-VL-8B-Instruct",
     ],
 )
 def test_converter_with_server_with_docker(file_path, model):
@@ -74,7 +75,7 @@ def test_converter_with_server_with_docker(file_path, model):
         docs = converter_with_server.parse([str(file_path), str(file_path)], debug=True)
 
         # Assertions
-        assert len(docs) == 1
+        assert len(docs) == 2
         doc = docs[0]
         assert len(doc.pages) == 2
         assert doc.pages[0].text is not None
