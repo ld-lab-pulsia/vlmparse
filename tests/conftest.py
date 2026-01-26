@@ -19,6 +19,14 @@ def file_path():
     return Path(__file__).parent / "data" / "Fiche_Graines_A5.pdf"
 
 
+@pytest.fixture
+def tmp_output_dir(tmp_path):
+    """Provide a temporary directory for test outputs."""
+    output_dir = tmp_path / "test_output"
+    output_dir.mkdir(exist_ok=True)
+    return output_dir
+
+
 # =============================================================================
 # Unified Mocking System
 # =============================================================================

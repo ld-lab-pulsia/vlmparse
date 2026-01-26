@@ -8,7 +8,6 @@ from PIL import Image
 from pydantic import Field
 
 from vlmparse.clients.openai_converter import (
-    LLMParams,
     OpenAIConverterClient,
     OpenAIConverterConfig,
 )
@@ -52,9 +51,7 @@ class DotsOCRDockerServerConfig(DockerServerConfig):
     @property
     def client_config(self):
         return DotsOCRConverterConfig(
-            llm_params=LLMParams(
-                base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
-            )
+            base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
         )
 
     def get_base_url_suffix(self) -> str:

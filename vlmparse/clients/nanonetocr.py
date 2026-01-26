@@ -12,7 +12,10 @@ class NanonetOCR2DockerServerConfig(VLLMDockerServerConfig):
 
     @property
     def client_config(self):
-        return NanonetOCR2ConverterConfig(llm_params=self.llm_params)
+        return NanonetOCR2ConverterConfig(
+            base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
+            model_name=self.default_model_name,
+        )
 
 
 class NanonetOCR2ConverterConfig(OpenAIConverterConfig):

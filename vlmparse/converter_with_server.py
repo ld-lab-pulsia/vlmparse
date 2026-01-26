@@ -71,6 +71,7 @@ class ConverterWithServer:
         concurrency: int = 10,
         vllm_args: dict | None = None,
         forget_predefined_vllm_args: bool = False,
+        return_documents: bool = False,
     ):
         self.model = model
         self.uri = uri
@@ -80,6 +81,7 @@ class ConverterWithServer:
         self.concurrency = concurrency
         self.vllm_args = vllm_args
         self.forget_predefined_vllm_args = forget_predefined_vllm_args
+        self.return_documents = return_documents
         self.server = None
         self.client = None
 
@@ -101,14 +103,20 @@ class ConverterWithServer:
             )
 
             if docker_config is not None:
-                self.client = docker_config.get_client()
+                self.client = docker_config.get_client(
+                    return_documents_in_batch_mode=self.return_documents
+                )
             else:
-                self.client = converter_config_registry.get(self.model).get_client()
+                self.client = converter_config_registry.get(self.model).get_client(
+                    return_documents_in_batch_mode=self.return_documents
+                )
 
         else:
             client_config = converter_config_registry.get(self.model, uri=self.uri)
 
-            self.client = client_config.get_client()
+            self.client = client_config.get_client(
+                return_documents_in_batch_mode=self.return_documents
+            )
 
     def stop_server(self):
         if self.server is not None and self.server.auto_stop:

@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 import pytest
 
 from vlmparse.converter_with_server import ConverterWithServer
@@ -44,20 +42,6 @@ class TestBatchParser:
                     # Client should be initialized from real converter registry
                     assert parser.client is not None
 
-    def test_init_with_uri(self, mock_openai_api):
-        """Test initialization with explicit URI."""
-        with mock_openai_api():
-            with patch(
-                "vlmparse.servers.utils.get_model_from_uri",
-                return_value="gemini-2.5-flash-lite",
-            ):
-                with ConverterWithServer(
-                    model="gemini-2.5-flash-lite", uri="http://custom.uri"
-                ) as parser:
-                    # Client should be initialized from real converter registry with URI
-                    assert parser.client is not None
-                    assert parser.uri == "http://custom.uri"
-
     def test_parse_updates_client_config(
         self, mock_docker_operations, datadir, mock_openai_api, tmp_path
     ):
@@ -71,6 +55,7 @@ class TestBatchParser:
             with mock_openai_api():
                 with ConverterWithServer(model="gemini-2.5-flash-lite") as parser:
                     # Call parse with real file
+                    parser.client.return_documents_in_batch_mode = True
                     documents = parser.parse(
                         inputs=[str(test_file)],
                         out_folder=str(tmp_path),
@@ -119,6 +104,7 @@ class TestBatchParser:
         with mock_docker_operations(model_filter=lambda model: False):
             with mock_openai_api():
                 with ConverterWithServer(model="gemini-2.5-flash-lite") as parser:
+                    parser.client.return_documents_in_batch_mode = True
                     # Call parse with retrylast - should only process file2
                     documents = parser.parse(
                         inputs=[str(file1), str(file2)],

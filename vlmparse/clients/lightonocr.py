@@ -25,7 +25,10 @@ class LightOnOCRDockerServerConfig(VLLMDockerServerConfig):
 
     @property
     def client_config(self):
-        return LightOnOCRConverterConfig(llm_params=self.llm_params)
+        return LightOnOCRConverterConfig(
+            base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
+            model_name=self.default_model_name,
+        )
 
 
 class LightOnOCRConverterConfig(OpenAIConverterConfig):

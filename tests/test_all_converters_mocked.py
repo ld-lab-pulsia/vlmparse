@@ -55,11 +55,15 @@ class TestConverterConfigs:
             "nanonets/Nanonets-OCR2-3B",
         ],
     )
-    def test_converter_basic_processing(self, file_path, model_name, mock_openai_api):
+    def test_converter_basic_processing(
+        self, file_path, model_name, mock_openai_api, tmp_output_dir
+    ):
         """Test basic document processing for OpenAI-compatible converters."""
         with mock_openai_api() as openai_client:
             config = converter_config_registry.get(model_name)
-            converter = config.get_client(num_concurrent_pages=2, debug=True)
+            converter = config.get_client(
+                num_concurrent_pages=2, debug=True, save_folder=str(tmp_output_dir)
+            )
 
             # Process document
             document = converter(file_path)
@@ -80,14 +84,14 @@ class TestConverterConfigs:
             # Verify API was called
             assert openai_client.chat.completions.create.call_count == 2
 
-    def test_converter_image_processing(self, datadir, mock_openai_api):
+    def test_converter_image_processing(self, datadir, mock_openai_api, tmp_output_dir):
         """Test processing of a single image file."""
         with mock_openai_api() as openai_client:
             model_name = "gemini-2.5-flash-lite"
             image_path = datadir / "page_with_formula.png"
 
             config = converter_config_registry.get(model_name)
-            converter = config.get_client(debug=True)
+            converter = config.get_client(debug=True, save_folder=str(tmp_output_dir))
 
             # Process image
             document = converter(image_path)
@@ -108,11 +112,13 @@ class TestConverterConfigs:
             # Verify API was called once
             assert openai_client.chat.completions.create.call_count == 1
 
-    def test_dotsocr_ocr_mode(self, file_path, mock_openai_api):
+    def test_dotsocr_ocr_mode(self, file_path, mock_openai_api, tmp_output_dir):
         """Test DotsOCR converter in OCR mode."""
         with mock_openai_api(content=MOCK_RESPONSES["dotsocr_ocr"]) as openai_client:
             config = converter_config_registry.get("dotsocr")
-            converter = config.get_client(num_concurrent_pages=2, debug=True)
+            converter = config.get_client(
+                num_concurrent_pages=2, debug=True, save_folder=str(tmp_output_dir)
+            )
 
             # Process document
             document = converter(file_path)
@@ -130,11 +136,13 @@ class TestConverterConfigs:
             assert openai_client.chat.completions.create.call_count == 2
 
     @pytest.mark.parametrize("model_name", ALL_MODELS)
-    def test_converter_error_handling(self, file_path, model_name, mock_openai_api):
+    def test_converter_error_handling(
+        self, file_path, model_name, mock_openai_api, tmp_output_dir
+    ):
         """Test that converters handle errors gracefully."""
         with mock_openai_api(side_effect=Exception("API Error")):
             config = converter_config_registry.get(model_name)
-            converter = config.get_client(debug=False)
+            converter = config.get_client(debug=False, save_folder=str(tmp_output_dir))
 
             # Process should not crash
             document = converter(file_path)
@@ -156,7 +164,9 @@ class TestConverterBatchProcessing:
             "lightonocr",
         ],
     )
-    def test_batch_processing(self, file_path, model_name, mock_openai_api):
+    def test_batch_processing(
+        self, file_path, model_name, mock_openai_api, tmp_output_dir
+    ):
         """Test batch processing of multiple files."""
         with mock_openai_api():
             config = converter_config_registry.get(model_name)
@@ -165,6 +175,7 @@ class TestConverterBatchProcessing:
                 num_concurrent_pages=2,
                 return_documents_in_batch_mode=True,
                 debug=True,
+                save_folder=str(tmp_output_dir),
             )
 
             # Process multiple files (same file for testing)
@@ -209,12 +220,16 @@ def mineru_mock_httpx_client():
 
 
 class TestMinerUConverterMockedApi:
-    def test_mineru_converter_repeated_call(self, file_path, mineru_mock_httpx_client):
+    def test_mineru_converter_repeated_call(
+        self, file_path, mineru_mock_httpx_client, tmp_output_dir
+    ):
         """Repeated `__call__` should keep working and call API each page."""
         from vlmparse.clients.mineru import MinerUConverterConfig
 
         config = MinerUConverterConfig(base_url="http://mineru.test")
-        converter = config.get_client(num_concurrent_pages=2, debug=True)
+        converter = config.get_client(
+            num_concurrent_pages=2, debug=True, save_folder=str(tmp_output_dir)
+        )
 
         with (
             patch("vlmparse.clients.mineru.clean_response", lambda x: x),
@@ -238,7 +253,7 @@ class TestMinerUConverterMockedApi:
         assert mineru_mock_httpx_client.post.call_count == 4
 
     def test_mineru_converter_batch_processing(
-        self, file_path, mineru_mock_httpx_client
+        self, file_path, mineru_mock_httpx_client, tmp_output_dir
     ):
         """Batch mode should return documents and call API for each page."""
         from vlmparse.clients.mineru import MinerUConverterConfig
@@ -249,6 +264,7 @@ class TestMinerUConverterMockedApi:
             num_concurrent_pages=2,
             return_documents_in_batch_mode=True,
             debug=True,
+            save_folder=str(tmp_output_dir),
         )
 
         with (
@@ -270,7 +286,7 @@ class TestMinerUConverterMockedApi:
 class TestCustomURI:
     """Test converter initialization with custom URIs."""
 
-    def test_custom_uri_config(self, mock_openai_api, file_path):
+    def test_custom_uri_config(self, mock_openai_api, file_path, tmp_output_dir):
         """Test that converters can be initialized with custom URIs."""
         with mock_openai_api():
             custom_uri = "http://localhost:8000/v1"
@@ -278,10 +294,10 @@ class TestCustomURI:
                 "gemini-2.5-flash-lite", uri=custom_uri
             )
 
-            assert config.llm_params.base_url == custom_uri
+            assert config.base_url == custom_uri
 
             # Test it works
-            converter = config.get_client(debug=True)
+            converter = config.get_client(debug=True, save_folder=str(tmp_output_dir))
             document = converter(file_path)
 
             assert isinstance(document, Document)
@@ -292,11 +308,15 @@ class TestConcurrency:
     """Test concurrent processing settings."""
 
     @pytest.mark.parametrize("model_name", ["gemini-2.5-flash-lite", "lightonocr"])
-    def test_concurrent_page_processing(self, file_path, model_name, mock_openai_api):
+    def test_concurrent_page_processing(
+        self, file_path, model_name, mock_openai_api, tmp_output_dir
+    ):
         """Test that concurrent page processing limits are respected."""
         with mock_openai_api() as openai_client:
             config = converter_config_registry.get(model_name)
-            converter = config.get_client(num_concurrent_pages=1, debug=True)
+            converter = config.get_client(
+                num_concurrent_pages=1, debug=True, save_folder=str(tmp_output_dir)
+            )
 
             document = converter(file_path)
 

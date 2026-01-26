@@ -28,7 +28,10 @@ class GraniteDoclingDockerServerConfig(VLLMDockerServerConfig):
 
     @property
     def client_config(self):
-        return GraniteDoclingConverterConfig(llm_params=self.llm_params)
+        return GraniteDoclingConverterConfig(
+            base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
+            model_name=self.default_model_name,
+        )
 
 
 class GraniteDoclingConverterConfig(OpenAIConverterConfig):
