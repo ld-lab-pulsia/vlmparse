@@ -137,6 +137,7 @@ class ConverterWithServer:
         dpi: int | None = None,
         debug: bool = False,
         retrylast: bool = False,
+        completion_kwargs: dict | None = None,
     ):
         assert (
             self.client is not None
@@ -172,6 +173,11 @@ class ConverterWithServer:
 
         if dpi is not None:
             self.client.config.dpi = int(dpi)
+
+        if completion_kwargs is not None and hasattr(
+            self.client.config, "completion_kwargs"
+        ):
+            self.client.config.completion_kwargs |= completion_kwargs
 
         if debug:
             self.client.debug = debug

@@ -29,6 +29,14 @@ ALL_MODELS = [
     "lightonocr",
     "dotsocr",
     "nanonets/Nanonets-OCR2-3B",
+    "hunyuanocr",
+    "olmocr-2-fp8",
+    "paddleocrvl",
+    "mineru25",
+    "chandra",
+    "deepseekocr",
+    "granite-docling",
+    "Qwen/Qwen3-VL-8B-Instruct",
 ]
 
 

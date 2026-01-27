@@ -59,6 +59,7 @@ def test_convert_mistral_ocr(file_path, model, tmp_output_dir):
         "deepseekocr",
         "granite-docling",
         "Qwen/Qwen3-VL-8B-Instruct",
+        "lightonocr2",
     ],
 )
 def test_converter_with_server_with_docker(file_path, model, tmp_output_dir):

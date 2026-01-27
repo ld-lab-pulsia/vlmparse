@@ -31,7 +31,6 @@ class MinerUDockerServerConfig(DockerServerConfig):
 class MinerUConverterConfig(ConverterConfig):
     """Configuration for MinerU API converter."""
 
-    base_url: str
     model_name: str = "opendatalab/MinerU2.5-2509-1.2B"
     aliases: list[str] = Field(default_factory=lambda: ["mineru25"])
     timeout: int = 600

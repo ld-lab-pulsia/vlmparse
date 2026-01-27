@@ -30,7 +30,8 @@ class GraniteDoclingDockerServerConfig(VLLMDockerServerConfig):
     def client_config(self):
         return GraniteDoclingConverterConfig(
             base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
-            model_name=self.default_model_name,
+            model_name=self.model_name,
+            default_model_name=self.default_model_name,
         )
 
 
@@ -73,7 +74,7 @@ class GraniteDoclingConverter(OpenAIConverterClient):
             }
         ]
 
-        doctags, usage = await self._get_chat_completion_adaptive(
+        doctags, usage = await self._get_chat_completion(
             messages, completion_kwargs=self.config.completion_kwargs
         )
         doctags = clean_response(doctags)
@@ -84,40 +85,6 @@ class GraniteDoclingConverter(OpenAIConverterClient):
             page.prompt_tokens = usage.prompt_tokens
             page.completion_tokens = usage.completion_tokens
         return page
-
-    async def _get_chat_completion_adaptive(
-        self, messages: list[dict], completion_kwargs: dict | None
-    ) -> str:
-        """
-        vLLM enforces input+output <= model context length. If `max_tokens` is too
-        high (especially for multimodal prompts), retry with progressively smaller
-        `max_tokens`.
-        """
-        kwargs = (completion_kwargs or {}).copy()
-        max_tokens = kwargs.get("max_tokens") or kwargs.get("max_completion_tokens")
-
-        for _ in range(6):
-            try:
-                return await self._get_chat_completion(
-                    messages, completion_kwargs=kwargs
-                )
-            except Exception as e:
-                msg = str(e)
-                too_large = (
-                    "max_tokens" in msg
-                    and "maximum context length" in msg
-                    and "is too large" in msg
-                )
-                if not too_large or not isinstance(max_tokens, int):
-                    raise
-
-                max_tokens = max(256, int(max_tokens * 0.75))
-                if "max_tokens" in kwargs:
-                    kwargs["max_tokens"] = max_tokens
-                if "max_completion_tokens" in kwargs:
-                    kwargs["max_completion_tokens"] = max_tokens
-
-        return await self._get_chat_completion(messages, completion_kwargs=kwargs)
 
 
 def _doctags_to_markdown(doctags: str, image):

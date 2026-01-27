@@ -27,7 +27,8 @@ class HunyuanOCRDockerServerConfig(VLLMDockerServerConfig):
     def client_config(self):
         return HunyuanOCRConverterConfig(
             base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
-            model_name=self.default_model_name,
+            model_name=self.model_name,
+            default_model_name=self.default_model_name,
         )
 
 

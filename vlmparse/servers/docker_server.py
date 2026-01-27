@@ -194,7 +194,7 @@ class DockerConfigRegistry:
         if model_name not in self._registry:
             if default:
                 return VLLMDockerServerConfig(
-                    model_name=model_name, default_model_name=model_name
+                    model_name=model_name, default_model_name=DEFAULT_MODEL_NAME
                 )
             return None
         return self._registry[model_name]()

@@ -27,7 +27,8 @@ class LightOnOCRDockerServerConfig(VLLMDockerServerConfig):
     def client_config(self):
         return LightOnOCRConverterConfig(
             base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
-            model_name=self.default_model_name,
+            model_name=self.model_name,
+            default_model_name=self.default_model_name,
         )
 
 
@@ -44,3 +45,13 @@ class LightOnOCRConverterConfig(OpenAIConverterConfig):
     }
     dpi: int = 200
     aliases: list[str] = Field(default_factory=lambda: ["lightonocr"])
+
+
+class LightonOCR21BServerConfig(LightOnOCRDockerServerConfig):
+    model_name: str = "lightonai/LightOnOCR-2-1B"
+    aliases: list[str] = Field(default_factory=lambda: ["lightonocr2"])
+
+
+class LightonOCR21BConverterConfig(LightOnOCRConverterConfig):
+    model_name: str = "lightonai/LightOnOCR-2-1B"
+    aliases: list[str] = Field(default_factory=lambda: ["lightonocr2"])

@@ -21,11 +21,12 @@ PDFIUM_LOCK = threading.Lock()
 
 
 class ConverterConfig(VLMParseBaseModel):
+    model_name: str
     aliases: list[str] = Field(default_factory=list)
     dpi: int = 175
     max_image_size: int | None = 4000
     base_url: str | None = None
-    model_name: str = DEFAULT_MODEL_NAME
+    default_model_name: str = DEFAULT_MODEL_NAME
 
     def get_client(self, **kwargs) -> "BaseConverter":
         return BaseConverter(config=self, **kwargs)

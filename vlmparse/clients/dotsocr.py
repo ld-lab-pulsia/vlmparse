@@ -47,11 +47,14 @@ class DotsOCRDockerServerConfig(DockerServerConfig):
     )
     add_model_key_to_server: bool = True
     aliases: list[str] = Field(default_factory=lambda: ["dotsocr"])
+    default_model_name: str = DEFAULT_MODEL_NAME
 
     @property
     def client_config(self):
         return DotsOCRConverterConfig(
             base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
+            model_name=self.model_name,
+            default_model_name=self.default_model_name,
         )
 
     def get_base_url_suffix(self) -> str:

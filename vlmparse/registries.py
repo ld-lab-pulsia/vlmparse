@@ -17,6 +17,8 @@ from vlmparse.clients.hunyuanocr import (
     HunyuanOCRDockerServerConfig,
 )
 from vlmparse.clients.lightonocr import (
+    LightonOCR21BConverterConfig,
+    LightonOCR21BServerConfig,
     LightOnOCRConverterConfig,
     LightOnOCRDockerServerConfig,
 )
@@ -56,6 +58,7 @@ for server_config_cls in [
     MinerUDockerServerConfig,
     DeepSeekOCRDockerServerConfig,
     GraniteDoclingDockerServerConfig,
+    LightonOCR21BServerConfig,
 ]:
     aliases = get_default(server_config_cls, "aliases") or []
     model_name = get_default(server_config_cls, "model_name")
@@ -113,6 +116,7 @@ for gemini_model in [
             model_name=model,
             base_url=GOOGLE_API_BASE_URL if uri is None else uri,
             api_key=os.getenv("GOOGLE_API_KEY"),
+            default_model_name=model,
         ),
     )
 for openai_model in [
@@ -126,6 +130,7 @@ for openai_model in [
             model_name=model,
             base_url=None,
             api_key=os.getenv("OPENAI_API_KEY"),
+            default_model_name=model,
         ),
     )
 
@@ -148,6 +153,7 @@ for converter_config_cls in [
     DeepSeekOCRConverterConfig,
     GraniteDoclingConverterConfig,
     OlmOCRConverterConfig,
+    LightonOCR21BConverterConfig,
 ]:
     aliases = get_default(converter_config_cls, "aliases") or []
     model_name = get_default(converter_config_cls, "model_name")
