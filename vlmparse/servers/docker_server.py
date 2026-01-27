@@ -87,19 +87,13 @@ class VLLMDockerServerConfig(DockerServerConfig):
     aliases: list[str] = Field(default_factory=list)
 
     @property
-    def llm_params(self):
-        from vlmparse.clients.openai_converter import LLMParams
-
-        return LLMParams(
-            base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
-            model_name=self.default_model_name,
-        )
-
-    @property
     def client_config(self):
         from vlmparse.clients.openai_converter import OpenAIConverterConfig
 
-        return OpenAIConverterConfig(llm_params=self.llm_params)
+        return OpenAIConverterConfig(
+            base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
+            model_name=self.default_model_name,
+        )
 
     def get_command(self) -> list[str]:
         """Build VLLM-specific command."""
@@ -199,7 +193,9 @@ class DockerConfigRegistry:
         """Get config for a model name. Returns default if not registered."""
         if model_name not in self._registry:
             if default:
-                return VLLMDockerServerConfig(model_name=model_name)
+                return VLLMDockerServerConfig(
+                    model_name=model_name, default_model_name=DEFAULT_MODEL_NAME
+                )
             return None
         return self._registry[model_name]()
 

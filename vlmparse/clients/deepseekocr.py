@@ -35,7 +35,11 @@ class DeepSeekOCRDockerServerConfig(VLLMDockerServerConfig):
 
     @property
     def client_config(self):
-        return DeepSeekOCRConverterConfig(llm_params=self.llm_params)
+        return DeepSeekOCRConverterConfig(
+            base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
+            model_name=self.model_name,
+            default_model_name=self.default_model_name,
+        )
 
 
 class DeepSeekOCRConverterConfig(OpenAIConverterConfig):
@@ -169,7 +173,7 @@ class DeepSeekOCRConverterClient(OpenAIConverterClient):
         ]
 
         # Get raw response using parent's method
-        response = await self._get_chat_completion(messages)
+        response, usage = await self._get_chat_completion(messages)
         logger.info("Response length: " + str(len(response)))
         page.raw_response = response
 
@@ -199,5 +203,8 @@ class DeepSeekOCRConverterClient(OpenAIConverterClient):
 
         page.text = outputs.strip()
         logger.debug(page.text)
+        if usage is not None:
+            page.prompt_tokens = usage.prompt_tokens
+            page.completion_tokens = usage.completion_tokens
 
         return page

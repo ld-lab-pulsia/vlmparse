@@ -6,9 +6,11 @@ from vlmparse.registries import converter_config_registry
 
 
 @pytest.mark.parametrize("model", ["gemini-2.5-flash-lite"])
-def test_convert(file_path, model):
+def test_convert(file_path, model, tmp_output_dir):
     config = converter_config_registry.get(model)
-    client = config.get_client(return_documents_in_batch_mode=True, debug=True)
+    client = config.get_client(
+        return_documents_in_batch_mode=True, debug=True, save_folder=str(tmp_output_dir)
+    )
     docs = client.batch([file_path])
     assert len(docs) == 1
     doc = docs[0]
@@ -23,9 +25,11 @@ def test_convert(file_path, model):
 
 @pytest.mark.skip(reason="Disabled to avoid excessive API calls")
 @pytest.mark.parametrize("model", ["mistral-ocr"])
-def test_convert_mistral_ocr(file_path, model):
+def test_convert_mistral_ocr(file_path, model, tmp_output_dir):
     config = converter_config_registry.get(model)
-    client = config.get_client(return_documents_in_batch_mode=True, debug=True)
+    client = config.get_client(
+        return_documents_in_batch_mode=True, debug=True, save_folder=str(tmp_output_dir)
+    )
     docs = client.batch([file_path])
     assert len(docs) == 1
     doc = docs[0]
@@ -54,9 +58,11 @@ def test_convert_mistral_ocr(file_path, model):
         "chandra",
         "deepseekocr",
         "granite-docling",
+        "Qwen/Qwen3-VL-8B-Instruct",
+        "lightonocr2",
     ],
 )
-def test_converter_with_server_with_docker(file_path, model):
+def test_converter_with_server_with_docker(file_path, model, tmp_output_dir):
     """Test conversion with automatic Docker deployment (requires GPU due to vllm limitations)."""
 
     from vlmparse.converter_with_server import ConverterWithServer
@@ -71,11 +77,13 @@ def test_converter_with_server_with_docker(file_path, model):
     ) as converter_with_server:
         converter_with_server.client.return_documents_in_batch_mode = True
 
-        docs = converter_with_server.parse([str(file_path), str(file_path)], debug=True)
+        docs = converter_with_server.parse(
+            [str(file_path), str(file_path)], out_folder=str(tmp_output_dir), debug=True
+        )
 
         # Assertions
-        assert len(docs) == 1
+        assert len(docs) == 2
         doc = docs[0]
         assert len(doc.pages) == 2
-        assert doc.pages[0].text is not None
-        assert doc.pages[1].text is not None
+        assert doc.pages[0].text is not None and len(doc.pages[0].text) > 0
+        assert doc.pages[1].text is not None and len(doc.pages[1].text) > 0

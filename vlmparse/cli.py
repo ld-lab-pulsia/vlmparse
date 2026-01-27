@@ -53,6 +53,7 @@ class DParseCLI:
         concurrency: int = 10,
         dpi: int | None = None,
         debug: bool = False,
+        _return_documents: bool = False,
     ):
         """Parse PDF documents and save results.
 
@@ -76,6 +77,7 @@ class DParseCLI:
             gpus=gpus,
             with_vllm_server=with_vllm_server,
             concurrency=concurrency,
+            return_documents=_return_documents,
         ) as converter_with_server:
             return converter_with_server.parse(
                 inputs=inputs, out_folder=out_folder, mode=mode, dpi=dpi, debug=debug

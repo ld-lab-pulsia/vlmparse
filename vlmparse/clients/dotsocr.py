@@ -8,7 +8,6 @@ from PIL import Image
 from pydantic import Field
 
 from vlmparse.clients.openai_converter import (
-    LLMParams,
     OpenAIConverterClient,
     OpenAIConverterConfig,
 )
@@ -48,13 +47,14 @@ class DotsOCRDockerServerConfig(DockerServerConfig):
     )
     add_model_key_to_server: bool = True
     aliases: list[str] = Field(default_factory=lambda: ["dotsocr"])
+    default_model_name: str = DEFAULT_MODEL_NAME
 
     @property
     def client_config(self):
         return DotsOCRConverterConfig(
-            llm_params=LLMParams(
-                base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
-            )
+            base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
+            model_name=self.model_name,
+            default_model_name=self.default_model_name,
         )
 
     def get_base_url_suffix(self) -> str:
@@ -286,5 +286,4 @@ class DotsOCRConverter(OpenAIConverterClient):
 
         page.completion_tokens = usage.completion_tokens
         page.prompt_tokens = usage.prompt_tokens
-        page.reasoning_tokens = usage.reasoning_tokens
         return page

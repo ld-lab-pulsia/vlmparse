@@ -71,6 +71,7 @@ class ConverterWithServer:
         concurrency: int = 10,
         vllm_args: dict | None = None,
         forget_predefined_vllm_args: bool = False,
+        return_documents: bool = False,
     ):
         self.model = model
         self.uri = uri
@@ -80,10 +81,11 @@ class ConverterWithServer:
         self.concurrency = concurrency
         self.vllm_args = vllm_args
         self.forget_predefined_vllm_args = forget_predefined_vllm_args
+        self.return_documents = return_documents
         self.server = None
         self.client = None
 
-        if self.uri is not None and self.model is None:
+        if self.uri is not None:
             self.model = get_model_from_uri(self.uri)
 
     def start_server_and_client(self):
@@ -101,14 +103,20 @@ class ConverterWithServer:
             )
 
             if docker_config is not None:
-                self.client = docker_config.get_client()
+                self.client = docker_config.get_client(
+                    return_documents_in_batch_mode=self.return_documents
+                )
             else:
-                self.client = converter_config_registry.get(self.model).get_client()
+                self.client = converter_config_registry.get(self.model).get_client(
+                    return_documents_in_batch_mode=self.return_documents
+                )
 
         else:
             client_config = converter_config_registry.get(self.model, uri=self.uri)
 
-            self.client = client_config.get_client()
+            self.client = client_config.get_client(
+                return_documents_in_batch_mode=self.return_documents
+            )
 
     def stop_server(self):
         if self.server is not None and self.server.auto_stop:
@@ -129,6 +137,7 @@ class ConverterWithServer:
         dpi: int | None = None,
         debug: bool = False,
         retrylast: bool = False,
+        completion_kwargs: dict | None = None,
     ):
         assert (
             self.client is not None
@@ -164,6 +173,11 @@ class ConverterWithServer:
 
         if dpi is not None:
             self.client.config.dpi = int(dpi)
+
+        if completion_kwargs is not None and hasattr(
+            self.client.config, "completion_kwargs"
+        ):
+            self.client.config.completion_kwargs |= completion_kwargs
 
         if debug:
             self.client.debug = debug

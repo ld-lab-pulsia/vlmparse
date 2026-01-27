@@ -238,61 +238,34 @@ class ChandraConverterClient(OpenAIConverterClient):
 
         retries = 0
         max_retries = self.config.max_retries
-        max_failure_retries = self.config.max_failure_retries
 
         result_content = ""
-        error_occurred = False
 
         while True:
-            try:
-                # Adjust temperature if retrying
-                temperature = self.config.completion_kwargs.get("temperature", 0.0)
-                if retries > 0:
-                    temperature = 0.3  # As per vllm.py logic
-
-                completion_kwargs = self.config.completion_kwargs.copy()
-                completion_kwargs["temperature"] = temperature
-                if retries > 0:
-                    completion_kwargs["top_p"] = 0.95
-
-                result_content = await self._get_chat_completion(
-                    messages, completion_kwargs=completion_kwargs
-                )
-                error_occurred = False
-            except Exception as e:
-                logger.error(f"Error during VLLM generation: {e}")
-                error_occurred = True
-                result_content = ""
-
             should_retry = False
+            # Adjust temperature if retrying
+            temperature = self.config.completion_kwargs.get("temperature", 0.0)
+            if retries > 0:
+                temperature = 0.3  # As per vllm.py logic
 
-            # Check for repeat token
-            if not error_occurred:
-                has_repeat = detect_repeat_token(result_content) or (
-                    len(result_content) > 50
-                    and detect_repeat_token(result_content, cut_from_end=50)
+            completion_kwargs = self.config.completion_kwargs.copy()
+            completion_kwargs["temperature"] = temperature
+            if retries > 0:
+                completion_kwargs["top_p"] = 0.95
+
+            result_content, usage = await self._get_chat_completion(
+                messages, completion_kwargs=completion_kwargs
+            )
+
+            has_repeat = detect_repeat_token(result_content) or (
+                len(result_content) > 50
+                and detect_repeat_token(result_content, cut_from_end=50)
+            )
+            if has_repeat and retries < max_retries:
+                logger.warning(
+                    f"Detected repeat token, retrying generation (attempt {retries + 1})..."
                 )
-                if has_repeat and retries < max_retries:
-                    logger.warning(
-                        f"Detected repeat token, retrying generation (attempt {retries + 1})..."
-                    )
-                    should_retry = True
-
-            # Check for error
-            if error_occurred:
-                if max_failure_retries is not None:
-                    if retries < max_failure_retries:
-                        logger.warning(
-                            f"Detected vllm error, retrying generation (attempt {retries + 1})..."
-                        )
-                        should_retry = True
-                elif (
-                    retries < max_retries
-                ):  # Fallback to max_retries if max_failure_retries not set (vllm.py logic varies slightly but this is safe)
-                    logger.warning(
-                        f"Detected vllm error, retrying generation (attempt {retries + 1})..."
-                    )
-                    should_retry = True
+                should_retry = True
 
             if should_retry:
                 time.sleep(2 * (retries + 1))
@@ -308,7 +281,8 @@ class ChandraConverterClient(OpenAIConverterClient):
         # Convert HTML to MD
         text = html_to_md_keep_tables(text)
         page.text = text
-
+        page.completion_tokens = usage.completion_tokens
+        page.prompt_tokens = usage.prompt_tokens
         return page
 
 
@@ -320,4 +294,8 @@ class ChandraDockerServerConfig(VLLMDockerServerConfig):
 
     @property
     def client_config(self):
-        return ChandraConverterConfig(llm_params=self.llm_params)
+        return ChandraConverterConfig(
+            base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
+            model_name=self.model_name,
+            default_model_name=self.default_model_name,
+        )
