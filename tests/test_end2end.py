@@ -73,7 +73,7 @@ def test_converter_with_server_with_docker(file_path, model, tmp_output_dir):
         gpus=os.environ["GPU_TEST_VLMPARSE"],
         with_vllm_server=True,
         concurrency=10,
-        port=8059,
+        port=8173,
     ) as converter_with_server:
         converter_with_server.client.return_documents_in_batch_mode = True
 

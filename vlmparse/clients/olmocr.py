@@ -41,7 +41,7 @@ class OlmOCRConverterConfig(OpenAIConverterConfig):
         "Return your output as markdown, with a front matter section on top specifying values for the primary_language, is_rotation_valid, rotation_correction, is_table, and is_diagram parameters."
     )
     postprompt: str | None = None
-    completion_kwargs: dict | None = {
+    completion_kwargs: dict = {
         "temperature": 0.1,
         "max_tokens": 8000,
     }

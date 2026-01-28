@@ -73,6 +73,12 @@ class ConverterWithServer:
         forget_predefined_vllm_args: bool = False,
         return_documents: bool = False,
     ):
+        if model is None and uri is None:
+            raise ValueError("Either 'model' or 'uri' must be provided")
+
+        if concurrency < 1:
+            raise ValueError("concurrency must be at least 1")
+
         self.model = model
         self.uri = uri
         self.port = port
@@ -127,7 +133,11 @@ class ConverterWithServer:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.stop_server()
+        try:
+            self.stop_server()
+        except Exception as e:
+            logger.warning(f"Error stopping server during cleanup: {e}")
+        return False  # Don't suppress exceptions
 
     def parse(
         self,

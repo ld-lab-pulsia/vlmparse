@@ -1,7 +1,6 @@
 import asyncio
 import threading
 import time
-import traceback
 from pathlib import Path
 from typing import Literal
 
@@ -23,8 +22,8 @@ PDFIUM_LOCK = threading.Lock()
 class ConverterConfig(VLMParseBaseModel):
     model_name: str
     aliases: list[str] = Field(default_factory=list)
-    dpi: int = 175
-    max_image_size: int | None = 4000
+    dpi: int = Field(default=175, ge=30, le=600)
+    max_image_size: int | None = Field(default=4000, ge=50)
     base_url: str | None = None
     default_model_name: str = DEFAULT_MODEL_NAME
 
@@ -99,14 +98,22 @@ class BaseConverter:
                         page = await self.async_call_inside_page(page)
                         toc = time.perf_counter()
                         page.latency = toc - tic
-                        logger.debug(f"Time taken: {page.latency} seconds")
+                        logger.debug(
+                            "Page {page_idx} processed in {latency:.2f}s",
+                            page_idx=page_idx,
+                            latency=page.latency,
+                        )
                     except KeyboardInterrupt:
                         raise
                     except Exception:
                         if self.debug:
                             raise
                         else:
-                            logger.exception(traceback.format_exc())
+                            logger.opt(exception=True).error(
+                                "Error processing page {page_idx} of {file_path}",
+                                page_idx=page_idx,
+                                file_path=str(file_path),
+                            )
                             page.error = ProcessingError.from_class(self)
                     if not self.save_page_images:
                         page.buffer_image = dict(
@@ -127,12 +134,19 @@ class BaseConverter:
             if self.debug:
                 raise
             else:
-                logger.exception(traceback.format_exc())
+                logger.opt(exception=True).error(
+                    "Error processing document {file_path}",
+                    file_path=str(file_path),
+                )
                 document.error = ProcessingError.from_class(self)
                 return document
         toc = time.perf_counter()
         document.latency = toc - tic
-        logger.debug(f"Time taken to process the document: {document.latency} seconds")
+        logger.debug(
+            "Document {file_path} processed in {latency:.2f}s",
+            file_path=str(file_path),
+            latency=document.latency,
+        )
         if self.save_folder is not None:
             self._save_document(document)
 

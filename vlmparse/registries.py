@@ -56,18 +56,25 @@ for server_config_cls in SERVER_CONFIGS:
 
 
 class ConverterConfigRegistry:
-    """Registry for mapping model names to their converter configurations."""
+    """Registry for mapping model names to their converter configurations.
+
+    Thread-safe registry that maps model names to their converter configuration factories.
+    """
 
     def __init__(self):
+        import threading
+
         self._registry: dict[str, Callable[[str | None], ConverterConfig]] = {}
+        self._lock = threading.RLock()
 
     def register(
         self,
         model_name: str,
         config_factory: Callable[[str | None], ConverterConfig],
     ):
-        """Register a config factory for a model name."""
-        self._registry[model_name] = config_factory
+        """Register a config factory for a model name (thread-safe)."""
+        with self._lock:
+            self._registry[model_name] = config_factory
 
     def register_from_server(
         self,
@@ -93,21 +100,26 @@ class ConverterConfigRegistry:
                 client_config = client_config.model_copy(update={"base_url": uri})
             return client_config
 
-        for name in names:
-            self._registry[name] = factory
+        with self._lock:
+            for name in names:
+                self._registry[name] = factory
 
     def get(self, model_name: str, uri: str | None = None) -> ConverterConfig:
-        """Get config for a model name. Returns default if not registered."""
-        if model_name in self._registry:
-            return self._registry[model_name](uri)
+        """Get config for a model name (thread-safe). Returns default if not registered."""
+        with self._lock:
+            factory = self._registry.get(model_name)
+
+        if factory is not None:
+            return factory(uri)
         # Fallback to OpenAIConverterConfig for unregistered models
         if uri is not None:
             return OpenAIConverterConfig(base_url=uri)
         return OpenAIConverterConfig(model_name=model_name)
 
     def list_models(self) -> list[str]:
-        """List all registered model names."""
-        return list(self._registry.keys())
+        """List all registered model names (thread-safe)."""
+        with self._lock:
+            return list(self._registry.keys())
 
 
 # Global registry instance
