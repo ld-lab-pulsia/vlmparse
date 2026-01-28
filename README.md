@@ -1,5 +1,11 @@
 # vlmparse
 
+<div align="center">
+
+[\[📜 arXiv coming soon\]] | [[Dataset (🤗Hugging Face)]](https://huggingface.co/datasets/pulsia/fr-bench-pdf2md) | [[pypi]](https://pypi.org/project/vlmparse/) | [[vlmparse]](https://github.com/ld-lab-pulsia/vlmparse) | [[Benchmark]](https://github.com/ld-lab-pulsia/benchpdf2md)
+
+</div>
+
 A unified wrapper for Vision Language Models (VLM) and OCR solutions to parse PDF documents into Markdown.
 
 Features:
@@ -155,3 +161,7 @@ with ConverterWithServer(model="mineru2.5") as converter_with_server:
 ```
 
 Note that if you pass an uri of a vllm server to `ConverterWithServer`, the model name is inferred automatically and no server is started.
+
+## Credits
+
+This work was financed by La Poste and led by members of Probayes and OpenValue, two subsidiaries (filiales) of La Poste.
