@@ -24,9 +24,9 @@ class OlmOCRDockerServerConfig(VLLMDockerServerConfig):
     @property
     def client_config(self):
         return OlmOCRConverterConfig(
-            base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
-            model_name=self.model_name,
-            default_model_name=self.default_model_name,
+            **self._create_client_kwargs(
+                f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}"
+            )
         )
 
 

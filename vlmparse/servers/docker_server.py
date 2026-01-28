@@ -2,15 +2,23 @@ import os
 from typing import Callable
 
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import Field
 
+from .model_identity import ModelIdentityMixin
 from .utils import docker_server
 
 
-class DockerServerConfig(BaseModel):
-    """Base configuration for deploying a Docker server."""
+class DockerServerConfig(ModelIdentityMixin):
+    """Base configuration for deploying a Docker server.
 
-    model_name: str
+    Inherits from ModelIdentityMixin which provides:
+    - model_name: str
+    - default_model_name: str | None
+    - aliases: list[str]
+    - _create_client_kwargs(base_url): Helper for creating client configs
+    - get_all_names(): All names this model can be referenced by
+    """
+
     docker_image: str
     dockerfile_dir: str | None = None
     command_args: list[str] = Field(default_factory=list)
@@ -27,7 +35,6 @@ class DockerServerConfig(BaseModel):
     environment: dict[str, str] = Field(default_factory=dict)
     volumes: dict[str, dict] | None = None
     entrypoint: str | None = None
-    aliases: list[str] = Field(default_factory=list)
 
     class Config:
         extra = "allow"
@@ -84,15 +91,15 @@ class VLLMDockerServerConfig(DockerServerConfig):
     hf_home_folder: str | None = os.getenv("HF_HOME", None)
     add_model_key_to_server: bool = False
     container_port: int = 8000
-    aliases: list[str] = Field(default_factory=list)
 
     @property
     def client_config(self):
         from vlmparse.clients.openai_converter import OpenAIConverterConfig
 
         return OpenAIConverterConfig(
-            base_url=f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}",
-            model_name=self.default_model_name,
+            **self._create_client_kwargs(
+                f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}"
+            )
         )
 
     def get_command(self) -> list[str]:

@@ -1,40 +1,24 @@
 import os
 from collections.abc import Callable
 
-from vlmparse.clients.chandra import ChandraConverterConfig, ChandraDockerServerConfig
-from vlmparse.clients.deepseekocr import (
-    DeepSeekOCRConverterConfig,
-    DeepSeekOCRDockerServerConfig,
-)
-from vlmparse.clients.docling import DoclingConverterConfig, DoclingDockerServerConfig
-from vlmparse.clients.dotsocr import DotsOCRConverterConfig, DotsOCRDockerServerConfig
-from vlmparse.clients.granite_docling import (
-    GraniteDoclingConverterConfig,
-    GraniteDoclingDockerServerConfig,
-)
-from vlmparse.clients.hunyuanocr import (
-    HunyuanOCRConverterConfig,
-    HunyuanOCRDockerServerConfig,
-)
+from vlmparse.clients.chandra import ChandraDockerServerConfig
+from vlmparse.clients.deepseekocr import DeepSeekOCRDockerServerConfig
+from vlmparse.clients.docling import DoclingDockerServerConfig
+from vlmparse.clients.dotsocr import DotsOCRDockerServerConfig
+from vlmparse.clients.granite_docling import GraniteDoclingDockerServerConfig
+from vlmparse.clients.hunyuanocr import HunyuanOCRDockerServerConfig
 from vlmparse.clients.lightonocr import (
-    LightonOCR21BConverterConfig,
     LightonOCR21BServerConfig,
-    LightOnOCRConverterConfig,
     LightOnOCRDockerServerConfig,
 )
-from vlmparse.clients.mineru import MinerUConverterConfig, MinerUDockerServerConfig
+from vlmparse.clients.mineru import MinerUDockerServerConfig
 from vlmparse.clients.mistral_converter import MistralOCRConverterConfig
-from vlmparse.clients.nanonetocr import (
-    NanonetOCR2ConverterConfig,
-    NanonetOCR2DockerServerConfig,
-)
-from vlmparse.clients.olmocr import OlmOCRConverterConfig, OlmOCRDockerServerConfig
+from vlmparse.clients.nanonetocr import NanonetOCR2DockerServerConfig
+from vlmparse.clients.olmocr import OlmOCRDockerServerConfig
 from vlmparse.clients.openai_converter import OpenAIConverterConfig
-from vlmparse.clients.paddleocrvl import (
-    PaddleOCRVLConverterConfig,
-    PaddleOCRVLDockerServerConfig,
-)
-from vlmparse.servers.docker_server import DEFAULT_MODEL_NAME, docker_config_registry
+from vlmparse.clients.paddleocrvl import PaddleOCRVLDockerServerConfig
+from vlmparse.converter import ConverterConfig
+from vlmparse.servers.docker_server import DockerServerConfig, docker_config_registry
 
 
 def get_default(cls, field_name):
@@ -46,7 +30,8 @@ def get_default(cls, field_name):
     return field_info.default
 
 
-for server_config_cls in [
+# All server configs - single source of truth
+SERVER_CONFIGS: list[type[DockerServerConfig]] = [
     ChandraDockerServerConfig,
     LightOnOCRDockerServerConfig,
     DotsOCRDockerServerConfig,
@@ -59,7 +44,10 @@ for server_config_cls in [
     DeepSeekOCRDockerServerConfig,
     GraniteDoclingDockerServerConfig,
     LightonOCR21BServerConfig,
-]:
+]
+
+# Register docker server configs
+for server_config_cls in SERVER_CONFIGS:
     aliases = get_default(server_config_cls, "aliases") or []
     model_name = get_default(server_config_cls, "model_name")
     names = [n for n in aliases + [model_name] if isinstance(n, str)]
@@ -68,23 +56,50 @@ for server_config_cls in [
 
 
 class ConverterConfigRegistry:
-    """Registry for mapping model names to their Docker configurations."""
+    """Registry for mapping model names to their converter configurations."""
 
     def __init__(self):
-        self._registry = dict()
+        self._registry: dict[str, Callable[[str | None], ConverterConfig]] = {}
 
     def register(
         self,
         model_name: str,
-        config_factory: Callable[[str], OpenAIConverterConfig | None],
+        config_factory: Callable[[str | None], ConverterConfig],
     ):
         """Register a config factory for a model name."""
         self._registry[model_name] = config_factory
 
-    def get(self, model_name: str, uri: str | None = None) -> OpenAIConverterConfig:
+    def register_from_server(
+        self,
+        server_config_cls: type[DockerServerConfig],
+    ):
+        """Register converter config derived from a server config class.
+
+        This ensures model_name and default_model_name are consistently
+        passed from server to client config via _create_client_kwargs.
+        """
+        aliases = get_default(server_config_cls, "aliases") or []
+        model_name = get_default(server_config_cls, "model_name")
+        names = [n for n in aliases + [model_name] if isinstance(n, str)]
+        # Also register short name (after last /)
+        if model_name and "/" in model_name:
+            names.append(model_name.split("/")[-1])
+
+        def factory(uri: str | None, cls=server_config_cls) -> ConverterConfig:
+            server = cls()
+            client_config = server.client_config
+            # Override base_url if provided
+            if uri is not None:
+                client_config = client_config.model_copy(update={"base_url": uri})
+            return client_config
+
+        for name in names:
+            self._registry[name] = factory
+
+    def get(self, model_name: str, uri: str | None = None) -> ConverterConfig:
         """Get config for a model name. Returns default if not registered."""
         if model_name in self._registry:
-            return self._registry[model_name](uri=uri)
+            return self._registry[model_name](uri)
         # Fallback to OpenAIConverterConfig for unregistered models
         if uri is not None:
             return OpenAIConverterConfig(base_url=uri)
@@ -97,6 +112,13 @@ class ConverterConfigRegistry:
 
 # Global registry instance
 converter_config_registry = ConverterConfigRegistry()
+
+# Register all server-backed converters through the server config
+# This ensures model_name and default_model_name are consistently passed
+for server_config_cls in SERVER_CONFIGS:
+    converter_config_registry.register_from_server(server_config_cls)
+
+# External API configs (no server config - these are cloud APIs)
 GOOGLE_API_BASE_URL = (
     os.getenv("GOOGLE_API_BASE_URL")
     or "https://generativelanguage.googleapis.com/v1beta/openai/"
@@ -142,37 +164,3 @@ for mistral_model in ["mistral-ocr-latest", "mistral-ocr"]:
             api_key=os.getenv("MISTRAL_API_KEY"),
         ),
     )
-
-for converter_config_cls in [
-    ChandraConverterConfig,
-    LightOnOCRConverterConfig,
-    DotsOCRConverterConfig,
-    PaddleOCRVLConverterConfig,
-    NanonetOCR2ConverterConfig,
-    HunyuanOCRConverterConfig,
-    DeepSeekOCRConverterConfig,
-    GraniteDoclingConverterConfig,
-    OlmOCRConverterConfig,
-    LightonOCR21BConverterConfig,
-]:
-    aliases = get_default(converter_config_cls, "aliases") or []
-    model_name = get_default(converter_config_cls, "model_name")
-    names = [n for n in aliases + [model_name] if isinstance(n, str)]
-    for name in names:
-        converter_config_registry.register(
-            name,
-            lambda uri, cls=converter_config_cls: cls(
-                base_url=uri,
-                model_name=DEFAULT_MODEL_NAME,
-                api_key="",
-            ),
-        )
-for converter_config_cls in [MinerUConverterConfig, DoclingConverterConfig]:
-    aliases = get_default(converter_config_cls, "aliases") or []
-    model_name = get_default(converter_config_cls, "model_name")
-    names = [n for n in aliases + [model_name] if isinstance(n, str)]
-    for name in names:
-        converter_config_registry.register(
-            name,
-            lambda uri, cls=converter_config_cls: cls(base_url=uri),
-        )
