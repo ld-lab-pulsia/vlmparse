@@ -37,6 +37,7 @@ ALL_MODELS = [
     "deepseekocr",
     "granite-docling",
     "Qwen/Qwen3-VL-8B-Instruct",
+    "deepseekocr2",
 ]
 
 

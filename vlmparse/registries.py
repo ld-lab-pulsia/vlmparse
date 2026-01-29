@@ -2,7 +2,10 @@ import os
 from collections.abc import Callable
 
 from vlmparse.clients.chandra import ChandraDockerServerConfig
-from vlmparse.clients.deepseekocr import DeepSeekOCRDockerServerConfig
+from vlmparse.clients.deepseekocr import (
+    DeepSeekOCR2DockerServerConfig,
+    DeepSeekOCRDockerServerConfig,
+)
 from vlmparse.clients.docling import DoclingDockerServerConfig
 from vlmparse.clients.dotsocr import DotsOCRDockerServerConfig
 from vlmparse.clients.granite_docling import GraniteDoclingDockerServerConfig
@@ -42,6 +45,7 @@ SERVER_CONFIGS: list[type[DockerServerConfig]] = [
     OlmOCRDockerServerConfig,
     MinerUDockerServerConfig,
     DeepSeekOCRDockerServerConfig,
+    DeepSeekOCR2DockerServerConfig,
     GraniteDoclingDockerServerConfig,
     LightonOCR21BServerConfig,
 ]
