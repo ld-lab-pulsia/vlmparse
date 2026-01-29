@@ -67,6 +67,13 @@ def test_converter_with_server_with_docker(file_path, model, tmp_output_dir):
 
     from vlmparse.converter_with_server import ConverterWithServer
 
+    prompt_modes_by_model = {
+        "dotsocr": ["ocr", "ocr_layout"],
+        "deepseekocr": ["ocr", "ocr_layout", "image_description"],
+        "paddleocrvl": ["ocr", "table", "formula", "chart"],
+        "chandra": ["ocr", "ocr_layout"],
+    }
+
     with ConverterWithServer(
         model=model,
         uri=None,
@@ -87,3 +94,26 @@ def test_converter_with_server_with_docker(file_path, model, tmp_output_dir):
         assert len(doc.pages) == 2
         assert doc.pages[0].text is not None and len(doc.pages[0].text) > 0
         assert doc.pages[1].text is not None and len(doc.pages[1].text) > 0
+
+        prompt_modes = prompt_modes_by_model.get(model, [])
+        for conversion_mode in prompt_modes:
+            docs = converter_with_server.parse(
+                [str(file_path)],
+                out_folder=str(tmp_output_dir),
+                debug=True,
+                conversion_mode=conversion_mode,
+            )
+
+            assert len(docs) == 1
+            doc = docs[0]
+            assert len(doc.pages) == 2
+            assert doc.pages[0].text is not None and len(doc.pages[0].text) > 0
+            assert doc.pages[1].text is not None and len(doc.pages[1].text) > 0
+
+            if conversion_mode == "ocr_layout" and model in {
+                "dotsocr",
+                "deepseekocr",
+                "chandra",
+            }:
+                assert doc.pages[0].items is not None
+                assert len(doc.pages[0].items) > 0

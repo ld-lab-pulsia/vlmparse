@@ -144,6 +144,15 @@ class ConverterWithServer:
         inputs: str | list[str],
         out_folder: str = ".",
         mode: Literal["document", "md", "md_page"] = "document",
+        conversion_mode: Literal[
+            "ocr",
+            "ocr_layout",
+            "table",
+            "image_description",
+            "formula",
+            "chart",
+        ]
+        | None = None,
         dpi: int | None = None,
         debug: bool = False,
         retrylast: bool = False,
@@ -183,6 +192,9 @@ class ConverterWithServer:
 
         if dpi is not None:
             self.client.config.dpi = int(dpi)
+
+        if conversion_mode is not None:
+            self.client.config.conversion_mode = conversion_mode
 
         if completion_kwargs is not None and hasattr(
             self.client.config, "completion_kwargs"

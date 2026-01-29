@@ -1,5 +1,4 @@
 import re
-from typing import ClassVar, Literal
 
 from loguru import logger
 from PIL import Image
@@ -47,8 +46,17 @@ class DeepSeekOCRConverterConfig(OpenAIConverterConfig):
 
     model_name: str = "deepseek-ai/DeepSeek-OCR"
     aliases: list[str] = Field(default_factory=lambda: ["deepseekocr"])
+    postprompt: str | None = None
+    prompts: dict[str, str] = {
+        "layout": "<|grounding|>Convert the document to markdown.",
+        "ocr": "Free OCR.",
+        "image_description": "Describe this image in detail.",
+    }
+    prompt_mode_map: dict[str, str] = {
+        "ocr_layout": "layout",
+        "table": "layout",
+    }
 
-    prompt_mode: Literal["layout", "ocr"] = "ocr"
     completion_kwargs: dict | None = {
         "temperature": 0.0,
         "max_tokens": 8181,
@@ -98,12 +106,6 @@ def extract_coordinates_and_label(ref_text):
 
 class DeepSeekOCRConverterClient(OpenAIConverterClient):
     """Client for DeepSeekOCR with specific post-processing."""
-
-    PROMPTS: ClassVar[dict] = {
-        "layout": "<|grounding|>Convert the document to markdown.",
-        "ocr": "Free OCR.",
-        "image_description": "Describe this image in detail.",
-    }
 
     def extract_items(self, image: Image.Image, matches: list) -> list[Item]:
         items = []
@@ -157,6 +159,8 @@ class DeepSeekOCRConverterClient(OpenAIConverterClient):
         # Prepare messages as in parent class
         image = page.image
 
+        prompt_key = self.get_prompt_key() or "ocr"
+
         messages = [
             {
                 "role": "user",
@@ -167,7 +171,7 @@ class DeepSeekOCRConverterClient(OpenAIConverterClient):
                             "url": f"data:image/png;base64,{to_base64(image)}"
                         },
                     },
-                    {"type": "text", "text": self.PROMPTS[self.config.prompt_mode]},
+                    {"type": "text", "text": self.config.prompts[prompt_key]},
                 ],
             },
         ]
@@ -177,7 +181,7 @@ class DeepSeekOCRConverterClient(OpenAIConverterClient):
         logger.info("Response length: " + str(len(response)))
         page.raw_response = response
 
-        if self.config.prompt_mode == "layout":
+        if prompt_key == "layout":
             # Post-processing
             matches, matches_image, matches_other = re_match(response)
 

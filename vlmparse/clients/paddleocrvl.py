@@ -43,7 +43,10 @@ class PaddleOCRVLConverterConfig(OpenAIConverterConfig):
 
     model_name: str = "PaddlePaddle/PaddleOCR-VL"
     preprompt: str | None = None
-    postprompt: str | None = TASKS["ocr"]
+    postprompt: dict[str, str] = TASKS
+    prompt_mode_map: dict[str, str] = {
+        "ocr_layout": "ocr",
+    }
     completion_kwargs: dict | None = {
         "temperature": 0.0,
         "max_completion_tokens": 16384,

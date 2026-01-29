@@ -26,6 +26,14 @@ class ConverterConfig(VLMParseBaseModel):
     max_image_size: int | None = Field(default=4000, ge=50)
     base_url: str | None = None
     default_model_name: str = DEFAULT_MODEL_NAME
+    conversion_mode: Literal[
+        "ocr",
+        "ocr_layout",
+        "table",
+        "image_description",
+        "formula",
+        "chart",
+    ] = "ocr"
 
     def get_client(self, **kwargs) -> "BaseConverter":
         return BaseConverter(config=self, **kwargs)
@@ -188,8 +196,16 @@ class BaseConverter:
         else:
             logger.warning(f"Unknown save_mode: {self.save_mode}, skipping save")
 
+    async def _async_call_with_cleanup(self, file_path: str | Path):
+        """Call async_call and ensure cleanup."""
+        try:
+            return await self.async_call(file_path)
+        finally:
+            if hasattr(self, "aclose"):
+                await self.aclose()
+
     def __call__(self, file_path: str | Path):
-        return asyncio.run(self.async_call(file_path))
+        return asyncio.run(self._async_call_with_cleanup(file_path))
 
     async def async_batch(self, file_paths: list[str | Path]) -> list[Document] | None:
         """Process multiple files concurrently with semaphore limit."""
@@ -203,9 +219,14 @@ class BaseConverter:
                     await self.async_call(file_path)
 
         tasks = [asyncio.create_task(worker(file_path)) for file_path in file_paths]
-        documents = await asyncio.gather(*tasks)
-        if self.return_documents_in_batch_mode:
-            return documents
+        try:
+            documents = await asyncio.gather(*tasks)
+            if self.return_documents_in_batch_mode:
+                return documents
+        finally:
+            # Close async resources before the event loop ends
+            if hasattr(self, "aclose"):
+                await self.aclose()
 
     def batch(self, file_paths: list[str | Path]) -> list[Document] | None:
         """Synchronous wrapper for async_batch."""

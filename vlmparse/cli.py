@@ -49,6 +49,14 @@ class DParseCLI:
         uri: str | None = None,
         gpus: str | None = None,
         mode: Literal["document", "md", "md_page"] = "document",
+        conversion_mode: Literal[
+            "ocr",
+            "ocr_layout",
+            "table",
+            "image_description",
+            "formula",
+            "chart",
+        ] = "ocr",
         with_vllm_server: bool = False,
         concurrency: int = 10,
         dpi: int | None = None,
@@ -65,6 +73,7 @@ class DParseCLI:
             uri: URI of the server, if not specified and the pipe is vllm, a local server will be deployed
             gpus: Comma-separated GPU device IDs (e.g., "0" or "0,1,2"). If not specified, all GPUs will be used.
             mode: Output mode - "document" (save as JSON zip), "md" (save as markdown file), "md_page" (save as folder of markdown pages)
+            conversion_mode: Conversion mode - "ocr" (plain), "ocr_layout" (OCR with layout), "table" (table-centric), "image_description" (describe the image), "formula" (formula extraction), "chart" (chart recognition)
             with_vllm_server: If True, a local VLLM server will be deployed if the model is not found in the registry. Note that if the model is in the registry and the uri is None, the server will be anyway deployed.
             dpi: DPI to use for the conversion. If not specified, the default DPI will be used.
             debug: If True, run in debug mode (single-threaded, no concurrency)
@@ -80,7 +89,12 @@ class DParseCLI:
             return_documents=_return_documents,
         ) as converter_with_server:
             return converter_with_server.parse(
-                inputs=inputs, out_folder=out_folder, mode=mode, dpi=dpi, debug=debug
+                inputs=inputs,
+                out_folder=out_folder,
+                mode=mode,
+                conversion_mode=conversion_mode,
+                dpi=dpi,
+                debug=debug,
             )
 
     def list(self):
