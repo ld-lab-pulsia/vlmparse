@@ -73,6 +73,12 @@ class ConverterWithServer:
         forget_predefined_vllm_args: bool = False,
         return_documents: bool = False,
     ):
+        if model is None and uri is None:
+            raise ValueError("Either 'model' or 'uri' must be provided")
+
+        if concurrency < 1:
+            raise ValueError("concurrency must be at least 1")
+
         self.model = model
         self.uri = uri
         self.port = port
@@ -127,13 +133,26 @@ class ConverterWithServer:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.stop_server()
+        try:
+            self.stop_server()
+        except Exception as e:
+            logger.warning(f"Error stopping server during cleanup: {e}")
+        return False  # Don't suppress exceptions
 
     def parse(
         self,
         inputs: str | list[str],
         out_folder: str = ".",
         mode: Literal["document", "md", "md_page"] = "document",
+        conversion_mode: Literal[
+            "ocr",
+            "ocr_layout",
+            "table",
+            "image_description",
+            "formula",
+            "chart",
+        ]
+        | None = None,
         dpi: int | None = None,
         debug: bool = False,
         retrylast: bool = False,
@@ -173,6 +192,9 @@ class ConverterWithServer:
 
         if dpi is not None:
             self.client.config.dpi = int(dpi)
+
+        if conversion_mode is not None:
+            self.client.config.conversion_mode = conversion_mode
 
         if completion_kwargs is not None and hasattr(
             self.client.config, "completion_kwargs"

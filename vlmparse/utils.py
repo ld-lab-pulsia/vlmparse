@@ -19,8 +19,19 @@ def from_base64(base64_str: str):
     return Image.open(BytesIO(image_data))
 
 
-def get_file_paths(inputs: str | list[str]):
-    # Expand file paths from glob patterns
+def get_file_paths(inputs: str | list[str], raise_on_empty: bool = False) -> list[str]:
+    """Expand file paths from glob patterns.
+
+    Args:
+        inputs: A string or list of strings containing file paths, glob patterns, or directories.
+        raise_on_empty: If True, raise FileNotFoundError when no files are found.
+
+    Returns:
+        List of valid file paths.
+
+    Raises:
+        FileNotFoundError: If raise_on_empty is True and no files are found.
+    """
     file_paths = []
     if isinstance(inputs, str):
         inputs = [inputs]
@@ -36,6 +47,8 @@ def get_file_paths(inputs: str | list[str]):
     file_paths = [f for f in file_paths if os.path.exists(f) and os.path.isfile(f)]
 
     if not file_paths:
+        if raise_on_empty:
+            raise FileNotFoundError("No files found matching the input patterns")
         logger.error("No PDF files found matching the inputs patterns")
 
     return file_paths

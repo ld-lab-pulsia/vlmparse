@@ -1,7 +1,7 @@
 import json
 import math
 from pathlib import Path
-from typing import ClassVar, Literal
+from typing import ClassVar
 
 from loguru import logger
 from PIL import Image
@@ -65,29 +65,7 @@ class DotsOCRConverterConfig(OpenAIConverterConfig):
     model_name: str = "rednote-hilab/dots.ocr"
     preprompt: str | None = ""
     postprompt: str | None = None
-    completion_kwargs: dict | None = {
-        "temperature": 0.1,
-        "top_p": 1.0,
-        "max_completion_tokens": 16384,
-    }
-    aliases: list[str] = Field(default_factory=lambda: ["dotsocr"])
-    dpi: int = 200
-    prompt_mode: Literal["prompt_layout_all_en", "prompt_ocr"] = "prompt_ocr"
-
-    def get_client(self, **kwargs) -> "DotsOCRConverter":
-        return DotsOCRConverter(config=self, **kwargs)
-
-
-class DotsOCRConverter(OpenAIConverterClient):
-    """DotsOCR VLLM converter."""
-
-    # Constants
-    MIN_PIXELS: ClassVar[int] = 3136
-    MAX_PIXELS: ClassVar[int] = 11289600
-    IMAGE_FACTOR: ClassVar[int] = 28
-
-    # Prompts
-    PROMPTS: ClassVar[dict] = {
+    prompts: dict[str, str] = {
         "prompt_layout_all_en": """Please output the layout information from the PDF image, including each layout element's bbox, its category, and the corresponding text content within the bbox.
 
 1. Bbox format: [x1, y1, x2, y2]
@@ -108,6 +86,30 @@ class DotsOCRConverter(OpenAIConverterClient):
 """,
         "prompt_ocr": """Extract the text content from this image.""",
     }
+    prompt_mode_map: dict[str, str] = {
+        "ocr": "prompt_ocr",
+        "ocr_layout": "prompt_layout_all_en",
+        "table": "prompt_layout_all_en",
+    }
+    completion_kwargs: dict | None = {
+        "temperature": 0.1,
+        "top_p": 1.0,
+        "max_completion_tokens": 16384,
+    }
+    aliases: list[str] = Field(default_factory=lambda: ["dotsocr"])
+    dpi: int = 200
+
+    def get_client(self, **kwargs) -> "DotsOCRConverter":
+        return DotsOCRConverter(config=self, **kwargs)
+
+
+class DotsOCRConverter(OpenAIConverterClient):
+    """DotsOCR VLLM converter."""
+
+    # Constants
+    MIN_PIXELS: ClassVar[int] = 3136
+    MAX_PIXELS: ClassVar[int] = 11289600
+    IMAGE_FACTOR: ClassVar[int] = 28
 
     @staticmethod
     def round_by_factor(number: int, factor: int) -> int:
@@ -235,7 +237,7 @@ class DotsOCRConverter(OpenAIConverterClient):
         image = self.fetch_image(
             origin_image, min_pixels=self.MIN_PIXELS, max_pixels=self.MAX_PIXELS
         )
-        prompt = self.PROMPTS[prompt_mode]
+        prompt = self.config.prompts[prompt_mode]
 
         response, usage = await self._async_inference_with_vllm(image, prompt)
 
@@ -258,13 +260,15 @@ class DotsOCRConverter(OpenAIConverterClient):
     async def async_call_inside_page(self, page: Page) -> Page:
         image = page.image
 
+        prompt_key = self.get_prompt_key() or "prompt_ocr"
+
         _, response, _, usage = await self._parse_image_vllm(
-            image, prompt_mode=self.config.prompt_mode
+            image, prompt_mode=prompt_key
         )
         logger.info("Response: " + str(response))
 
         items = None
-        if self.config.prompt_mode == "prompt_layout_all_en":
+        if prompt_key == "prompt_layout_all_en":
             text = "\n\n".join([item.get("text", "") for item in response])
 
             items = []

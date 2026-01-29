@@ -10,12 +10,10 @@ from .constants import PDF_EXTENSION
 
 
 def convert_pdfium(file_path, dpi):
-    pdf = pdfium.PdfDocument(file_path)
     pil_images = []
-    for page in pdf:
-        pil_images.append(page.render(scale=dpi / 72).to_pil())
-
-    pdf.close()
+    with pdfium.PdfDocument(file_path) as pdf:
+        for page in pdf:
+            pil_images.append(page.render(scale=dpi / 72).to_pil())
     return pil_images
 
 
@@ -32,24 +30,29 @@ def convert_pdfium_to_images(file_path, dpi=175):
         ]
 
     except PIL.Image.DecompressionBombError as e:
-        logger.exception(f"Got problem size document with {file_path}")
+        logger.opt(exception=True).warning(
+            "Decompression bomb detected for {file_path}, reducing DPI",
+            file_path=str(file_path),
+        )
         cur_size, limit_size = map(int, re.findall(r"\d+", str(e)))
         factor = custom_ceil(cur_size / limit_size, precision=1)
-        logger.warning(
-            f"Try again by reducing DPI for doc {file_path} from {dpi} to {dpi//factor}"
+        new_dpi = dpi // factor
+        logger.info(
+            "Retrying {file_path} with reduced DPI: {old_dpi} -> {new_dpi}",
+            file_path=str(file_path),
+            old_dpi=dpi,
+            new_dpi=new_dpi,
         )
-        dpi = dpi // factor
-        images = convert_pdfium(file_path, dpi=dpi)
+        images = convert_pdfium(file_path, dpi=new_dpi)
 
     return images
 
 
 def convert_specific_page_to_image(file_path, page_number, dpi=175):
-    pdf = pdfium.PdfDocument(file_path)
-    page = pdf.get_page(page_number)
-    image = page.render(scale=dpi / 72).to_pil()
-    image = image.convert("L").convert("RGB") if image.mode != "RGB" else image
-    pdf.close()
+    with pdfium.PdfDocument(file_path) as pdf:
+        page = pdf.get_page(page_number)
+        image = page.render(scale=dpi / 72).to_pil()
+        image = image.convert("L").convert("RGB") if image.mode != "RGB" else image
     return image
 
 
@@ -68,9 +71,7 @@ def resize_image(image, max_image_size):
 
 def get_page_count(file_path):
     if Path(file_path).suffix.lower() == PDF_EXTENSION:
-        pdf = pdfium.PdfDocument(file_path)
-        count = len(pdf)
-        pdf.close()
-        return count
+        with pdfium.PdfDocument(file_path) as pdf:
+            return len(pdf)
     else:
         return 1

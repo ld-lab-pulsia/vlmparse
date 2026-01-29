@@ -1,6 +1,9 @@
+import json
 import math
 import time
+from dataclasses import asdict, dataclass
 
+from bs4 import BeautifulSoup
 from loguru import logger
 from PIL import Image
 from pydantic import Field
@@ -11,7 +14,8 @@ from vlmparse.clients.openai_converter import (
 )
 from vlmparse.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_tables
 from vlmparse.clients.pipe_utils.utils import clean_response
-from vlmparse.data_model.document import Page
+from vlmparse.data_model.box import BoundingBox
+from vlmparse.data_model.document import Item, Page
 from vlmparse.servers.docker_server import VLLMDockerServerConfig
 from vlmparse.utils import to_base64
 
@@ -110,11 +114,6 @@ OCR this image to HTML.
 {PROMPT_ENDING}
 """.strip()
 
-PROMPT_MAPPING = {
-    "ocr_layout": OCR_LAYOUT_PROMPT,
-    "ocr": OCR_PROMPT,
-}
-
 
 def scale_to_fit(
     img: Image.Image,
@@ -188,11 +187,135 @@ def detect_repeat_token(
     return False
 
 
+@dataclass
+class LayoutBlock:
+    """Represents a layout block with bounding box and content."""
+
+    bbox: list[int]
+    label: str
+    content: str
+
+
+def parse_layout(
+    html: str, image: Image.Image, bbox_scale: int = 1024
+) -> list[LayoutBlock]:
+    """
+    Parse HTML layout blocks with bounding boxes.
+
+    Args:
+        html: HTML string with layout blocks (divs with data-bbox and data-label attributes)
+        image: PIL Image to get dimensions for bbox scaling
+        bbox_scale: The scale used in the prompt for normalized bboxes
+
+    Returns:
+        List of LayoutBlock objects with scaled bounding boxes
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    top_level_divs = soup.find_all("div", recursive=False)
+    width, height = image.size
+    width_scaler = width / bbox_scale
+    height_scaler = height / bbox_scale
+    layout_blocks = []
+
+    for div in top_level_divs:
+        bbox = div.get("data-bbox")
+
+        try:
+            bbox = json.loads(bbox)
+            assert len(bbox) == 4, "Invalid bbox length"
+        except Exception:
+            try:
+                bbox = bbox.split(" ")
+                assert len(bbox) == 4, "Invalid bbox length"
+            except Exception:
+                # Default bbox if parsing fails
+                bbox = [0, 0, bbox_scale, bbox_scale]
+
+        bbox = list(map(int, bbox))
+        # Scale bbox to image dimensions
+        bbox = [
+            max(0, int(bbox[0] * width_scaler)),
+            max(0, int(bbox[1] * height_scaler)),
+            min(int(bbox[2] * width_scaler), width),
+            min(int(bbox[3] * height_scaler), height),
+        ]
+
+        label = div.get("data-label", "block")
+        content = str(div.decode_contents())
+        layout_blocks.append(LayoutBlock(bbox=bbox, label=label, content=content))
+
+    return layout_blocks
+
+
+def parse_chunks(html: str, image: Image.Image, bbox_scale: int = 1024) -> list[dict]:
+    """
+    Parse HTML layout blocks into dictionaries.
+
+    Args:
+        html: HTML string with layout blocks
+        image: PIL Image to get dimensions for bbox scaling
+        bbox_scale: The scale used in the prompt for normalized bboxes
+
+    Returns:
+        List of dictionaries with bbox, label, and content keys
+    """
+    layout = parse_layout(html, image, bbox_scale=bbox_scale)
+    chunks = [asdict(block) for block in layout]
+    return chunks
+
+
+def layout_blocks_to_items(
+    layout_blocks: list[LayoutBlock],
+) -> list[Item]:
+    """
+    Convert layout blocks to Item objects for the Page model.
+
+    Args:
+        layout_blocks: List of LayoutBlock objects
+
+    Returns:
+        List of Item objects with category, box, and text
+    """
+    items = []
+    for block in layout_blocks:
+        # Convert content HTML to markdown
+        try:
+            text = html_to_md_keep_tables(block.content)
+        except Exception as e:
+            logger.warning(f"Error converting block content to markdown: {e}")
+            text = block.content
+
+        # Create bounding box from [x0, y0, x1, y1] format
+        bbox = BoundingBox(
+            l=block.bbox[0],
+            t=block.bbox[1],
+            r=block.bbox[2],
+            b=block.bbox[3],
+        )
+
+        items.append(
+            Item(
+                category=block.label,
+                box=bbox,
+                text=text.strip(),
+            )
+        )
+
+    return items
+
+
 class ChandraConverterConfig(OpenAIConverterConfig):
     """Chandra converter configuration."""
 
     model_name: str = "datalab-to/chandra"
-    prompt_type: str = "ocr"  # Default prompt type
+    postprompt: str | None = None
+    prompts: dict[str, str] = {
+        "ocr": OCR_PROMPT,
+        "ocr_layout": OCR_LAYOUT_PROMPT,
+    }
+    prompt_mode_map: dict[str, str] = {
+        "table": "ocr_layout",
+    }
     bbox_scale: int = 1024
     max_retries: int = 0
     max_failure_retries: int = None
@@ -216,8 +339,7 @@ class ChandraConverterClient(OpenAIConverterClient):
 
     async def async_call_inside_page(self, page: Page) -> Page:
         """Process a single page using Chandra logic."""
-
-        prompt = PROMPT_MAPPING.get(self.config.prompt_type, OCR_PROMPT)
+        prompt = self.get_prompt_for_mode() or OCR_PROMPT
         prompt = prompt.replace("{bbox_scale}", str(self.config.bbox_scale))
 
         image = scale_to_fit(page.image)
@@ -277,6 +399,22 @@ class ChandraConverterClient(OpenAIConverterClient):
         logger.info("Response length: " + str(len(result_content)))
         page.raw_response = result_content
         text = clean_response(result_content)
+
+        # Check if we're in layout mode (ocr_layout prompt)
+        current_prompt_key = self.get_prompt_key()
+        is_layout_mode = current_prompt_key == "ocr_layout"
+
+        if is_layout_mode:
+            # Parse layout blocks and populate items
+            try:
+                layout_blocks = parse_layout(
+                    text, image, bbox_scale=self.config.bbox_scale
+                )
+                page.items = layout_blocks_to_items(layout_blocks)
+                logger.info(f"Parsed {len(page.items)} layout blocks")
+            except Exception as e:
+                logger.warning(f"Error parsing layout blocks: {e}")
+                page.items = []
 
         # Convert HTML to MD
         text = html_to_md_keep_tables(text)

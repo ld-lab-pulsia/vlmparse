@@ -1,3 +1,4 @@
+import asyncio
 from typing import Literal, Optional
 
 from loguru import logger
@@ -19,7 +20,9 @@ class OpenAIConverterConfig(ConverterConfig):
     timeout: int | None = 500
     max_retries: int = 1
     preprompt: str | None = None
-    postprompt: str | None = PDF2MD_PROMPT
+    postprompt: str | dict[str, str] | None = PDF2MD_PROMPT
+    prompts: dict[str, str] = Field(default_factory=dict)
+    prompt_mode_map: dict[str, str] = Field(default_factory=dict)
     completion_kwargs: dict = Field(default_factory=dict)
     stream: bool = False
 
@@ -29,6 +32,33 @@ class OpenAIConverterConfig(ConverterConfig):
 
 class OpenAIConverterClient(BaseConverter):
     """Client for OpenAI-compatible API servers."""
+
+    def get_prompt_key(self) -> str | None:
+        """Resolve a prompt key from conversion_mode using class mappings."""
+        mode = getattr(self.config, "conversion_mode", None) or "ocr"
+        prompts = self._get_prompts()
+        if mode in prompts:
+            return mode
+        mapped = self._get_prompt_mode_map().get(mode)
+        if mapped in prompts:
+            return mapped
+        return None
+
+    def get_prompt_for_mode(self) -> str | None:
+        key = self.get_prompt_key()
+        if key is None:
+            return None
+        return self._get_prompts().get(key)
+
+    def _get_prompts(self) -> dict[str, str]:
+        if self.config.prompts:
+            return self.config.prompts
+        if isinstance(self.config.postprompt, dict):
+            return self.config.postprompt
+        return {}
+
+    def _get_prompt_mode_map(self) -> dict[str, str]:
+        return self.config.prompt_mode_map or {}
 
     def __init__(
         self,
@@ -49,14 +79,54 @@ class OpenAIConverterClient(BaseConverter):
             debug=debug,
             return_documents_in_batch_mode=return_documents_in_batch_mode,
         )
-        from openai import AsyncOpenAI
+        self._model = None
+        self._model_loop = None
 
-        self.model = AsyncOpenAI(
-            base_url=self.config.base_url,
-            api_key=self.config.api_key,
-            timeout=self.config.timeout,
-            max_retries=self.config.max_retries,
-        )
+    async def _get_async_model(self):
+        loop = asyncio.get_running_loop()
+        if self._model is None or self._model_loop is not loop:
+            await self._close_model()
+            from openai import AsyncOpenAI
+
+            self._model = AsyncOpenAI(
+                base_url=self.config.base_url,
+                api_key=self.config.api_key,
+                timeout=self.config.timeout,
+                max_retries=self.config.max_retries,
+            )
+            self._model_loop = loop
+        return self._model
+
+    async def _close_model(self):
+        """Close the async OpenAI client if it exists."""
+        if self._model is not None:
+            try:
+                await self._model.close()
+            except RuntimeError:
+                # Event loop may already be closed
+                pass
+            finally:
+                self._model = None
+                self._model_loop = None
+
+    async def aclose(self):
+        """Close the converter and release resources."""
+        await self._close_model()
+
+    def close(self):
+        """Synchronously close the converter if possible."""
+        if self._model is not None:
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self._close_model())
+            except RuntimeError:
+                # No running loop, try to close synchronously
+                try:
+                    asyncio.run(self._close_model())
+                except RuntimeError:
+                    # Event loop already closed, force cleanup
+                    self._model = None
+                    self._model_loop = None
 
     async def _get_chat_completion(
         self, messages: list[dict], completion_kwargs: dict | None = None
@@ -65,8 +135,10 @@ class OpenAIConverterClient(BaseConverter):
         if completion_kwargs is None:
             completion_kwargs = self.config.completion_kwargs
 
+        model = await self._get_async_model()
+
         if self.config.stream:
-            response_stream = await self.model.chat.completions.create(
+            response_stream = await model.chat.completions.create(
                 model=self.config.default_model_name,
                 messages=messages,
                 stream=True,
@@ -79,7 +151,7 @@ class OpenAIConverterClient(BaseConverter):
 
             return "".join(response_parts), None
         else:
-            response_obj = await self.model.chat.completions.create(
+            response_obj = await model.chat.completions.create(
                 model=self.config.default_model_name,
                 messages=messages,
                 **completion_kwargs,
@@ -106,11 +178,15 @@ class OpenAIConverterClient(BaseConverter):
         else:
             preprompt = []
 
-        postprompt = (
-            [{"type": "text", "text": self.config.postprompt}]
-            if self.config.postprompt
-            else []
-        )
+        selected_prompt = self.get_prompt_for_mode()
+        if selected_prompt is not None:
+            postprompt = [{"type": "text", "text": selected_prompt}]
+        else:
+            postprompt = (
+                [{"type": "text", "text": self.config.postprompt}]
+                if isinstance(self.config.postprompt, str) and self.config.postprompt
+                else []
+            )
 
         messages = [
             *preprompt,

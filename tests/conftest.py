@@ -113,6 +113,10 @@ def mock_openai_api():
             # Or with custom content
             with mock_openai_api(content="Custom") as client:
                 # client is configured
+
+            # For streaming responses
+            with mock_openai_api(content="Streamed", stream=True) as client:
+                # client is configured for streaming
     """
     from contextlib import contextmanager
 
@@ -124,6 +128,7 @@ def mock_openai_api():
         reasoning_tokens: int = 30,
         side_effect: Optional[Exception] = None,
         call_tracker: Optional[Callable] = None,
+        stream: bool = False,
     ):
         """Create and configure a mock OpenAI client."""
         with patch("openai.AsyncOpenAI") as mock_client_class:
@@ -136,6 +141,8 @@ def mock_openai_api():
             )
 
             mock_instance = MagicMock()
+            # Support for async close() method
+            mock_instance.close = AsyncMock()
 
             if side_effect:
                 mock_instance.chat.completions.create = AsyncMock(
@@ -148,6 +155,10 @@ def mock_openai_api():
             else:
 
                 async def create_response(*args, **kwargs):
+                    is_stream = kwargs.get("stream", False)
+                    if is_stream or stream:
+                        # Return an async iterator for streaming responses
+                        return _create_stream_response(content)
                     return response_config.create_response()
 
                 mock_instance.chat.completions.create = AsyncMock(
@@ -156,6 +167,16 @@ def mock_openai_api():
 
             mock_client_class.return_value = mock_instance
             yield mock_instance
+
+    async def _create_stream_response(content: str):
+        """Create an async iterator that yields streaming chunks."""
+        # Split content into chunks to simulate streaming
+        chunks = [content[i : i + 10] for i in range(0, len(content), 10)]
+        for chunk_text in chunks:
+            chunk = MagicMock()
+            chunk.choices = [MagicMock()]
+            chunk.choices[0].delta.content = chunk_text
+            yield chunk
 
     return _create_mock
 
