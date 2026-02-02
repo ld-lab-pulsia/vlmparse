@@ -1,7 +1,7 @@
 import asyncio
-import base64
 import os
 from pathlib import Path
+from typing import Any
 
 import httpx
 import orjson
@@ -82,37 +82,23 @@ class PaddleOCRVLConverterConfig(ConverterConfig):
     endpoint_layout_parsing: str = "/layout-parsing"
     endpoint_restructure_pages: str = "/restructure-pages"
 
-    file_type: int | None = None
-    use_doc_orientation_classify: bool | None = None
-    use_doc_unwarping: bool | None = None
-    use_layout_detection: bool | None = None
-    use_chart_recognition: bool | None = None
-    use_seal_recognition: bool | None = None
-    use_ocr_for_image_block: bool | None = None
-    layout_threshold: float | dict | None = None
-    layout_nms: bool | None = None
-    layout_unclip_ratio: float | list | dict | None = None
-    layout_merge_bboxes_mode: str | dict | None = None
-    layout_shape_mode: str | None = None
-    prompt_label: str | None = None
-    format_block_content: bool | None = None
-    repetition_penalty: float | None = None
-    temperature: float | None = None
-    top_p: float | None = None
-    min_pixels: int | None = None
-    max_pixels: int | None = None
-    max_new_tokens: int | None = None
-    merge_layout_blocks: bool | None = None
-    markdown_ignore_labels: list | None = None
-    vlm_extra_args: dict | None = None
-    prettify_markdown: bool | None = True
-    show_formula_number: bool | None = False
-    restructure_pages: bool | None = False
-    merge_tables: bool | None = None
-    relevel_titles: bool | None = None
-    concatenate_pages: bool | None = None
-    visualize: bool | None = None
-    request_overrides: dict = Field(default_factory=dict)
+    # Dict of PaddleOCR-VL API args.
+    # Keys should match the PaddleOCR-VL API JSON fields (camelCase), e.g.
+    # {"useLayoutDetection": true, "promptLabel": "..."}.
+    paddleocr_args: dict[str, Any] = Field(
+        default_factory=lambda: {
+            # Preserve previous default behavior (these were always sent before).
+            "prettifyMarkdown": True,
+            "showFormulaNumber": False,
+            "restructurePages": False,
+        }
+    )
+
+    # Optional args for the /restructure-pages endpoint (if/when used).
+    restructure_args: dict[str, Any] = Field(default_factory=dict)
+
+    # Backward-compat escape hatch: if set, applied last to the payload.
+    request_overrides: dict[str, Any] = Field(default_factory=dict)
 
     def get_client(self, **kwargs) -> "PaddleOCRVLConverter":
         return PaddleOCRVLConverter(config=self, **kwargs)
@@ -124,45 +110,13 @@ class PaddleOCRVLConverter(BaseConverter):
     config: PaddleOCRVLConverterConfig
 
     def _build_layout_payload(self, file_content_b64: str, file_type: int | None):
-        payload: dict = {"file": file_content_b64}
+        payload: dict[str, Any] = {"file": file_content_b64}
+
+        if self.config.paddleocr_args:
+            payload.update(self.config.paddleocr_args)
+
         if file_type is not None:
             payload["fileType"] = file_type
-
-        mapping = {
-            "use_doc_orientation_classify": "useDocOrientationClassify",
-            "use_doc_unwarping": "useDocUnwarping",
-            "use_layout_detection": "useLayoutDetection",
-            "use_chart_recognition": "useChartRecognition",
-            "use_seal_recognition": "useSealRecognition",
-            "use_ocr_for_image_block": "useOcrForImageBlock",
-            "layout_threshold": "layoutThreshold",
-            "layout_nms": "layoutNms",
-            "layout_unclip_ratio": "layoutUnclipRatio",
-            "layout_merge_bboxes_mode": "layoutMergeBboxesMode",
-            "layout_shape_mode": "layoutShapeMode",
-            "prompt_label": "promptLabel",
-            "format_block_content": "formatBlockContent",
-            "repetition_penalty": "repetitionPenalty",
-            "temperature": "temperature",
-            "top_p": "topP",
-            "min_pixels": "minPixels",
-            "max_pixels": "maxPixels",
-            "max_new_tokens": "maxNewTokens",
-            "merge_layout_blocks": "mergeLayoutBlocks",
-            "markdown_ignore_labels": "markdownIgnoreLabels",
-            "vlm_extra_args": "vlmExtraArgs",
-            "prettify_markdown": "prettifyMarkdown",
-            "show_formula_number": "showFormulaNumber",
-            "restructure_pages": "restructurePages",
-            "merge_tables": "mergeTables",
-            "relevel_titles": "relevelTitles",
-            "visualize": "visualize",
-        }
-
-        for attr, key in mapping.items():
-            value = getattr(self.config, attr)
-            if value is not None:
-                payload[key] = value
 
         if self.config.request_overrides:
             payload.update(self.config.request_overrides)
@@ -183,18 +137,10 @@ class PaddleOCRVLConverter(BaseConverter):
                 }
             )
 
-        payload = {"pages": pages}
+        payload: dict[str, Any] = {"pages": pages}
 
-        if self.config.merge_tables is not None:
-            payload["mergeTables"] = self.config.merge_tables
-        if self.config.relevel_titles is not None:
-            payload["relevelTitles"] = self.config.relevel_titles
-        if self.config.concatenate_pages is not None:
-            payload["concatenatePages"] = self.config.concatenate_pages
-        if self.config.prettify_markdown is not None:
-            payload["prettifyMarkdown"] = self.config.prettify_markdown
-        if self.config.show_formula_number is not None:
-            payload["showFormulaNumber"] = self.config.show_formula_number
+        if self.config.restructure_args:
+            payload.update(self.config.restructure_args)
 
         return payload
 
@@ -209,12 +155,6 @@ class PaddleOCRVLConverter(BaseConverter):
         if data.get("errorCode", 0) != 0:
             raise RuntimeError(data.get("errorMsg", "Unknown error"))
         return data
-
-    @staticmethod
-    def _file_to_base64(file_path: str | Path) -> str:
-        file_path = Path(file_path)
-        content = file_path.read_bytes()
-        return base64.b64encode(content).decode("utf-8")
 
     def _apply_markdown(self, page: Page, markdown_text: str | None):
         text = markdown_text or ""
@@ -231,6 +171,7 @@ class PaddleOCRVLConverter(BaseConverter):
         for block in parsing_res_list:
             bbox = block.get("block_bbox")
             if not bbox or len(bbox) != 4:
+                logger.warning(f"Invalid bbox in block: {block}")
                 continue
             l, t, r, b = bbox
             text = block.get("block_content") or ""
