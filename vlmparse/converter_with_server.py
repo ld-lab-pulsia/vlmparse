@@ -42,13 +42,14 @@ def start_server(
         if port is not None:
             docker_config.docker_port = port
         docker_config.gpu_device_ids = gpu_device_ids
-        docker_config.update_command_args(
-            vllm_args,
-            forget_predefined_vllm_args=forget_predefined_vllm_args,
-        )
+        if hasattr(docker_config, "update_command_args"):
+            docker_config.update_command_args(
+                vllm_args,
+                forget_predefined_vllm_args=forget_predefined_vllm_args,
+            )
 
         logger.info(
-            f"Deploying VLLM server for {docker_config.model_name} on port {port}..."
+            f"Deploying server for {docker_config.model_name} on port {port}..."
         )
         server = docker_config.get_server(auto_stop=auto_stop)
         if server is None:
@@ -91,7 +92,7 @@ class ConverterWithServer:
         self.server = None
         self.client = None
 
-        if self.uri is not None:
+        if self.uri is not None and self.model is None:
             self.model = get_model_from_uri(self.uri)
 
     def start_server_and_client(self):

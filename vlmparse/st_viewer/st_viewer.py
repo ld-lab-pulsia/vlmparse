@@ -40,7 +40,7 @@ def run_streamlit(folder: str) -> None:
     col1, col2 = st.columns(2)
     with col1:
         with st.container(height=700):
-            st.write(doc.pages[settings["page_no"]].text)
+            st.markdown(doc.pages[settings["page_no"]].text, unsafe_allow_html=True)
 
     with col2:
         if settings["plot_layouts"]:

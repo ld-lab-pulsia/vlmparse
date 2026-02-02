@@ -21,7 +21,9 @@ from vlmparse.clients.olmocr import OlmOCRDockerServerConfig
 from vlmparse.clients.openai_converter import OpenAIConverterConfig
 from vlmparse.clients.paddleocrvl import PaddleOCRVLDockerServerConfig
 from vlmparse.converter import ConverterConfig
-from vlmparse.servers.docker_server import DockerServerConfig, docker_config_registry
+from vlmparse.servers.docker_compose_server import DockerComposeServerConfig
+from vlmparse.servers.docker_server import DockerServerConfig
+from vlmparse.servers.server_registry import docker_config_registry
 
 
 def get_default(cls, field_name):
@@ -34,7 +36,7 @@ def get_default(cls, field_name):
 
 
 # All server configs - single source of truth
-SERVER_CONFIGS: list[type[DockerServerConfig]] = [
+SERVER_CONFIGS: list[type[DockerServerConfig | DockerComposeServerConfig]] = [
     ChandraDockerServerConfig,
     LightOnOCRDockerServerConfig,
     DotsOCRDockerServerConfig,
@@ -82,7 +84,7 @@ class ConverterConfigRegistry:
 
     def register_from_server(
         self,
-        server_config_cls: type[DockerServerConfig],
+        server_config_cls: type[DockerServerConfig | DockerComposeServerConfig],
     ):
         """Register converter config derived from a server config class.
 
