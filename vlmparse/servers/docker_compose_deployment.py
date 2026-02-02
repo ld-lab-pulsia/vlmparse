@@ -3,6 +3,7 @@ import os
 import re
 import subprocess
 import tempfile
+import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -115,7 +116,10 @@ def _build_compose_override_yaml(config: "DockerComposeServerConfig") -> str | N
         lines.append(f"  {service}:")
 
         if "ports" in overrides:
-            lines.append("    ports:")
+            # Compose override files normally merge/append list fields (like ports).
+            # Use !override so we replace the base compose list instead of adding
+            # extra published ports.
+            lines.append("    ports: !override")
             for port in overrides["ports"]:
                 lines.append(f'      - "{port}"')
 
@@ -133,7 +137,8 @@ def _build_compose_override_yaml(config: "DockerComposeServerConfig") -> str | N
             lines.append("    deploy:")
             lines.append("      resources:")
             lines.append("        reservations:")
-            lines.append("          devices:")
+            # Same story as ports: ensure we replace the base list.
+            lines.append("          devices: !override")
             devices = overrides["deploy"]["resources"]["reservations"].get("devices")
             if not devices:
                 lines.append("            []")
@@ -165,6 +170,99 @@ def _get_compose_container(
     if not containers:
         return None
     return containers[0]
+
+
+def _start_compose_logs_stream(
+    compose_cmd: list[str],
+    *,
+    env: dict | None,
+    model_name: str,
+    services: list[str] | None = None,
+    tail: int = 200,
+) -> tuple[subprocess.Popen[str], threading.Event, threading.Thread] | None:
+    """Stream `docker compose logs -f` output into loguru.
+
+    This is useful for compose stacks where the actual failure happens in a
+    dependency service (db, redis, etc). Output is forwarded line-by-line so it
+    shows up similarly to the single-container `docker_server` startup logs.
+
+    Returns a (process, stop_event, thread) triple, or None if the stream can't
+    be started.
+    """
+
+    cmd = list(compose_cmd) + [
+        "logs",
+        "--no-color",
+        "--follow",
+        "--tail",
+        str(tail),
+    ]
+    if services:
+        cmd.extend([s for s in services if s])
+
+    try:
+        proc: subprocess.Popen[str] = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            env=env,
+            bufsize=1,
+        )
+    except Exception as e:
+        logger.debug(f"Failed to start docker compose log stream: {e}")
+        return None
+
+    stop_event = threading.Event()
+
+    def _pump_logs() -> None:
+        try:
+            if proc.stdout is None:
+                return
+            for line in proc.stdout:
+                if stop_event.is_set():
+                    break
+                line = line.rstrip("\n")
+                if line.strip():
+                    # Compose already prefixes with service name; keep a stable
+                    # model prefix so users can correlate when multiplexed.
+                    logger.info(f"[{model_name}] {line}")
+        except Exception as e:
+            logger.debug(f"Compose log stream stopped: {e}")
+        finally:
+            try:
+                if proc.stdout is not None:
+                    proc.stdout.close()
+            except Exception:
+                pass
+
+    thread = threading.Thread(target=_pump_logs, name="compose-logs", daemon=True)
+    thread.start()
+    return proc, stop_event, thread
+
+
+def _stop_compose_logs_stream(
+    stream: tuple[subprocess.Popen[str], threading.Event, threading.Thread] | None,
+    *,
+    timeout: float = 2.0,
+) -> None:
+    if stream is None:
+        return
+
+    proc, stop_event, thread = stream
+    stop_event.set()
+    try:
+        proc.terminate()
+    except Exception:
+        pass
+    try:
+        proc.wait(timeout=timeout)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+    thread.join(timeout=timeout)
 
 
 @contextmanager
@@ -248,9 +346,64 @@ def docker_compose_server(
                     logger.error(
                         f"Docker Compose stderr for {config.model_name}:\n{e.stderr}"
                     )
+
+                # Best-effort diagnostics: container status and last logs.
+                # This is especially helpful when dependencies crash quickly (e.g. exit 137).
+                try:
+                    ps_res = subprocess.run(
+                        compose_cmd + ["ps"],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                        env=env,
+                    )
+                    if ps_res.stdout:
+                        logger.error(
+                            f"Docker Compose ps for {config.model_name}:\n{ps_res.stdout}"
+                        )
+                    if ps_res.stderr:
+                        logger.error(
+                            f"Docker Compose ps stderr for {config.model_name}:\n{ps_res.stderr}"
+                        )
+
+                    logs_res = subprocess.run(
+                        compose_cmd + ["logs", "--no-color", "--tail", "200"],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                        env=env,
+                    )
+                    if logs_res.stdout:
+                        logger.error(
+                            f"Docker Compose logs (tail=200) for {config.model_name}:\n{logs_res.stdout}"
+                        )
+                    if logs_res.stderr:
+                        logger.error(
+                            f"Docker Compose logs stderr for {config.model_name}:\n{logs_res.stderr}"
+                        )
+                except Exception as diag_error:
+                    logger.warning(
+                        f"Failed to collect docker compose diagnostics: {diag_error}"
+                    )
                 raise
 
             logger.info("Compose stack started, waiting for server to be ready...")
+
+            # Stream logs for the whole compose stack (or requested services).
+            # This mirrors the visibility you get with `docker_server` while
+            # being much more useful for multi-service compose deployments.
+            service_names = (
+                config.compose_services
+                if config.compose_services
+                else ([config.server_service] if config.server_service else None)
+            )
+            logs_stream = _start_compose_logs_stream(
+                compose_cmd,
+                env=env,
+                model_name=config.model_name,
+                services=service_names,
+                tail=200,
+            )
 
             start_time = time.time()
             server_ready = False
@@ -275,11 +428,9 @@ def docker_compose_server(
 
                 if container.status == "running":
                     all_logs = container.logs().decode("utf-8")
+                    # Keep the old log-position tracker for readiness checks.
+                    # Actual log visibility is handled by the compose log stream.
                     if len(all_logs) > last_log_position:
-                        new_logs = all_logs[last_log_position:]
-                        for line in new_logs.splitlines():
-                            if line.strip():
-                                logger.info(f"[{config.model_name}] {line}")
                         last_log_position = len(all_logs)
 
                     for indicator in config.server_ready_indicators:
@@ -313,6 +464,7 @@ def docker_compose_server(
             yield base_url, container
 
         finally:
+            _stop_compose_logs_stream(logs_stream)
             if cleanup:
                 logger.info("Stopping Docker Compose stack")
                 subprocess.run(
