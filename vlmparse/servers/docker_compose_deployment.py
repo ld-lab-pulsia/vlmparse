@@ -324,6 +324,8 @@ def docker_compose_server(
         if override_file is not None:
             compose_cmd.extend(["-f", str(override_file)])
 
+        logs_stream = None
+
         try:
             logger.info(
                 f"Starting Docker Compose for {config.model_name} on port {config.docker_port}"
@@ -460,6 +462,12 @@ def docker_compose_server(
                 f"http://localhost:{config.docker_port}{config.get_base_url_suffix()}"
             )
             logger.info(f"{config.model_name} server ready at {base_url}")
+
+            # Deployment phase is over: stop log streaming so we don't
+            # continuously forward runtime logs (caller can still fetch logs
+            # explicitly via Docker / CLI if needed).
+            _stop_compose_logs_stream(logs_stream)
+            logs_stream = None
 
             yield base_url, container
 
