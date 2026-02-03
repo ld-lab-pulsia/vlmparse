@@ -31,7 +31,6 @@ ALL_MODELS = [
     "nanonets/Nanonets-OCR2-3B",
     "hunyuanocr",
     "olmocr-2-fp8",
-    "paddleocrvl",
     "mineru25",
     "chandra",
     "deepseekocr",

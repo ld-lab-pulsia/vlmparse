@@ -53,7 +53,6 @@ def test_convert_mistral_ocr(file_path, model, tmp_output_dir):
         "nanonets/Nanonets-OCR2-3B",
         "hunyuanocr",
         "olmocr-2-fp8",
-        "paddleocrvl",
         "mineru25",
         "chandra",
         "deepseekocr",
@@ -61,6 +60,7 @@ def test_convert_mistral_ocr(file_path, model, tmp_output_dir):
         "Qwen/Qwen3-VL-8B-Instruct",
         "lightonocr2",
         "deepseekocr2",
+        "paddleocrvl1.5",
     ],
 )
 def test_converter_with_server_with_docker(file_path, model, tmp_output_dir):
