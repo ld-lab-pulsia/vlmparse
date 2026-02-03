@@ -232,6 +232,7 @@ class DeepSeekOCR2DockerServerConfig(VLLMDockerServerConfig):
     - Custom image processor (DeepseekOCR2Processor)
     """
 
+    docker_image: str = "vllm/vllm-openai:nightly"
     model_name: str = "deepseek-ai/DeepSeek-OCR-2"
     command_args: list[str] = Field(
         default_factory=lambda: [
@@ -248,7 +249,6 @@ class DeepSeekOCR2DockerServerConfig(VLLMDockerServerConfig):
             "0",
             "--gpu-memory-utilization",
             "0.9",
-            "--disable-mm-preprocessor-cache",
             "--logits_processors",
             "vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor",
         ]
@@ -292,7 +292,7 @@ class DeepSeekOCR2ConverterConfig(OpenAIConverterConfig):
 
     completion_kwargs: dict | None = {
         "temperature": 0.0,
-        "max_tokens": 8192,
+        "max_tokens": 8180,
         "extra_body": {
             "skip_special_tokens": False,
             # args used to control custom logits processor
