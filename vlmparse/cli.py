@@ -15,8 +15,8 @@ def serve(
         None,
         help='Comma-separated GPU device IDs (e.g., "0" or "0,1,2"). If not specified, all GPUs will be used.',
     ),
-    server: Literal["registry", "hf"] = typer.Option(
-        "registry", help="Server type for the model. 'registry' (default) or 'hf'."
+    provider: Literal["registry", "hf"] = typer.Option(
+        "registry", help="provider type for the model. 'registry' (default) or 'hf'."
     ),
     vllm_args: list[str] | None = typer.Option(
         None,
@@ -48,7 +48,7 @@ def serve(
         model=model,
         gpus=gpus,
         port=port,
-        server=server,
+        provider=provider,
         vllm_args=vllm_args,
         forget_predefined_vllm_args=forget_predefined_vllm_args,
         auto_stop=False,
@@ -99,7 +99,7 @@ def convert(
             "image_description (describe the image), formula (formula extraction), chart (chart recognition)"
         ),
     ),
-    server: Literal["registry", "hf", "google", "openai"] = typer.Option(
+    provider: Literal["registry", "hf", "google", "openai"] = typer.Option(
         "registry",
         help="Server type for the model. Defaults to 'registry'.",
     ),
@@ -127,21 +127,20 @@ def convert(
         gpus: Comma-separated GPU device IDs (e.g., "0" or "0,1,2"). If not specified, all GPUs will be used.
         mode: Output mode - "document" (save as JSON zip), "md" (save as markdown file), "md_page" (save as folder of markdown pages)
         conversion_mode: Conversion mode - "ocr" (plain), "ocr_layout" (OCR with layout), "table" (table-centric), "image_description" (describe the image), "formula" (formula extraction), "chart" (chart recognition)
-        server: Server type for the model. Defaults to 'registry'.
-        with_vllm_server: Deprecated. Use --server hf instead. If True, a local VLLM server will be deployed if the model is not found in the registry. Note that if the model is in the registry and the uri is None, the server will be anyway deployed.
+        provider: provider type for the model. Defaults to 'registry'.
         dpi: DPI to use for the conversion. If not specified, the default DPI will be used.
         debug: If True, run in debug mode (single-threaded, no concurrency)
     """
     from vlmparse.converter_with_server import ConverterWithServer
 
-    if with_vllm_server and server == "registry":
-        server = "hf"
+    if with_vllm_server and provider == "registry":
+        provider = "hf"
 
     with ConverterWithServer(
         model=model,
         uri=uri,
         gpus=gpus,
-        server=server,
+        provider=provider,
         concurrency=concurrency,
         return_documents=_return_documents,
     ) as converter_with_server:

@@ -16,11 +16,11 @@ class TestBatchParser:
             mock_client,
         ):
             # Initialize
-            with ConverterWithServer(model="test_model", server="hf") as parser:
+            with ConverterWithServer(model="test_model", provider="hf") as parser:
                 # Verify interactions
-                # For server="hf", we expect lookup in registry then fallback if not found
+                # For provider="hf", we expect lookup in registry then fallback if not found
                 # The mock setup seems to imply it finds it or defaults?
-                # In start_server, if server="hf" and not in registry, it makes a default config.
+                # In start_server, if provider="hf" and not in registry, it makes a default config.
                 # If mock_docker_registry.get returns something, it uses it.
                 mock_docker_registry.get.assert_called_with("test_model")
                 mock_config.get_server.assert_called_with(auto_stop=True)
@@ -38,10 +38,10 @@ class TestBatchParser:
                 # Initialize with a real model from registry
                 with ConverterWithServer(model="gemini-2.5-flash-lite") as parser:
                     # Verify interactions
-                    # Because server="registry" (default), we check valid model
+                    # Because provider="registry" (default), we check valid model
                     # If model is not in docker registry, it shouldn't try to get with default=False anymore
                     # logic:
-                    # if server="registry": if model in docker_config_registry.list_models() -> start_server
+                    # if provider="registry": if model in docker_config_registry.list_models() -> start_server
                     # else -> directly to converter_config_registry
 
                     # The mock_docker_operations mocks list_models via the model_filter probably?
