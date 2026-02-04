@@ -33,7 +33,7 @@ def serve(
     Args:
         model: Model name
         port: VLLM server port (default: 8056)
-        gpus: Comma-separated GPU device IDs (e.g., "0" or "0,1,2"). If not specified, all GPUs will be used.
+        gpus: Comma-separated GPU device IDs (e.g., "0" or "0,1,2"). If not specified, GPU 0 will be used.
         vllm_args: Additional keyword arguments to pass to the VLLM server.
         forget_predefined_vllm_args: If True, the predefined VLLM kwargs from the docker config will be replaced by vllm_args otherwise the predefined kwargs will be updated with vllm_args with a risk of collision of argument names.
     """
@@ -72,7 +72,7 @@ def convert(
     ),
     gpus: str | None = typer.Option(
         None,
-        help='Comma-separated GPU device IDs (e.g., "0" or "0,1,2"). If not specified, all GPUs will be used.',
+        help='Comma-separated GPU device IDs (e.g., "0" or "0,1,2"). If not specified, GPU 0 will be used.',
     ),
     mode: Literal["document", "md", "md_page"] = typer.Option(
         "document",
@@ -147,49 +147,77 @@ def containers():
     """List all containers whose name begins with vlmparse."""
     import docker
 
+    from vlmparse.servers.utils import _get_container_labels
+
     try:
         client = docker.from_env()
-        containers = client.containers.list()
+        all_containers = client.containers.list(all=True)
 
-        if not containers:
-            logger.info("No running containers found")
+        if not all_containers:
+            logger.info("No containers found")
             return
 
-        # Filter for containers whose name begins with "vlmparse"
-        vlmparse_containers = [
-            container
-            for container in containers
-            if container.name.startswith("vlmparse")
-        ]
+        # Group containers by compose project or as standalone
+        projects = {}  # project_name -> list of containers
 
-        if not vlmparse_containers:
+        for container in all_containers:
+            labels = _get_container_labels(container)
+            project = labels.get("com.docker.compose.project") or labels.get(
+                "vlmparse_compose_project"
+            )
+
+            # Include if name starts with vlmparse OR if it's in a vlmparse compose project
+            if container.name.startswith("vlmparse"):
+                if project:
+                    projects.setdefault(project, []).append(container)
+                else:
+                    projects[container.name] = [container]
+            elif project and project.startswith("vlmparse"):
+                projects.setdefault(project, []).append(container)
+
+        if not projects:
             logger.info("No vlmparse containers found")
             return
 
-        # Prepare table data
+        # Prepare table data - one row per project/standalone container
         table_data = []
-        for container in vlmparse_containers:
-            # Extract port mappings
+        for project_name, project_containers in projects.items():
+            # Find the main container with vlmparse labels
+            main_container = project_containers[0]
+            for c in project_containers:
+                labels = _get_container_labels(c)
+                if labels.get("vlmparse_uri"):
+                    main_container = c
+                    break
+
+            labels = _get_container_labels(main_container)
+
+            # Extract port mappings from all containers in the project
             ports = []
-            if container.ports:
-                for _, host_bindings in container.ports.items():
-                    if host_bindings:
-                        for binding in host_bindings:
-                            ports.append(f"{binding['HostPort']}")
+            for container in project_containers:
+                if container.ports:
+                    for _, host_bindings in container.ports.items():
+                        if host_bindings:
+                            for binding in host_bindings:
+                                ports.append(f"{binding['HostPort']}")
 
-            port_str = ", ".join(set(ports)) if ports else "N/A"
-            uri = container.labels.get("vlmparse_uri", "N/A")
-            gpu = container.labels.get("vlmparse_gpus", "N/A")
+            port_str = ", ".join(sorted(set(ports))) if ports else "N/A"
+            uri = labels.get("vlmparse_uri", "N/A")
+            gpu = labels.get("vlmparse_gpus", "N/A")
 
-            table_data.append(
-                [
-                    container.name,
-                    container.status,
-                    port_str,
-                    gpu,
-                    uri,
-                ]
+            # Get all statuses
+            statuses = list(set(c.status for c in project_containers))
+            status_str = (
+                statuses[0] if len(statuses) == 1 else f"mixed ({', '.join(statuses)})"
             )
+
+            # Name: show project name if compose, otherwise container name
+            is_compose = labels.get("com.docker.compose.project") or labels.get(
+                "vlmparse_compose_project"
+            )
+            name = project_name if is_compose else main_container.name
+
+            table_data.append([name, status_str, port_str, gpu, uri])
 
         # Display as table
         from tabulate import tabulate
@@ -197,7 +225,10 @@ def containers():
         headers = ["Name", "Status", "Port(s)", "GPU", "URI"]
         table = tabulate(table_data, headers=headers, tablefmt="grid")
 
-        logger.info(f"\nFound {len(vlmparse_containers)} vlmparse container(s):\n")
+        total = sum(len(containers) for containers in projects.values())
+        logger.info(
+            f"\nFound {len(projects)} vlmparse deployment(s) ({total} container(s)):\n"
+        )
         print(table)
 
     except docker.errors.DockerException as e:
@@ -228,24 +259,48 @@ def stop(
 
         # If no container specified, try to auto-select
         if container is None:
-            containers = client.containers.list()
-            vlmparse_containers = [
-                c for c in containers if c.name.startswith("vlmparse")
-            ]
+            from vlmparse.servers.utils import _get_container_labels
 
-            if len(vlmparse_containers) == 0:
+            all_containers = client.containers.list()
+
+            # Group containers by compose project or as standalone
+            projects = {}  # project_name -> list of containers
+            for c in all_containers:
+                labels = _get_container_labels(c)
+                project = labels.get("com.docker.compose.project") or labels.get(
+                    "vlmparse_compose_project"
+                )
+
+                # Include if name starts with vlmparse OR if it's in a vlmparse compose project
+                if c.name.startswith("vlmparse"):
+                    if project:
+                        projects.setdefault(project, []).append(c)
+                    else:
+                        projects[c.name] = [c]
+                elif project and project.startswith("vlmparse"):
+                    projects.setdefault(project, []).append(c)
+
+            if len(projects) == 0:
                 logger.error("No vlmparse containers found")
                 return
-            elif len(vlmparse_containers) > 1:
+            elif len(projects) > 1:
                 logger.error(
-                    f"Multiple vlmparse containers found ({len(vlmparse_containers)}). "
+                    f"Multiple vlmparse deployments found ({len(projects)}). "
                     "Please specify a container ID or name:"
                 )
-                for c in vlmparse_containers:
-                    logger.info(f"  - {c.name} ({c.short_id})")
+                for project_name, containers in projects.items():
+                    if len(containers) > 1:
+                        logger.info(
+                            f"  - {project_name} ({len(containers)} containers)"
+                        )
+                    else:
+                        logger.info(
+                            f"  - {containers[0].name} ({containers[0].short_id})"
+                        )
                 return
             else:
-                target_container = vlmparse_containers[0]
+                # Only one project/deployment, pick any container from it
+                target_container = list(projects.values())[0][0]
         else:
             # Try to get the specified container
             try:
@@ -281,7 +336,7 @@ def stop(
 
 @app.command("log")
 def log(
-    container: str | None = typer.Option(
+    container: str | None = typer.Argument(
         None, help="Container ID or name. If not specified, auto-selects."
     ),
     follow: bool = typer.Option(True, help="Follow log output"),
@@ -301,10 +356,22 @@ def log(
 
         # If no container specified, try to auto-select
         if container is None:
-            containers = client.containers.list()
-            vlmparse_containers = [
-                c for c in containers if c.name.startswith("vlmparse")
-            ]
+            from vlmparse.servers.utils import _get_container_labels
+
+            all_containers = client.containers.list()
+            vlmparse_containers = []
+
+            for c in all_containers:
+                labels = _get_container_labels(c)
+                project = labels.get("com.docker.compose.project") or labels.get(
+                    "vlmparse_compose_project"
+                )
+
+                # Include if name starts with vlmparse OR if it's in a vlmparse compose project
+                if c.name.startswith("vlmparse") or (
+                    project and project.startswith("vlmparse")
+                ):
+                    vlmparse_containers.append(c)
 
             if len(vlmparse_containers) == 0:
                 logger.error("No vlmparse containers found")
