@@ -61,6 +61,7 @@ def test_convert_mistral_ocr(file_path, model, tmp_output_dir):
         "lightonocr2",
         "deepseekocr2",
         "paddleocrvl1.5",
+        "glmocr",
     ],
 )
 def test_converter_with_server_with_docker(file_path, model, tmp_output_dir):

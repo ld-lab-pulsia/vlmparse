@@ -1,0 +1,71 @@
+
+services:
+  glmocr-vllm-server:
+    image: vllm/vllm-openai:nightly
+    container_name: vlmparse-glmocr-vllm-server
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        apt-get update && apt-get install -y git curl &&
+        pip install --no-cache-dir git+https://github.com/huggingface/transformers.git &&
+        vllm serve zai-org/GLM-OCR --allowed-local-media-path / --port 8080 --speculative-config '{"method": "mtp", "num_speculative_tokens": 1}'
+    ports:
+      - "${VLM_PORT:-8080}:8080"
+    volumes:
+      - ${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+      - HF_HOME=/root/.cache/huggingface
+    shm_size: '16gb'
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 30
+      start_period: 500s
+
+  glmocr-api:
+    image: python:3.10-slim${API_IMAGE_TAG_SUFFIX:-}
+    container_name: vlmparse-glmocr-api
+    working_dir: /app
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        apt-get update && apt-get install -y git ffmpeg libsm6 libxext6   &&
+        echo '=== Cloning GLM-OCR repository ===' &&
+        cd /app &&
+        rm -rf GLM-OCR &&
+        git clone https://github.com/zai-org/GLM-OCR.git &&
+        cd GLM-OCR &&
+        echo '=== Installing in editable mode ===' &&
+        pip install --no-cache-dir -e .[layout] &&
+        echo '=== Installing transformers ===' &&
+        pip install --no-cache-dir git+https://github.com/huggingface/transformers.git &&
+        echo '=== Verifying installation ===' &&
+        python -c "import glmocr.pipeline; print('✓ glmocr.pipeline imported successfully')" &&
+        echo '=== Copying config file ===' &&
+        cp /app/config.yaml /app/GLM-OCR/glmocr/config.yaml &&
+        echo '=== Starting server ===' &&
+        python -m glmocr.server --log-level ${LOG_LEVEL:-INFO}
+    ports:
+      - "${API_PORT:-5002}:5002"
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      glmocr-vllm-server:
+        condition: service_healthy
+    stop_grace_period: 30s
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+
+networks:
+  default:
+    name: glmocr-network

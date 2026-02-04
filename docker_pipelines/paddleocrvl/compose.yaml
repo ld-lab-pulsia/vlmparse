@@ -25,7 +25,7 @@ services:
 
   paddleocr-vlm-server:
     image: ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddleocr-genai-${VLM_BACKEND}-server:${VLM_IMAGE_TAG_SUFFIX}
-    container_name: paddleocr-vlm-server
+    container_name: vlmparse-paddleocr-vlm-server
     deploy:
       resources:
         reservations:

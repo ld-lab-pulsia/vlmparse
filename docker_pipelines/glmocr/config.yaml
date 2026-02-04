@@ -1,0 +1,40 @@
+# GLM-OCR Configuration for Docker deployment
+
+# Server (for glmocr.server)
+server:
+  host: "0.0.0.0"
+  port: 5002
+  debug: false
+
+# Logging
+logging:
+  level: INFO  # DEBUG enables profiling
+
+# Pipeline
+pipeline:
+  # OCR API connection (vLLM server)
+  ocr_api:
+    api_host: glmocr-vllm-server
+    api_port: 8080
+    api_key: null
+    connect_timeout: 300
+    request_timeout: 300
+
+  # Page loader settings
+  page_loader:
+    max_tokens: 16384
+    temperature: 0.01
+    image_format: JPEG
+    min_pixels: 12544
+    max_pixels: 71372800
+
+  # Result formatting
+  result_formatter:
+    output_format: both  # json, markdown, or both
+
+  # Layout detection (optional)
+  enable_layout: false
+  
+  # MaaS API (disabled for self-hosted)
+  maas:
+    enabled: false
