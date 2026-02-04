@@ -7,9 +7,13 @@ import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import docker
 from loguru import logger
+
+if TYPE_CHECKING:
+    from .base_server import BaseServerConfig
 
 
 def _sanitize_compose_project_name(name: str, fallback: str = "vlmparse") -> str:
@@ -29,7 +33,7 @@ def _sanitize_compose_project_name(name: str, fallback: str = "vlmparse") -> str
     return sanitized or fallback
 
 
-def _build_compose_override_yaml(config: "DockerComposeServerConfig") -> str | None:  # noqa: F821
+def _build_compose_override_yaml(config: "BaseServerConfig") -> str | None:
     services_overrides: dict[str, dict] = {}
 
     service_names = config.compose_services or [config.server_service]
@@ -37,7 +41,7 @@ def _build_compose_override_yaml(config: "DockerComposeServerConfig") -> str | N
     # Labels for model/uri inference (match docker_server behavior)
     uri = f"http://localhost:{config.docker_port}{config.get_base_url_suffix()}"
     if config.gpu_device_ids is None:
-        gpu_label = "all"
+        gpu_label = "0"
     elif len(config.gpu_device_ids) == 0 or (
         len(config.gpu_device_ids) == 1 and config.gpu_device_ids[0] == ""
     ):
@@ -267,7 +271,7 @@ def _stop_compose_logs_stream(
 
 @contextmanager
 def docker_compose_server(
-    config: "DockerComposeServerConfig",  # noqa: F821
+    config: "BaseServerConfig",
     timeout: int = 1000,
     cleanup: bool = True,
 ):

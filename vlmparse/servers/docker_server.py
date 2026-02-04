@@ -1,50 +1,27 @@
 import os
 
-from loguru import logger
 from pydantic import Field
 
+from .base_server import BaseServer, BaseServerConfig
 from .docker_run_deployment import docker_server
-from .model_identity import ModelIdentityMixin
 
 
-class DockerServerConfig(ModelIdentityMixin):
-    """Base configuration for deploying a Docker server.
+class DockerServerConfig(BaseServerConfig):
+    """Configuration for deploying a Docker server.
 
-    Inherits from ModelIdentityMixin which provides:
-    - model_name: str
-    - default_model_name: str | None
-    - aliases: list[str]
-    - _create_client_kwargs(base_url): Helper for creating client configs
-    - get_all_names(): All names this model can be referenced by
+    Inherits from BaseServerConfig which provides common server configuration.
     """
 
     docker_image: str
     dockerfile_dir: str | None = None
     command_args: list[str] = Field(default_factory=list)
-    server_ready_indicators: list[str] = Field(
-        default_factory=lambda: [
-            "Application startup complete",
-            "Uvicorn running",
-            "Starting vLLM API server",
-        ]
-    )
-    docker_port: int = 8056
-    gpu_device_ids: list[str] | None = None
-    container_port: int = 8000
-    environment: dict[str, str] = Field(default_factory=dict)
     volumes: dict[str, dict] | None = None
     entrypoint: str | None = None
-
-    class Config:
-        extra = "allow"
 
     @property
     def client_config(self):
         """Override in subclasses to return appropriate client config."""
         raise NotImplementedError
-
-    def get_client(self, **kwargs):
-        return self.client_config.get_client(**kwargs)
 
     def get_server(self, auto_stop: bool = True):
         return ConverterServer(config=self, auto_stop=auto_stop)
@@ -69,14 +46,6 @@ class DockerServerConfig(ModelIdentityMixin):
     def get_volumes(self) -> dict | None:
         """Setup volumes for container. Override in subclasses for specific logic."""
         return self.volumes
-
-    def get_environment(self) -> dict | None:
-        """Setup environment variables. Override in subclasses for specific logic."""
-        return self.environment if self.environment else None
-
-    def get_base_url_suffix(self) -> str:
-        """Return URL suffix (e.g., '/v1' for OpenAI-compatible APIs). Override in subclasses."""
-        return ""
 
 
 DEFAULT_MODEL_NAME = "vllm-model"
@@ -143,52 +112,9 @@ class VLLMDockerServerConfig(DockerServerConfig):
         return "/v1"
 
 
-class ConverterServer:
+class ConverterServer(BaseServer):
     """Manages Docker server lifecycle with start/stop methods."""
 
-    def __init__(self, config: DockerServerConfig, auto_stop: bool = True):
-        self.config = config
-        self.auto_stop = auto_stop
-        self._server_context = None
-        self._container = None
-        self.base_url = None
-
-    def start(self):
-        """Start the Docker server."""
-        if self._server_context is not None:
-            logger.warning("Server already started")
-            return self.base_url, self._container
-
-        # Use the generic docker_server for all server types
-        self._server_context = docker_server(config=self.config, cleanup=self.auto_stop)
-
-        self.base_url, self._container = self._server_context.__enter__()
-        logger.info(f"Server started at {self.base_url}")
-        logger.info(f"Container ID: {self._container.id}")
-        logger.info(f"Container name: {self._container.name}")
-        return self.base_url, self._container
-
-    def stop(self):
-        """Stop the Docker server."""
-        if self._server_context is not None:
-            try:
-                self._server_context.__exit__(None, None, None)
-            except Exception as e:
-                logger.warning(f"Error during server cleanup: {e}")
-            finally:
-                self._server_context = None
-                self._container = None
-                self.base_url = None
-            logger.info("Server stopped")
-
-    def __del__(self):
-        """Automatically stop server when object is destroyed if auto_stop is True.
-
-        Note: This is a fallback mechanism. Prefer using the context manager
-        or explicitly calling stop() for reliable cleanup.
-        """
-        try:
-            if self.auto_stop and self._server_context is not None:
-                self.stop()
-        except Exception:
-            pass  # Suppress errors during garbage collection
+    def _create_server_context(self):
+        """Create the Docker server context."""
+        return docker_server(config=self.config, cleanup=self.auto_stop)

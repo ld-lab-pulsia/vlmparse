@@ -2,9 +2,13 @@ import getpass
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import docker
 from loguru import logger
+
+if TYPE_CHECKING:
+    from .base_server import BaseServerConfig
 
 
 def _ensure_image_exists(
@@ -55,14 +59,14 @@ def _ensure_image_exists(
 
 @contextmanager
 def docker_server(
-    config: "DockerServerConfig",  # noqa: F821
+    config: "BaseServerConfig",
     timeout: int = 1000,
     cleanup: bool = True,
 ):
     """Generic context manager for Docker server deployment.
 
     Args:
-        config: DockerServerConfig (can be VLLMDockerServerConfig or GenericDockerServerConfig)
+        config: BaseServerConfig (can be any subclass like DockerServerConfig or VLLMDockerServerConfig)
         timeout: Timeout in seconds to wait for server to be ready
         cleanup: If True, stop and remove container on exit. If False, leave container running
 
@@ -128,7 +132,7 @@ def docker_server(
 
         # Determine GPU label
         if config.gpu_device_ids is None:
-            gpu_label = "all"
+            gpu_label = "0"
         elif len(config.gpu_device_ids) == 0 or (
             len(config.gpu_device_ids) == 1 and config.gpu_device_ids[0] == ""
         ):

@@ -1,11 +1,7 @@
 from typing import Callable
 
-from vlmparse.servers.docker_compose_server import DockerComposeServerConfig
-from vlmparse.servers.docker_server import (
-    DEFAULT_MODEL_NAME,
-    DockerServerConfig,
-    VLLMDockerServerConfig,
-)
+from vlmparse.servers.base_server import BaseServerConfig
+from vlmparse.servers.docker_server import DEFAULT_MODEL_NAME, VLLMDockerServerConfig
 
 
 class DockerConfigRegistry:
@@ -17,25 +13,19 @@ class DockerConfigRegistry:
     def __init__(self):
         import threading
 
-        self._registry: dict[
-            str, Callable[[], DockerServerConfig | DockerComposeServerConfig | None]
-        ] = {}
+        self._registry: dict[str, Callable[[], BaseServerConfig | None]] = {}
         self._lock = threading.RLock()
 
     def register(
         self,
         model_name: str,
-        config_factory: Callable[
-            [], DockerServerConfig | DockerComposeServerConfig | None
-        ],
+        config_factory: Callable[[], BaseServerConfig | None],
     ):
         """Register a config factory for a model name (thread-safe)."""
         with self._lock:
             self._registry[model_name] = config_factory
 
-    def get(
-        self, model_name: str, default=False
-    ) -> DockerServerConfig | DockerComposeServerConfig | None:
+    def get(self, model_name: str, default=False) -> BaseServerConfig | None:
         """Get config for a model name (thread-safe). Returns default if not registered."""
         with self._lock:
             if model_name not in self._registry:
