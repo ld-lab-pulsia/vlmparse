@@ -1,7 +1,6 @@
 from typing import Callable
 
 from vlmparse.servers.base_server import BaseServerConfig
-from vlmparse.servers.docker_server import DEFAULT_MODEL_NAME, VLLMDockerServerConfig
 
 
 class DockerConfigRegistry:
@@ -25,14 +24,10 @@ class DockerConfigRegistry:
         with self._lock:
             self._registry[model_name] = config_factory
 
-    def get(self, model_name: str, default=False) -> BaseServerConfig | None:
-        """Get config for a model name (thread-safe). Returns default if not registered."""
+    def get(self, model_name: str) -> BaseServerConfig | None:
+        """Get config for a model name (thread-safe). Returns None if not registered."""
         with self._lock:
             if model_name not in self._registry:
-                if default:
-                    return VLLMDockerServerConfig(
-                        model_name=model_name, default_model_name=DEFAULT_MODEL_NAME
-                    )
                 return None
             factory = self._registry[model_name]
         return factory()

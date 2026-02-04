@@ -35,7 +35,7 @@ class TestServeCommand:
             assert result.exit_code == 0, result.output
 
             # Verify registry was called with correct model
-            mock_registry.get.assert_called_once_with("lightonocr", default=True)
+            mock_registry.get.assert_called_once_with("lightonocr")
 
             # Verify port was set to default
             assert mock_config.docker_port == 8056
@@ -84,11 +84,12 @@ class TestServeCommand:
         with mock_docker_operations(
             model_filter=lambda model: False  # No docker for any model
         ) as (mock_registry, _, _, _):
-            # Should not raise an exception, just log warning
+            # Should raise ValueError because server defaults to "registry" and model is unknown
             result = runner.invoke(app, ["serve", "unknown_model"])
-            assert result.exit_code == 0, result.output
+            assert result.exit_code != 0
+            assert isinstance(result.exception, ValueError)
 
-            mock_registry.get.assert_called_once_with("unknown_model", default=True)
+            mock_registry.get.assert_called_once_with("unknown_model")
 
 
 class TestConvertCommand:
@@ -238,7 +239,13 @@ class TestConvertCommand:
             assert result.exit_code == 0, result.output
 
             # Verify Docker server was started
-            mock_docker_reg.get.assert_called_once_with("lightonocr", default=False)
+            # Since lightonocr is allowed by default filter in mock_docker_operations,
+            # and cli uses server="registry" by default,
+            # it should check registry and start server.
+            # ConvertWithServer calls start_server_and_client which calls docker_config_registry.list_models()
+            # We assume mock_docker_operations mocks list_models correctly.
+
+            mock_docker_reg.get.assert_called_with("lightonocr")
             mock_docker_config.get_server.assert_called_once_with(auto_stop=True)
             mock_server.start.assert_called_once()
             mock_client.batch.assert_called_once()

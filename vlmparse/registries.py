@@ -112,17 +112,19 @@ class ConverterConfigRegistry:
             for name in names:
                 self._registry[name] = factory
 
-    def get(self, model_name: str, uri: str | None = None) -> ConverterConfig:
-        """Get config for a model name (thread-safe). Returns default if not registered."""
+    def get(
+        self,
+        model_name: str,
+        uri: str | None = None,
+    ) -> ConverterConfig:
+        """Get config for a model name (thread-safe). Raises ValueError if not registered."""
         with self._lock:
             factory = self._registry.get(model_name)
 
         if factory is not None:
             return factory(uri)
-        # Fallback to OpenAIConverterConfig for unregistered models
-        if uri is not None:
-            return OpenAIConverterConfig(base_url=uri)
-        return OpenAIConverterConfig(model_name=model_name)
+
+        raise ValueError(f"Model '{model_name}' not found in registry.")
 
     def list_models(self) -> list[str]:
         """List all registered model names (thread-safe)."""
