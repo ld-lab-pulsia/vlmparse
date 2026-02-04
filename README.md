@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[\[📜 arXiv coming soon\]] | [[Dataset (🤗Hugging Face)]](https://huggingface.co/datasets/pulsia/fr-bench-pdf2md) | [[pypi]](https://pypi.org/project/vlmparse/) | [[vlmparse]](https://github.com/ld-lab-pulsia/vlmparse) | [[Benchmark]](https://github.com/ld-lab-pulsia/benchpdf2md)
+[\[📜 arXiv coming soon\]] | [[Dataset (🤗Hugging Face)]](https://huggingface.co/datasets/pulsia/fr-bench-pdf2md) | [[pypi]](https://pypi.org/project/vlmparse/) | [[vlmparse]](https://github.com/ld-lab-pulsia/vlmparse) | [[Benchmark]](https://github.com/ld-lab-pulsia/benchpdf2md) | [[Leaderboard]](https://huggingface.co/spaces/pulsia/fr-bench-pdf2md)
 
 </div>
 
@@ -17,7 +17,7 @@ Features:
 
 Supported Converters:
 
-- **Open Source Small VLMs**: `lightonocr`, `mineru2.5`, `hunyuanocr`, `paddleocrvl`, `granite-docling`, `olmocr2-fp8`, `dotsocr`, `chandra`, `deepseekocr`, `nanonets/Nanonets-OCR2-3B`
+- **Open Source Small VLMs**: `lightonocr2`, `mineru2.5`, `hunyuanocr`, `paddleocrvl-1.5`, `granite-docling`, `olmocr2-fp8`, `dotsocr`, `chandra`, `deepseekocr2`, `nanonets/Nanonets-OCR2-3B`
 - **Open Source Generalist VLMs**: such as the Qwen family.
 - **Pipelines**: `docling`
 - **Proprietary LLMs**: `gemini`, `gpt`
@@ -61,13 +61,13 @@ Note that you can bypass the previous installation step and just add uvx before 
 With a general VLM (requires setting your api key as an environment variable):
 
 ```bash
-vlmparse convert --input "*.pdf" --out_folder ./output --model gemini-2.5-flash-lite
+vlmparse convert "*.pdf" --out_folder ./output --model gemini-2.5-flash-lite
 ```
 
 Convert with auto deployment of a small vlm (or any huggingface VLM model, requires a gpu + docker installation):
 
 ```bash
-vlmparse convert --input "*.pdf" --out_folder ./output --model nanonets/Nanonets-OCR2-3B
+vlmparse convert "*.pdf" --out_folder ./output --model nanonets/Nanonets-OCR2-3B
 ```
 
 ### Deploy a local model server
@@ -77,7 +77,7 @@ Deployment (requires a gpu + docker installation):
 - Check that the port is not used by another service.
 
 ```bash
-vlmparse serve --model lightonocr2 --port 8000 --gpus 1
+vlmparse serve lightonocr2 --port 8000 --gpus 1
 ```
 
 then convert:

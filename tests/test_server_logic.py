@@ -58,7 +58,7 @@ def test_start_server_registry_success(mock_vllm_config, mock_registry):
     )
     mock_registry.get.return_value = mock_config
 
-    start_server("test_model", gpus="0", server="registry")
+    start_server("test_model", gpus="0", provider="registry")
 
     # Check calling with proper model name
     mock_registry.get.assert_called_with("test_model")
@@ -70,7 +70,7 @@ def test_start_server_registry_not_found(mock_registry):
     mock_registry.get.return_value = None
 
     with pytest.raises(ValueError, match="Model 'unknown_model' not found in registry"):
-        start_server("unknown_model", gpus="0", server="registry")
+        start_server("unknown_model", gpus="0", provider="registry")
 
 
 @patch("vlmparse.registries.docker_config_registry")
@@ -85,7 +85,7 @@ def test_start_server_hf_fallback(mock_vllm_config, mock_registry):
     mock_docker_config_instance.get_server.return_value = mock_server_instance
     mock_vllm_config.return_value = mock_docker_config_instance
 
-    _, _, _, config = start_server("hf_model", gpus="0", server="hf")
+    _, _, _, config = start_server("hf_model", gpus="0", provider="hf")
 
     # Check that we tried to get from registry first (which returned None)
     mock_registry.get.assert_called_with("hf_model")
@@ -109,9 +109,9 @@ def test_converter_registry_unregistered(
     mock_docker_reg.list_models.return_value = []
     mock_converter_reg.get.side_effect = ValueError("Not found")
 
-    # Case: server="registry", uri provided (remote)
+    # Case: provider="registry", uri provided (remote)
     converter = ConverterWithServer(
-        model="unknown", uri="http://foo", server="registry"
+        model="unknown", uri="http://foo", provider="registry"
     )
 
     with pytest.raises(ValueError, match="Not found"):
@@ -127,8 +127,8 @@ def test_converter_hf_unregistered(mock_docker_reg, mock_converter_reg, mock_sta
     # Setup: Not in docker registry
     mock_docker_reg.list_models.return_value = []
 
-    # Case: server="hf", uri provided (remote) -> Should use OpenAIConverterConfig generic
-    converter = ConverterWithServer(model="unknown", uri="http://foo", server="hf")
+    # Case: provider="hf", uri provided (remote) -> Should use OpenAIConverterConfig generic
+    converter = ConverterWithServer(model="unknown", uri="http://foo", provider="hf")
 
     converter.start_server_and_client()
 
@@ -141,12 +141,12 @@ def test_converter_hf_unregistered(mock_docker_reg, mock_converter_reg, mock_sta
 @patch("vlmparse.registries.converter_config_registry")
 @patch("vlmparse.registries.docker_config_registry")
 def test_converter_with_local_start(mock_docker_reg, mock_converter_reg, mock_start):
-    # Setup: server="hf" means force start local
+    # Setup: provider="hf" means force start local
     mock_docker_reg.list_models.return_value = []
     mock_docker_config = MagicMock()
     mock_start.return_value = ("url", "container", "server", mock_docker_config)
 
-    converter = ConverterWithServer(model="unknown", server="hf")
+    converter = ConverterWithServer(model="unknown", provider="hf")
     converter.start_server_and_client()
 
     mock_start.assert_called()

@@ -14,7 +14,7 @@ def start_server(
     model: str,
     gpus: str,
     port: None | int = None,
-    server: Literal["registry", "hf"] = "registry",
+    provider: Literal["registry", "hf"] = "registry",
     vllm_args: list[str] = {},
     forget_predefined_vllm_args: bool = False,
     auto_stop: bool = False,
@@ -33,12 +33,12 @@ def start_server(
         port = DEFAULT_SERVER_PORT
 
     if docker_config is None:
-        if server == "registry":
+        if provider == "registry":
             print(f"DEBUG: Registry lookup failed for {model} (strict mode)")
             raise ValueError(
-                f"Model '{model}' not found in registry and server='registry'. Use server='hf' to serve arbitrary HuggingFace models."
+                f"Model '{model}' not found in registry and provider='registry'. Use provider='hf' to serve arbitrary HuggingFace models."
             )
-        elif server == "hf":
+        elif provider == "hf":
             docker_config = VLLMDockerServerConfig(
                 model_name=model, default_model_name=DEFAULT_MODEL_NAME
             )
@@ -65,14 +65,14 @@ def start_server(
         logger.info(
             f"Deploying server for {docker_config.model_name} on port {port}..."
         )
-        server = docker_config.get_server(auto_stop=auto_stop)
-        if server is None:
+        provider = docker_config.get_server(auto_stop=auto_stop)
+        if provider is None:
             logger.error(f"Model server not found for model: {model}")
             return "", container, None, docker_config
 
-        base_url, container = server.start()
+        base_url, container = provider.start()
 
-    return base_url, container, server, docker_config
+    return base_url, container, provider, docker_config
 
 
 class ConverterWithServer:
@@ -82,7 +82,7 @@ class ConverterWithServer:
         uri: str | None = None,
         gpus: str | None = None,
         port: int | None = None,
-        server: Literal["registry", "hf", "google", "openai"] = "registry",
+        provider: Literal["registry", "hf", "google", "openai"] = "registry",
         concurrency: int = 10,
         vllm_args: dict | None = None,
         forget_predefined_vllm_args: bool = False,
@@ -98,7 +98,7 @@ class ConverterWithServer:
         self.uri = uri
         self.port = port
         self.gpus = gpus
-        self.server_type = server
+        self.provider = provider
         self.concurrency = concurrency
         self.vllm_args = vllm_args
         self.forget_predefined_vllm_args = forget_predefined_vllm_args
@@ -118,19 +118,19 @@ class ConverterWithServer:
 
         start_local_server = False
         if self.uri is None:
-            if self.server_type == "hf":
+            if self.provider == "hf":
                 start_local_server = True
-            elif self.server_type == "registry":
+            elif self.provider == "registry":
                 if self.model in docker_config_registry.list_models():
                     start_local_server = True
 
         if start_local_server:
-            server_arg = "hf" if self.server_type == "hf" else "registry"
+            server_arg = "hf" if self.provider == "hf" else "registry"
             _, _, self.server, docker_config = start_server(
                 model=self.model,
                 gpus=self.gpus,
                 port=self.port,
-                server=server_arg,
+                provider=server_arg,
                 vllm_args=self.vllm_args,
                 forget_predefined_vllm_args=self.forget_predefined_vllm_args,
                 auto_stop=True,
@@ -146,7 +146,7 @@ class ConverterWithServer:
                     return_documents_in_batch_mode=self.return_documents
                 )
 
-        elif self.server_type == "hf":
+        elif self.provider == "hf":
             client_config = OpenAIConverterConfig(
                 model_name=self.model, base_url=self.uri
             )

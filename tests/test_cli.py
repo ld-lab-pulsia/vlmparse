@@ -240,7 +240,7 @@ class TestConvertCommand:
 
             # Verify Docker server was started
             # Since lightonocr is allowed by default filter in mock_docker_operations,
-            # and cli uses server="registry" by default,
+            # and cli uses provider="registry" by default,
             # it should check registry and start server.
             # ConvertWithServer calls start_server_and_client which calls docker_config_registry.list_models()
             # We assume mock_docker_operations mocks list_models correctly.

@@ -80,7 +80,7 @@ def test_converter_with_server_with_docker(file_path, model, tmp_output_dir):
         model=model,
         uri=None,
         gpus=os.environ["GPU_TEST_VLMPARSE"],
-        server="registry",
+        provider="registry" if model != "Qwen/Qwen3-VL-8B-Instruct" else "hf",
         concurrency=10,
         port=8173,
     ) as converter_with_server:
