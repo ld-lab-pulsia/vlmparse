@@ -14,25 +14,39 @@ def start_server(
     model: str,
     gpus: str,
     port: None | int = None,
-    with_vllm_server: bool = True,
+    server: Literal["registry", "hf"] = "registry",
     vllm_args: list[str] = {},
     forget_predefined_vllm_args: bool = False,
     auto_stop: bool = False,
 ):
     from vlmparse.registries import docker_config_registry
+    from vlmparse.servers.docker_server import (
+        DEFAULT_MODEL_NAME,
+        VLLMDockerServerConfig,
+    )
 
     base_url = ""
     container = None
-    docker_config = docker_config_registry.get(model, default=with_vllm_server)
+    docker_config = docker_config_registry.get(model)
 
     if port is None:
         port = DEFAULT_SERVER_PORT
 
     if docker_config is None:
-        logger.warning(
-            f"No Docker configuration found for model: {model}, using default configuration"
-        )
-        return "", container, None, docker_config
+        if server == "registry":
+            print(f"DEBUG: Registry lookup failed for {model} (strict mode)")
+            raise ValueError(
+                f"Model '{model}' not found in registry and server='registry'. Use server='hf' to serve arbitrary HuggingFace models."
+            )
+        elif server == "hf":
+            docker_config = VLLMDockerServerConfig(
+                model_name=model, default_model_name=DEFAULT_MODEL_NAME
+            )
+        else:
+            logger.warning(
+                f"No Docker configuration found for model: {model} and server type is undetermined."
+            )
+            return "", container, None, docker_config
 
     gpu_device_ids = None
     if gpus is not None:
@@ -42,13 +56,14 @@ def start_server(
         if port is not None:
             docker_config.docker_port = port
         docker_config.gpu_device_ids = gpu_device_ids
-        docker_config.update_command_args(
-            vllm_args,
-            forget_predefined_vllm_args=forget_predefined_vllm_args,
-        )
+        if hasattr(docker_config, "update_command_args"):
+            docker_config.update_command_args(
+                vllm_args,
+                forget_predefined_vllm_args=forget_predefined_vllm_args,
+            )
 
         logger.info(
-            f"Deploying VLLM server for {docker_config.model_name} on port {port}..."
+            f"Deploying server for {docker_config.model_name} on port {port}..."
         )
         server = docker_config.get_server(auto_stop=auto_stop)
         if server is None:
@@ -67,7 +82,7 @@ class ConverterWithServer:
         uri: str | None = None,
         gpus: str | None = None,
         port: int | None = None,
-        with_vllm_server: bool = False,
+        server: Literal["registry", "hf", "google", "openai"] = "registry",
         concurrency: int = 10,
         vllm_args: dict | None = None,
         forget_predefined_vllm_args: bool = False,
@@ -83,7 +98,7 @@ class ConverterWithServer:
         self.uri = uri
         self.port = port
         self.gpus = gpus
-        self.with_vllm_server = with_vllm_server
+        self.server_type = server
         self.concurrency = concurrency
         self.vllm_args = vllm_args
         self.forget_predefined_vllm_args = forget_predefined_vllm_args
@@ -91,18 +106,31 @@ class ConverterWithServer:
         self.server = None
         self.client = None
 
-        if self.uri is not None:
+        if self.uri is not None and self.model is None:
             self.model = get_model_from_uri(self.uri)
 
     def start_server_and_client(self):
-        from vlmparse.registries import converter_config_registry
+        from vlmparse.clients.openai_converter import OpenAIConverterConfig
+        from vlmparse.registries import (
+            converter_config_registry,
+            docker_config_registry,
+        )
 
+        start_local_server = False
         if self.uri is None:
+            if self.server_type == "hf":
+                start_local_server = True
+            elif self.server_type == "registry":
+                if self.model in docker_config_registry.list_models():
+                    start_local_server = True
+
+        if start_local_server:
+            server_arg = "hf" if self.server_type == "hf" else "registry"
             _, _, self.server, docker_config = start_server(
                 model=self.model,
                 gpus=self.gpus,
                 port=self.port,
-                with_vllm_server=self.with_vllm_server,
+                server=server_arg,
                 vllm_args=self.vllm_args,
                 forget_predefined_vllm_args=self.forget_predefined_vllm_args,
                 auto_stop=True,
@@ -113,9 +141,18 @@ class ConverterWithServer:
                     return_documents_in_batch_mode=self.return_documents
                 )
             else:
+                # Should not happen if start_server works as expected
                 self.client = converter_config_registry.get(self.model).get_client(
                     return_documents_in_batch_mode=self.return_documents
                 )
+
+        elif self.server_type == "hf":
+            client_config = OpenAIConverterConfig(
+                model_name=self.model, base_url=self.uri
+            )
+            self.client = client_config.get_client(
+                return_documents_in_batch_mode=self.return_documents
+            )
 
         else:
             client_config = converter_config_registry.get(self.model, uri=self.uri)

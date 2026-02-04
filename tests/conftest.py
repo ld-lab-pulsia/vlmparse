@@ -235,6 +235,14 @@ def mock_docker_operations():
 
             mock_docker_registry.get.side_effect = get_docker_config
 
+            # Configure list_models to return the requested model if it passes the filter
+
+            test_models = ["lightonocr", "gemini-2.5-flash-lite", "dotsocr"]
+            if model_filter:
+                test_models = [m for m in test_models if model_filter(m)]
+
+            mock_docker_registry.list_models.return_value = test_models
+
             yield mock_docker_registry, mock_config, mock_server, mock_client
 
     return _create_mock

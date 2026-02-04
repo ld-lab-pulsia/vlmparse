@@ -13,6 +13,10 @@ from vlmparse.data_model.document import Item, Page
 from vlmparse.servers.docker_server import VLLMDockerServerConfig
 from vlmparse.utils import to_base64
 
+# ==============================================================================
+# DeepSeek-OCR (v1)
+# ==============================================================================
+
 
 class DeepSeekOCRDockerServerConfig(VLLMDockerServerConfig):
     """Configuration for DeepSeekOCR model."""
@@ -201,6 +205,172 @@ class DeepSeekOCRConverterClient(OpenAIConverterClient):
                     outputs.replace(a_match_other, "")
                     .replace("\\coloneqq", ":=")
                     .replace("\\eqqcolon", "=:")
+                )
+        else:
+            outputs = response
+
+        page.text = outputs.strip()
+        logger.debug(page.text)
+        if usage is not None:
+            page.prompt_tokens = usage.prompt_tokens
+            page.completion_tokens = usage.completion_tokens
+
+        return page
+
+
+# ==============================================================================
+# DeepSeek-OCR-2
+# ==============================================================================
+
+
+class DeepSeekOCR2DockerServerConfig(VLLMDockerServerConfig):
+    """Configuration for DeepSeek-OCR-2 model.
+
+    DeepSeek-OCR-2 uses a custom architecture that requires:
+    - Custom model registration via hf_overrides
+    - NoRepeatNGram logits processor with specific whitelist tokens
+    - Custom image processor (DeepseekOCR2Processor)
+    """
+
+    docker_image: str = "vllm/vllm-openai:nightly"
+    model_name: str = "deepseek-ai/DeepSeek-OCR-2"
+    command_args: list[str] = Field(
+        default_factory=lambda: [
+            "--limit-mm-per-prompt",
+            '{"image": 1}',
+            "--hf-overrides",
+            '{"architectures": ["DeepseekOCR2ForCausalLM"]}',
+            "--block-size",
+            "256",
+            "--trust-remote-code",
+            "--max-model-len",
+            "8192",
+            "--swap-space",
+            "0",
+            "--gpu-memory-utilization",
+            "0.9",
+            "--logits_processors",
+            "vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor",
+        ]
+    )
+    aliases: list[str] = Field(
+        default_factory=lambda: ["deepseekocr2", "DeepSeek-OCR-2"]
+    )
+
+    @property
+    def client_config(self):
+        return DeepSeekOCR2ConverterConfig(
+            **self._create_client_kwargs(
+                f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}"
+            )
+        )
+
+
+class DeepSeekOCR2ConverterConfig(OpenAIConverterConfig):
+    """DeepSeek-OCR-2 converter configuration.
+
+    Key differences from DeepSeek-OCR v1:
+    - Uses DeepseekOCR2ForCausalLM architecture
+    - Different logits processor parameters (ngram_size=20, window_size=50)
+    - Supports cropping mode for image processing
+    """
+
+    model_name: str = "deepseek-ai/DeepSeek-OCR-2"
+    aliases: list[str] = Field(
+        default_factory=lambda: ["deepseekocr2", "DeepSeek-OCR-2"]
+    )
+    postprompt: str | None = None
+    prompts: dict[str, str] = {
+        "layout": "<|grounding|>Convert the document to markdown.",
+        "ocr": "Free OCR.",
+        "image_description": "Describe this image in detail.",
+    }
+    prompt_mode_map: dict[str, str] = {
+        "ocr_layout": "layout",
+        "table": "layout",
+    }
+
+    completion_kwargs: dict | None = {
+        "temperature": 0.0,
+        "max_tokens": 8180,
+        "extra_body": {
+            "skip_special_tokens": False,
+            # args used to control custom logits processor
+            "vllm_xargs": {
+                "ngram_size": 20,
+                "window_size": 50,
+                # whitelist: <td>, </td>
+                "whitelist_token_ids": [128821, 128822],
+            },
+        },
+    }
+    dpi: int = 144  # Default DPI used in reference implementation
+
+    def get_client(self, **kwargs) -> "DeepSeekOCR2ConverterClient":
+        return DeepSeekOCR2ConverterClient(config=self, **kwargs)
+
+
+class DeepSeekOCR2ConverterClient(DeepSeekOCRConverterClient):
+    """Client for DeepSeek-OCR-2 with specific post-processing.
+
+    Inherits from DeepSeekOCRConverterClient as the post-processing logic
+    for parsing grounding references and extracting items is the same.
+    The main differences are in the model configuration and logits processor.
+    """
+
+    async def async_call_inside_page(self, page: Page) -> Page:
+        # Prepare messages as in parent class
+        image = page.image
+
+        prompt_key = self.get_prompt_key() or "ocr"
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{to_base64(image)}"
+                        },
+                    },
+                    {"type": "text", "text": self.config.prompts[prompt_key]},
+                ],
+            },
+        ]
+
+        # Get raw response using parent's method
+        response, usage = await self._get_chat_completion(messages)
+        logger.info("Response length: " + str(len(response)))
+        page.raw_response = response
+
+        if prompt_key == "layout":
+            # Post-processing
+            matches, matches_image, matches_other = re_match(response)
+
+            # Extract items (bounding boxes)
+            page.items = self.extract_items(page.image, matches)
+
+            # Clean text
+            outputs = response
+
+            # Check for sentence end marker (indicates successful completion)
+            # If not present, it might be due to repetition detection
+            if "<｜end▁of▁sentence｜>" in outputs:
+                outputs = outputs.replace("<｜end▁of▁sentence｜>", "")
+
+            # Replace image references with a placeholder
+            for a_match_image in matches_image:
+                outputs = outputs.replace(a_match_image, "![image]")
+
+            # Replace other references (text grounding) and cleanup
+            for a_match_other in matches_other:
+                outputs = (
+                    outputs.replace(a_match_other, "")
+                    .replace("\\coloneqq", ":=")
+                    .replace("\\eqqcolon", "=:")
+                    .replace("\n\n\n\n", "\n\n")
+                    .replace("\n\n\n", "\n\n")
                 )
         else:
             outputs = response

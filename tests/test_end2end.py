@@ -53,13 +53,15 @@ def test_convert_mistral_ocr(file_path, model, tmp_output_dir):
         "nanonets/Nanonets-OCR2-3B",
         "hunyuanocr",
         "olmocr-2-fp8",
-        "paddleocrvl",
         "mineru25",
         "chandra",
         "deepseekocr",
         "granite-docling",
         "Qwen/Qwen3-VL-8B-Instruct",
         "lightonocr2",
+        "deepseekocr2",
+        "paddleocrvl1.5",
+        "glmocr",
     ],
 )
 def test_converter_with_server_with_docker(file_path, model, tmp_output_dir):
@@ -78,7 +80,7 @@ def test_converter_with_server_with_docker(file_path, model, tmp_output_dir):
         model=model,
         uri=None,
         gpus=os.environ["GPU_TEST_VLMPARSE"],
-        with_vllm_server=True,
+        server="registry",
         concurrency=10,
         port=8173,
     ) as converter_with_server:

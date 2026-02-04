@@ -1,5 +1,8 @@
-"""
-Test CLI commands while mocking the server side.
+"""Test Typer CLI commands while mocking the server side.
+
+The CLI implementation moved from a Fire class-based interface to Typer.
+These tests invoke the Typer app through Click's test runner so that Typer
+options/arguments are parsed and default values are resolved.
 """
 
 import tempfile
@@ -7,15 +10,15 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from typer.testing import CliRunner
 
-from vlmparse.cli import DParseCLI
+from vlmparse.cli import app
 from vlmparse.data_model.document import Document, Page
 
 
 @pytest.fixture
-def cli():
-    """Create a CLI instance for testing."""
-    return DParseCLI()
+def runner() -> CliRunner:
+    return CliRunner()
 
 
 # Note: mock_docker_server and mock_converter_client fixtures are now replaced
@@ -25,13 +28,14 @@ def cli():
 class TestServeCommand:
     """Test the 'serve' command."""
 
-    def test_serve_default_port(self, cli, mock_docker_operations):
+    def test_serve_default_port(self, runner, mock_docker_operations):
         """Test serve command with default port."""
         with mock_docker_operations() as (mock_registry, mock_config, mock_server, _):
-            cli.serve(model="lightonocr")
+            result = runner.invoke(app, ["serve", "lightonocr"])
+            assert result.exit_code == 0, result.output
 
             # Verify registry was called with correct model
-            mock_registry.get.assert_called_once_with("lightonocr", default=True)
+            mock_registry.get.assert_called_once_with("lightonocr")
 
             # Verify port was set to default
             assert mock_config.docker_port == 8056
@@ -43,145 +47,174 @@ class TestServeCommand:
             mock_config.get_server.assert_called_once_with(auto_stop=False)
             mock_server.start.assert_called_once()
 
-    def test_serve_custom_port(self, cli, mock_docker_operations):
+    def test_serve_custom_port(self, runner, mock_docker_operations):
         """Test serve command with custom port."""
         with mock_docker_operations() as (mock_registry, mock_config, mock_server, _):
-            cli.serve(model="lightonocr", port=9000)
+            result = runner.invoke(app, ["serve", "lightonocr", "--port", "9000"])
+            assert result.exit_code == 0, result.output
 
             # Verify custom port was set
             assert mock_config.docker_port == 9000
             mock_server.start.assert_called_once()
 
-    def test_serve_with_gpus(self, cli, mock_docker_operations):
+    def test_serve_with_gpus(self, runner, mock_docker_operations):
         """Test serve command with GPU configuration."""
         with mock_docker_operations() as (mock_registry, mock_config, mock_server, _):
-            cli.serve(model="lightonocr", port=8056, gpus="0,1,2")
+            result = runner.invoke(
+                app,
+                ["serve", "lightonocr", "--port", "8056", "--gpus", "0,1,2"],
+            )
+            assert result.exit_code == 0, result.output
 
             # Verify GPU device IDs were parsed correctly
             assert mock_config.gpu_device_ids == ["0", "1", "2"]
             mock_server.start.assert_called_once()
 
-    def test_serve_single_gpu(self, cli, mock_docker_operations):
+    def test_serve_single_gpu(self, runner, mock_docker_operations):
         """Test serve command with single GPU."""
         with mock_docker_operations() as (mock_registry, mock_config, mock_server, _):
-            cli.serve(model="lightonocr", gpus="0")
+            result = runner.invoke(app, ["serve", "lightonocr", "--gpus", "0"])
+            assert result.exit_code == 0, result.output
 
             # Verify single GPU was parsed correctly
             assert mock_config.gpu_device_ids == ["0"]
 
-    def test_serve_unknown_model(self, cli, mock_docker_operations):
+    def test_serve_unknown_model(self, runner, mock_docker_operations):
         """Test serve command with unknown model (should warn and return)."""
         with mock_docker_operations(
             model_filter=lambda model: False  # No docker for any model
         ) as (mock_registry, _, _, _):
-            # Should not raise an exception, just log warning
-            cli.serve(model="unknown_model")
+            # Should raise ValueError because server defaults to "registry" and model is unknown
+            result = runner.invoke(app, ["serve", "unknown_model"])
+            assert result.exit_code != 0
+            assert isinstance(result.exception, ValueError)
 
-            mock_registry.get.assert_called_once_with("unknown_model", default=True)
+            mock_registry.get.assert_called_once_with("unknown_model")
 
 
 class TestConvertCommand:
     """Test the 'convert' command."""
 
     def test_convert_single_file(
-        self, cli, file_path, mock_docker_operations, mock_openai_api, tmp_output_dir
+        self, runner, file_path, mock_docker_operations, mock_openai_api, tmp_output_dir
     ):
         """Test convert with a single PDF file."""
         with mock_docker_operations(include_client=False):
-            with mock_openai_api():
-                with patch(
-                    "vlmparse.converter_with_server.get_model_from_uri",
-                    return_value="gemini-2.5-flash-lite",
-                ):
-                    documents = cli.convert(
-                        inputs=[str(file_path)],
-                        out_folder=str(tmp_output_dir),
-                        model="gemini-2.5-flash-lite",
-                        uri="http://localhost:8000/v1",
-                        debug=True,
-                        _return_documents=True,
-                    )
+            with mock_openai_api() as openai_client:
+                result = runner.invoke(
+                    app,
+                    [
+                        "convert",
+                        str(file_path),
+                        "--out-folder",
+                        str(tmp_output_dir),
+                        "--model",
+                        "gemini-2.5-flash-lite",
+                        "--uri",
+                        "http://localhost:8000/v1",
+                        "--debug",
+                    ],
+                )
 
-                    # Verify files were processed
-                    assert documents is not None
-                    assert len(documents) > 0
+                assert result.exit_code == 0, result.output
+                # 2 pages in test PDF -> 2 API calls
+                assert openai_client.chat.completions.create.call_count == 2
 
     def test_convert_multiple_files(
-        self, cli, file_path, mock_docker_operations, mock_openai_api, tmp_output_dir
+        self,
+        runner,
+        file_path,
+        mock_docker_operations,
+        mock_openai_api,
+        tmp_output_dir,
+        tmp_path,
     ):
-        """Test convert with multiple PDF files."""
-        with mock_docker_operations(include_client=False):
-            with mock_openai_api():
-                with patch(
-                    "vlmparse.converter_with_server.get_model_from_uri",
-                    return_value="gemini-2.5-flash-lite",
-                ):
-                    documents = cli.convert(
-                        inputs=[str(file_path), str(file_path)],
-                        out_folder=str(tmp_output_dir),
-                        model="gemini-2.5-flash-lite",
-                        uri="http://localhost:8000/v1",
-                        debug=True,
-                        _return_documents=True,
-                    )
+        """Test convert with multiple PDF files.
 
-                    # Verify both files were processed
-                    assert documents is not None
-                    assert len(documents) == 2
+        Typer's current CLI takes a single INPUTS argument. We pass a directory
+        containing two PDFs.
+        """
+        with mock_docker_operations(include_client=False):
+            input_dir = tmp_path / "inputs"
+            input_dir.mkdir()
+            (input_dir / "a.pdf").write_bytes(Path(file_path).read_bytes())
+            (input_dir / "b.pdf").write_bytes(Path(file_path).read_bytes())
+
+            with mock_openai_api() as openai_client:
+                result = runner.invoke(
+                    app,
+                    [
+                        "convert",
+                        str(input_dir),
+                        "--out-folder",
+                        str(tmp_output_dir),
+                        "--model",
+                        "gemini-2.5-flash-lite",
+                        "--uri",
+                        "http://localhost:8000/v1",
+                        "--debug",
+                    ],
+                )
+
+                assert result.exit_code == 0, result.output
+                # 2 files × 2 pages = 4 API calls
+                assert openai_client.chat.completions.create.call_count == 4
 
     def test_convert_with_glob_pattern(
-        self, cli, file_path, mock_docker_operations, mock_openai_api, tmp_output_dir
+        self, runner, file_path, mock_docker_operations, mock_openai_api, tmp_output_dir
     ):
         """Test convert with glob pattern."""
         with mock_docker_operations(include_client=False):
-            with mock_openai_api():
-                with patch(
-                    "vlmparse.converter_with_server.get_model_from_uri",
-                    return_value="gemini-2.5-flash-lite",
-                ):
-                    # Use the parent directory with a glob pattern
-                    pattern = str(file_path.parent / "*.pdf")
+            with mock_openai_api() as openai_client:
+                # Use the parent directory with a glob pattern
+                pattern = str(file_path.parent / "*.pdf")
 
-                    documents = cli.convert(
-                        inputs=[pattern],
-                        out_folder=str(tmp_output_dir),
-                        model="gemini-2.5-flash-lite",
-                        uri="http://localhost:8000/v1",
-                        debug=True,
-                        _return_documents=True,
-                    )
+                result = runner.invoke(
+                    app,
+                    [
+                        "convert",
+                        pattern,
+                        "--out-folder",
+                        str(tmp_output_dir),
+                        "--model",
+                        "gemini-2.5-flash-lite",
+                        "--uri",
+                        "http://localhost:8000/v1",
+                        "--debug",
+                    ],
+                )
 
-                    # Verify at least one file was found
-                    assert documents is not None
-                    assert len(documents) >= 1
+                assert result.exit_code == 0, result.output
+                assert openai_client.chat.completions.create.call_count >= 2
 
     def test_convert_with_custom_uri(
-        self, cli, file_path, mock_docker_operations, mock_openai_api, tmp_output_dir
+        self, runner, file_path, mock_docker_operations, mock_openai_api, tmp_output_dir
     ):
         """Test convert with custom URI (no Docker server needed)."""
         with mock_docker_operations(include_client=False):
             custom_uri = "http://custom-server:9000/v1"
 
-            with mock_openai_api():
-                with patch(
-                    "vlmparse.converter_with_server.get_model_from_uri",
-                    return_value="gemini-2.5-flash-lite",
-                ):
-                    documents = cli.convert(
-                        inputs=[str(file_path)],
-                        out_folder=str(tmp_output_dir),
-                        model="gemini-2.5-flash-lite",
-                        uri=custom_uri,
-                        debug=True,
-                        _return_documents=True,
-                    )
+            with mock_openai_api() as openai_client:
+                result = runner.invoke(
+                    app,
+                    [
+                        "convert",
+                        str(file_path),
+                        "--out-folder",
+                        str(tmp_output_dir),
+                        "--model",
+                        "gemini-2.5-flash-lite",
+                        "--uri",
+                        custom_uri,
+                        "--debug",
+                    ],
+                )
 
-                    # Verification now checks actual results rather than mock calls
-                    assert documents is not None
-                    assert len(documents) > 0
+                assert result.exit_code == 0, result.output
+                assert openai_client.chat.completions.create.call_count == 2
 
     def test_convert_without_uri_starts_server(
-        self, cli, file_path, mock_docker_operations, tmp_output_dir
+        self, runner, file_path, mock_docker_operations, tmp_output_dir
     ):
         """Test convert without URI starts a Docker server."""
         with mock_docker_operations(include_client=True, client_batch_return=None) as (
@@ -190,21 +223,35 @@ class TestConvertCommand:
             mock_server,
             mock_client,
         ):
-            cli.convert(
-                inputs=[str(file_path)],
-                out_folder=str(tmp_output_dir),
-                model="lightonocr",
-                debug=True,
+            result = runner.invoke(
+                app,
+                [
+                    "convert",
+                    str(file_path),
+                    "--out-folder",
+                    str(tmp_output_dir),
+                    "--model",
+                    "lightonocr",
+                    "--debug",
+                ],
             )
 
+            assert result.exit_code == 0, result.output
+
             # Verify Docker server was started
-            mock_docker_reg.get.assert_called_once_with("lightonocr", default=False)
+            # Since lightonocr is allowed by default filter in mock_docker_operations,
+            # and cli uses server="registry" by default,
+            # it should check registry and start server.
+            # ConvertWithServer calls start_server_and_client which calls docker_config_registry.list_models()
+            # We assume mock_docker_operations mocks list_models correctly.
+
+            mock_docker_reg.get.assert_called_with("lightonocr")
             mock_docker_config.get_server.assert_called_once_with(auto_stop=True)
             mock_server.start.assert_called_once()
             mock_client.batch.assert_called_once()
 
     def test_convert_with_gpus(
-        self, cli, file_path, mock_docker_operations, tmp_output_dir
+        self, runner, file_path, mock_docker_operations, tmp_output_dir
     ):
         """Test convert with GPU configuration."""
         with mock_docker_operations(include_client=True, client_batch_return=None) as (
@@ -213,91 +260,100 @@ class TestConvertCommand:
             mock_server,
             mock_client,
         ):
-            cli.convert(
-                inputs=[str(file_path)],
-                out_folder=str(tmp_output_dir),
-                model="lightonocr",
-                gpus="0,1",
-                debug=True,
+            result = runner.invoke(
+                app,
+                [
+                    "convert",
+                    str(file_path),
+                    "--out-folder",
+                    str(tmp_output_dir),
+                    "--model",
+                    "lightonocr",
+                    "--gpus",
+                    "0,1",
+                    "--debug",
+                ],
             )
+
+            assert result.exit_code == 0, result.output
 
             # Verify GPU device IDs were set
             assert mock_docker_config.gpu_device_ids == ["0", "1"]
 
     def test_convert_with_output_folder(
-        self, cli, file_path, mock_docker_operations, mock_openai_api
+        self, runner, file_path, mock_docker_operations, mock_openai_api
     ):
         """Test convert with custom output folder."""
         with mock_docker_operations(include_client=False):
-            with mock_openai_api():
-                with patch(
-                    "vlmparse.converter_with_server.get_model_from_uri",
-                    return_value="gemini-2.5-flash-lite",
-                ):
-                    with tempfile.TemporaryDirectory() as tmpdir:
-                        documents = cli.convert(
-                            inputs=[str(file_path)],
-                            out_folder=tmpdir,
-                            model="gemini-2.5-flash-lite",
-                            uri="http://localhost:8000/v1",
-                            debug=True,
-                            _return_documents=True,
-                        )
-
-                        # Verify the command completes successfully
-                        assert documents is not None
-                        assert len(documents) > 0
-
-    def test_convert_string_inputs(
-        self, cli, file_path, mock_docker_operations, mock_openai_api, tmp_output_dir
-    ):
-        """Test convert with string inputs (not list)."""
-        with mock_docker_operations(include_client=False):
-            with mock_openai_api():
-                with patch(
-                    "vlmparse.converter_with_server.get_model_from_uri",
-                    return_value="gemini-2.5-flash-lite",
-                ):
-                    # Pass string instead of list
-                    documents = cli.convert(
-                        inputs=str(file_path),
-                        out_folder=str(tmp_output_dir),
-                        model="gemini-2.5-flash-lite",
-                        uri="http://localhost:8000/v1",
-                        debug=True,
-                        _return_documents=True,
+            with mock_openai_api() as openai_client:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    result = runner.invoke(
+                        app,
+                        [
+                            "convert",
+                            str(file_path),
+                            "--out-folder",
+                            tmpdir,
+                            "--model",
+                            "gemini-2.5-flash-lite",
+                            "--uri",
+                            "http://localhost:8000/v1",
+                            "--debug",
+                        ],
                     )
 
-                    # Should convert to list internally and process
-                    assert documents is not None
-                    assert len(documents) == 1
+                    assert result.exit_code == 0, result.output
+                    assert openai_client.chat.completions.create.call_count == 2
+
+    def test_convert_string_inputs(
+        self, runner, file_path, mock_docker_operations, mock_openai_api, tmp_output_dir
+    ):
+        """Test convert with a single file path argument."""
+        with mock_docker_operations(include_client=False):
+            with mock_openai_api() as openai_client:
+                result = runner.invoke(
+                    app,
+                    [
+                        "convert",
+                        str(file_path),
+                        "--out-folder",
+                        str(tmp_output_dir),
+                        "--model",
+                        "gemini-2.5-flash-lite",
+                        "--uri",
+                        "http://localhost:8000/v1",
+                        "--debug",
+                    ],
+                )
+
+                assert result.exit_code == 0, result.output
+                assert openai_client.chat.completions.create.call_count == 2
 
     def test_convert_filters_non_pdf_files(
-        self, cli, mock_docker_operations, mock_openai_api
+        self, runner, mock_docker_operations, mock_openai_api
     ):
         """Test that convert filters out non-PDF files."""
         with mock_docker_operations(include_client=False):
             with mock_openai_api():
-                with patch(
-                    "vlmparse.converter_with_server.get_model_from_uri",
-                    return_value="gemini-2.5-flash-lite",
-                ):
-                    with tempfile.TemporaryDirectory() as tmpdir:
-                        # Create a non-PDF file
-                        txt_file = Path(tmpdir) / "test.txt"
-                        txt_file.write_text("test")
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    # Create a non-PDF file
+                    txt_file = Path(tmpdir) / "test.txt"
+                    txt_file.write_text("test")
 
-                        # Should raise an error for non-PDF files
-                        with pytest.raises(
-                            ValueError, match="Unsupported file extension"
-                        ):
-                            cli.convert(
-                                inputs=[str(txt_file)],
-                                model="gemini-2.5-flash-lite",
-                                uri="http://localhost:8000/v1",
-                                debug=True,
-                                _return_documents=True,
-                            )
+                    with pytest.raises(ValueError, match="Unsupported file extension"):
+                        runner.invoke(
+                            app,
+                            [
+                                "convert",
+                                str(txt_file),
+                                "--model",
+                                "gemini-2.5-flash-lite",
+                                "--uri",
+                                "http://localhost:8000/v1",
+                                "--debug",
+                            ],
+                            catch_exceptions=False,
+                        )
 
 
 class TestConvertWithDifferentModels:
@@ -314,7 +370,7 @@ class TestConvertWithDifferentModels:
     )
     def test_convert_with_various_models(
         self,
-        cli,
+        runner,
         file_path,
         model_name,
         mock_docker_operations,
@@ -323,30 +379,31 @@ class TestConvertWithDifferentModels:
     ):
         """Test convert with different registered models."""
         with mock_docker_operations(include_client=False):
-            with mock_openai_api():
-                with patch(
-                    "vlmparse.converter_with_server.get_model_from_uri",
-                    return_value=model_name,
-                ):
-                    documents = cli.convert(
-                        inputs=[str(file_path)],
-                        out_folder=str(tmp_output_dir),
-                        model=model_name,
-                        uri="http://localhost:8000/v1",
-                        debug=True,
-                        _return_documents=True,
-                    )
+            with mock_openai_api() as openai_client:
+                result = runner.invoke(
+                    app,
+                    [
+                        "convert",
+                        str(file_path),
+                        "--out-folder",
+                        str(tmp_output_dir),
+                        "--model",
+                        model_name,
+                        "--uri",
+                        "http://localhost:8000/v1",
+                        "--debug",
+                    ],
+                )
 
-                    # Verify files were processed
-                    assert documents is not None
-                    assert len(documents) > 0
+                assert result.exit_code == 0, result.output
+                assert openai_client.chat.completions.create.call_count == 2
 
 
 class TestCLIIntegration:
     """Integration tests for CLI with mocked server."""
 
     def test_full_workflow_without_uri(
-        self, cli, file_path, mock_docker_operations, tmp_output_dir
+        self, runner, file_path, mock_docker_operations, tmp_output_dir
     ):
         """Test full conversion workflow without providing URI."""
         with mock_docker_operations(include_client=True, client_batch_return=None) as (
@@ -355,13 +412,20 @@ class TestCLIIntegration:
             mock_server,
             mock_client,
         ):
-            # Run conversion
-            cli.convert(
-                inputs=[str(file_path)],
-                out_folder=str(tmp_output_dir),
-                model="lightonocr",
-                debug=True,
+            result = runner.invoke(
+                app,
+                [
+                    "convert",
+                    str(file_path),
+                    "--out-folder",
+                    str(tmp_output_dir),
+                    "--model",
+                    "lightonocr",
+                    "--debug",
+                ],
             )
+
+            assert result.exit_code == 0, result.output
 
             # Verify full workflow
             mock_docker_reg.get.assert_called_once()
@@ -369,7 +433,7 @@ class TestCLIIntegration:
             mock_client.batch.assert_called_once()
 
     def test_serve_then_convert_scenario(
-        self, cli, file_path, mock_docker_operations, mock_openai_api, tmp_output_dir
+        self, runner, file_path, mock_docker_operations, mock_openai_api, tmp_output_dir
     ):
         """Test scenario where server is started first, then convert is called."""
         # First part: serve
@@ -380,30 +444,32 @@ class TestCLIIntegration:
             _,
         ):
             # First serve
-            cli.serve(model="lightonocr", port=8056)
+            result = runner.invoke(app, ["serve", "lightonocr", "--port", "8056"])
+            assert result.exit_code == 0, result.output
 
             # Verify serve worked
             mock_server.start.assert_called_once()
 
         # Second part: convert with URI
         with mock_docker_operations(include_client=False):
-            with mock_openai_api():
-                with patch(
-                    "vlmparse.converter_with_server.get_model_from_uri",
-                    return_value="gemini-2.5-flash-lite",
-                ):
-                    documents = cli.convert(
-                        inputs=[str(file_path)],
-                        out_folder=str(tmp_output_dir),
-                        model="gemini-2.5-flash-lite",
-                        uri="http://localhost:8056/v1",
-                        debug=True,
-                        _return_documents=True,
-                    )
+            with mock_openai_api() as openai_client:
+                result = runner.invoke(
+                    app,
+                    [
+                        "convert",
+                        str(file_path),
+                        "--out-folder",
+                        str(tmp_output_dir),
+                        "--model",
+                        "gemini-2.5-flash-lite",
+                        "--uri",
+                        "http://localhost:8056/v1",
+                        "--debug",
+                    ],
+                )
 
-                    # Verify convert used the URI and processed files
-                    assert documents is not None
-                    assert len(documents) > 0
+                assert result.exit_code == 0, result.output
+                assert openai_client.chat.completions.create.call_count == 2
 
 
 class TestCLIConvertInDepth:
@@ -422,31 +488,36 @@ class TestCLIConvertInDepth:
     #         yield mock_convert
 
     def test_convert_with_real_converter_gemini(
-        self, cli, file_path, mock_openai_api, tmp_output_dir
+        self, runner, file_path, mock_openai_api, tmp_output_dir
     ):
         """Test convert with real Gemini converter and mocked OpenAI API."""
         with mock_openai_api() as openai_client:
-            with patch(
-                "vlmparse.converter_with_server.get_model_from_uri",
-                return_value="gemini-2.5-flash-lite",
-            ):
-                cli.convert(
-                    inputs=[str(file_path)],
-                    out_folder=str(tmp_output_dir),
-                    model="gemini-2.5-flash-lite",
-                    uri="http://mocked-api/v1",
-                    debug=True,
-                )
+            result = runner.invoke(
+                app,
+                [
+                    "convert",
+                    str(file_path),
+                    "--out-folder",
+                    str(tmp_output_dir),
+                    "--model",
+                    "gemini-2.5-flash-lite",
+                    "--uri",
+                    "http://mocked-api/v1",
+                    "--debug",
+                ],
+            )
 
-                # Verify OpenAI API was called (2 pages in test PDF)
-                assert openai_client.chat.completions.create.call_count == 2
+            assert result.exit_code == 0, result.output
 
-                # Verify the model parameter was correct
-                call_args = openai_client.chat.completions.create.call_args_list[0]
-                assert call_args[1]["model"] == "gemini-2.5-flash-lite"
+            # Verify OpenAI API was called (2 pages in test PDF)
+            assert openai_client.chat.completions.create.call_count == 2
+
+            # Verify the model parameter was correct
+            call_args = openai_client.chat.completions.create.call_args_list[0]
+            assert call_args[1]["model"] == "gemini-2.5-flash-lite"
 
     def test_convert_with_real_converter_lightonocr(
-        self, cli, file_path, mock_openai_api, mock_docker_operations, tmp_output_dir
+        self, runner, file_path, mock_docker_operations, tmp_output_dir
     ):
         """Test convert with real LightOnOCR converter, auto-starting mocked server."""
 
@@ -460,12 +531,20 @@ class TestCLIConvertInDepth:
             mock_doc.pages = [Page(text="Page 1"), Page(text="Page 2")]
             mock_client.batch.return_value = [mock_doc]
 
-            cli.convert(
-                inputs=[str(file_path)],
-                out_folder=str(tmp_output_dir),
-                model="lightonocr",
-                debug=True,
+            result = runner.invoke(
+                app,
+                [
+                    "convert",
+                    str(file_path),
+                    "--out-folder",
+                    str(tmp_output_dir),
+                    "--model",
+                    "lightonocr",
+                    "--debug",
+                ],
             )
+
+            assert result.exit_code == 0, result.output
 
             # Verify server was started
             mock_server.start.assert_called_once()
@@ -474,27 +553,37 @@ class TestCLIConvertInDepth:
             mock_client.batch.assert_called_once()
 
     def test_convert_batch_multiple_files(
-        self, cli, file_path, mock_openai_api, tmp_output_dir
+        self, runner, file_path, mock_openai_api, tmp_output_dir, tmp_path
     ):
         """Test batch conversion of multiple files with real converter."""
         with mock_openai_api() as openai_client:
-            with patch(
-                "vlmparse.converter_with_server.get_model_from_uri",
-                return_value="gemini-2.5-flash-lite",
-            ):
-                cli.convert(
-                    inputs=[str(file_path), str(file_path)],
-                    out_folder=str(tmp_output_dir),
-                    model="gemini-2.5-flash-lite",
-                    uri="http://mocked-api/v1",
-                    debug=True,
-                )
+            input_dir = tmp_path / "inputs"
+            input_dir.mkdir()
+            (input_dir / "a.pdf").write_bytes(Path(file_path).read_bytes())
+            (input_dir / "b.pdf").write_bytes(Path(file_path).read_bytes())
 
-                # Should process 2 files × 2 pages = 4 API calls
-                assert openai_client.chat.completions.create.call_count == 4
+            result = runner.invoke(
+                app,
+                [
+                    "convert",
+                    str(input_dir),
+                    "--out-folder",
+                    str(tmp_output_dir),
+                    "--model",
+                    "gemini-2.5-flash-lite",
+                    "--uri",
+                    "http://mocked-api/v1",
+                    "--debug",
+                ],
+            )
+
+            assert result.exit_code == 0, result.output
+
+            # Should process 2 files × 2 pages = 4 API calls
+            assert openai_client.chat.completions.create.call_count == 4
 
     def test_convert_verifies_document_structure(
-        self, cli, file_path, mock_openai_api, tmp_path
+        self, runner, file_path, mock_openai_api, tmp_path
     ):
         """Test that converted documents have correct structure."""
         output_dir = tmp_path / "output"
@@ -508,19 +597,28 @@ class TestCLIConvertInDepth:
             with mock_openai_api(
                 content="# Page Title\n\nPage content with text."
             ) as openai_client:
-                cli.convert(
-                    inputs=[str(file_path)],
-                    out_folder=str(output_dir),
-                    model="gemini-2.5-flash-lite",
-                    uri="http://mocked-api/v1",
-                    debug=True,
+                result = runner.invoke(
+                    app,
+                    [
+                        "convert",
+                        str(file_path),
+                        "--out-folder",
+                        str(output_dir),
+                        "--model",
+                        "gemini-2.5-flash-lite",
+                        "--uri",
+                        "http://mocked-api/v1",
+                        "--debug",
+                    ],
                 )
+
+                assert result.exit_code == 0, result.output
 
                 # Verify conversion happened (2 pages)
                 assert openai_client.chat.completions.create.call_count == 2
 
     def test_convert_handles_api_errors_gracefully(
-        self, cli, file_path, mock_openai_api, tmp_output_dir
+        self, runner, file_path, mock_openai_api, tmp_output_dir
     ):
         """Test that converter handles API errors without crashing."""
         with patch(
@@ -528,13 +626,21 @@ class TestCLIConvertInDepth:
             return_value="gemini-2.5-flash-lite",
         ):
             with mock_openai_api(side_effect=Exception("API Error")) as openai_client:
-                # Should not raise, but handle gracefully
-                cli.convert(
-                    inputs=[str(file_path)],
-                    out_folder=str(tmp_output_dir),
-                    model="gemini-2.5-flash-lite",
-                    uri="http://mocked-api/v1",
+                result = runner.invoke(
+                    app,
+                    [
+                        "convert",
+                        str(file_path),
+                        "--out-folder",
+                        str(tmp_output_dir),
+                        "--model",
+                        "gemini-2.5-flash-lite",
+                        "--uri",
+                        "http://mocked-api/v1",
+                    ],
                 )
+
+                assert result.exit_code == 0, result.output
 
                 # Verify it attempted to call API (2 pages)
                 assert openai_client.chat.completions.create.call_count == 2
@@ -548,7 +654,7 @@ class TestCLIConvertInDepth:
         ],
     )
     def test_convert_uses_correct_model_name(
-        self, cli, file_path, mock_openai_api, model_name, tmp_output_dir
+        self, runner, file_path, mock_openai_api, model_name, tmp_output_dir
     ):
         """Test that each converter uses the correct model name in API calls."""
         with mock_openai_api() as openai_client:
@@ -556,13 +662,22 @@ class TestCLIConvertInDepth:
                 "vlmparse.converter_with_server.get_model_from_uri",
                 return_value=model_name,
             ):
-                cli.convert(
-                    inputs=[str(file_path)],
-                    out_folder=str(tmp_output_dir),
-                    model=model_name,
-                    uri="http://mocked-api/v1",
-                    debug=True,
+                result = runner.invoke(
+                    app,
+                    [
+                        "convert",
+                        str(file_path),
+                        "--out-folder",
+                        str(tmp_output_dir),
+                        "--model",
+                        model_name,
+                        "--uri",
+                        "http://mocked-api/v1",
+                        "--debug",
+                    ],
                 )
+
+                assert result.exit_code == 0, result.output
 
                 # Check that model parameter is passed
                 call_args = openai_client.chat.completions.create.call_args_list[0]
@@ -576,7 +691,7 @@ class TestCLIConvertInDepth:
                 ]
 
     def test_convert_with_dotsocr_model(
-        self, cli, file_path, mock_openai_api, tmp_output_dir
+        self, runner, file_path, mock_openai_api, tmp_output_dir
     ):
         """Test convert with DotsOCR which has different prompt modes."""
         with mock_openai_api() as openai_client:
@@ -584,13 +699,22 @@ class TestCLIConvertInDepth:
                 "vlmparse.converter_with_server.get_model_from_uri",
                 return_value="dotsocr",
             ):
-                cli.convert(
-                    inputs=[str(file_path)],
-                    out_folder=str(tmp_output_dir),
-                    model="dotsocr",
-                    uri="http://mocked-api/v1",
-                    debug=True,
+                result = runner.invoke(
+                    app,
+                    [
+                        "convert",
+                        str(file_path),
+                        "--out-folder",
+                        str(tmp_output_dir),
+                        "--model",
+                        "dotsocr",
+                        "--uri",
+                        "http://mocked-api/v1",
+                        "--debug",
+                    ],
                 )
+
+                assert result.exit_code == 0, result.output
 
                 # Verify API was called (2 pages)
                 assert openai_client.chat.completions.create.call_count == 2
@@ -600,7 +724,7 @@ class TestCLIConvertInDepth:
                 assert "messages" in call_args[1]
 
     def test_convert_with_max_image_size_limit(
-        self, cli, file_path, mock_openai_api, tmp_output_dir
+        self, runner, file_path, mock_openai_api, tmp_output_dir
     ):
         """Test that max_image_size limit is respected for models that have it."""
         with mock_openai_api() as openai_client:
@@ -609,13 +733,22 @@ class TestCLIConvertInDepth:
                 "vlmparse.converter_with_server.get_model_from_uri",
                 return_value="lightonocr",
             ):
-                cli.convert(
-                    inputs=[str(file_path)],
-                    out_folder=str(tmp_output_dir),
-                    model="lightonocr",
-                    uri="http://mocked-api/v1",
-                    debug=True,
+                result = runner.invoke(
+                    app,
+                    [
+                        "convert",
+                        str(file_path),
+                        "--out-folder",
+                        str(tmp_output_dir),
+                        "--model",
+                        "lightonocr",
+                        "--uri",
+                        "http://mocked-api/v1",
+                        "--debug",
+                    ],
                 )
+
+                assert result.exit_code == 0, result.output
 
                 assert openai_client.chat.completions.create.call_count == 2
 
@@ -626,18 +759,27 @@ class TestCLIConvertInDepth:
                 "vlmparse.converter_with_server.get_model_from_uri",
                 return_value="nanonets/Nanonets-OCR2-3B",
             ):
-                cli.convert(
-                    inputs=[str(file_path)],
-                    out_folder=str(tmp_output_dir),
-                    model="nanonets/Nanonets-OCR2-3B",
-                    uri="http://mocked-api/v1",
-                    debug=True,
+                result = runner.invoke(
+                    app,
+                    [
+                        "convert",
+                        str(file_path),
+                        "--out-folder",
+                        str(tmp_output_dir),
+                        "--model",
+                        "nanonets/Nanonets-OCR2-3B",
+                        "--uri",
+                        "http://mocked-api/v1",
+                        "--debug",
+                    ],
                 )
+
+                assert result.exit_code == 0, result.output
 
                 assert openai_client.chat.completions.create.call_count == 2
 
     def test_convert_with_glob_pattern_real_converter(
-        self, cli, file_path, mock_openai_api, tmp_output_dir
+        self, runner, file_path, mock_openai_api, tmp_output_dir
     ):
         """Test glob pattern expansion with real converter."""
         pattern = str(file_path.parent / "*.pdf")
@@ -647,19 +789,28 @@ class TestCLIConvertInDepth:
             return_value="gemini-2.5-flash-lite",
         ):
             with mock_openai_api() as openai_client:
-                cli.convert(
-                    inputs=[pattern],
-                    out_folder=str(tmp_output_dir),
-                    model="gemini-2.5-flash-lite",
-                    uri="http://mocked-api/v1",
-                    debug=True,
+                result = runner.invoke(
+                    app,
+                    [
+                        "convert",
+                        pattern,
+                        "--out-folder",
+                        str(tmp_output_dir),
+                        "--model",
+                        "gemini-2.5-flash-lite",
+                        "--uri",
+                        "http://mocked-api/v1",
+                        "--debug",
+                    ],
                 )
+
+                assert result.exit_code == 0, result.output
 
                 # At least one file should be found and processed
                 assert openai_client.chat.completions.create.call_count >= 2
 
     def test_convert_checks_completion_kwargs(
-        self, cli, file_path, mock_openai_api, tmp_output_dir
+        self, runner, file_path, mock_openai_api, tmp_output_dir
     ):
         """Test that converter processes pages correctly."""
         with mock_openai_api() as openai_client:
@@ -667,13 +818,22 @@ class TestCLIConvertInDepth:
                 "vlmparse.converter_with_server.get_model_from_uri",
                 return_value="lightonocr",
             ):
-                cli.convert(
-                    inputs=[str(file_path)],
-                    out_folder=str(tmp_output_dir),
-                    model="lightonocr",
-                    uri="http://mocked-api/v1",
-                    debug=True,
+                result = runner.invoke(
+                    app,
+                    [
+                        "convert",
+                        str(file_path),
+                        "--out-folder",
+                        str(tmp_output_dir),
+                        "--model",
+                        "lightonocr",
+                        "--uri",
+                        "http://mocked-api/v1",
+                        "--debug",
+                    ],
                 )
+
+                assert result.exit_code == 0, result.output
 
                 # Check that API was called (2 pages)
                 assert openai_client.chat.completions.create.call_count == 2

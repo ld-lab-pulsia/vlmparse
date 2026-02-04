@@ -2,9 +2,13 @@ import os
 from collections.abc import Callable
 
 from vlmparse.clients.chandra import ChandraDockerServerConfig
-from vlmparse.clients.deepseekocr import DeepSeekOCRDockerServerConfig
+from vlmparse.clients.deepseekocr import (
+    DeepSeekOCR2DockerServerConfig,
+    DeepSeekOCRDockerServerConfig,
+)
 from vlmparse.clients.docling import DoclingDockerServerConfig
 from vlmparse.clients.dotsocr import DotsOCRDockerServerConfig
+from vlmparse.clients.glmocr import GLMOCRDockerServerConfig
 from vlmparse.clients.granite_docling import GraniteDoclingDockerServerConfig
 from vlmparse.clients.hunyuanocr import HunyuanOCRDockerServerConfig
 from vlmparse.clients.lightonocr import (
@@ -18,7 +22,9 @@ from vlmparse.clients.olmocr import OlmOCRDockerServerConfig
 from vlmparse.clients.openai_converter import OpenAIConverterConfig
 from vlmparse.clients.paddleocrvl import PaddleOCRVLDockerServerConfig
 from vlmparse.converter import ConverterConfig
-from vlmparse.servers.docker_server import DockerServerConfig, docker_config_registry
+from vlmparse.servers.docker_compose_server import DockerComposeServerConfig
+from vlmparse.servers.docker_server import DockerServerConfig
+from vlmparse.servers.server_registry import docker_config_registry
 
 
 def get_default(cls, field_name):
@@ -31,17 +37,19 @@ def get_default(cls, field_name):
 
 
 # All server configs - single source of truth
-SERVER_CONFIGS: list[type[DockerServerConfig]] = [
+SERVER_CONFIGS: list[type[DockerServerConfig | DockerComposeServerConfig]] = [
     ChandraDockerServerConfig,
     LightOnOCRDockerServerConfig,
     DotsOCRDockerServerConfig,
     PaddleOCRVLDockerServerConfig,
+    GLMOCRDockerServerConfig,
     NanonetOCR2DockerServerConfig,
     HunyuanOCRDockerServerConfig,
     DoclingDockerServerConfig,
     OlmOCRDockerServerConfig,
     MinerUDockerServerConfig,
     DeepSeekOCRDockerServerConfig,
+    DeepSeekOCR2DockerServerConfig,
     GraniteDoclingDockerServerConfig,
     LightonOCR21BServerConfig,
 ]
@@ -78,7 +86,7 @@ class ConverterConfigRegistry:
 
     def register_from_server(
         self,
-        server_config_cls: type[DockerServerConfig],
+        server_config_cls: type[DockerServerConfig | DockerComposeServerConfig],
     ):
         """Register converter config derived from a server config class.
 
@@ -104,17 +112,19 @@ class ConverterConfigRegistry:
             for name in names:
                 self._registry[name] = factory
 
-    def get(self, model_name: str, uri: str | None = None) -> ConverterConfig:
-        """Get config for a model name (thread-safe). Returns default if not registered."""
+    def get(
+        self,
+        model_name: str,
+        uri: str | None = None,
+    ) -> ConverterConfig:
+        """Get config for a model name (thread-safe). Raises ValueError if not registered."""
         with self._lock:
             factory = self._registry.get(model_name)
 
         if factory is not None:
             return factory(uri)
-        # Fallback to OpenAIConverterConfig for unregistered models
-        if uri is not None:
-            return OpenAIConverterConfig(base_url=uri)
-        return OpenAIConverterConfig(model_name=model_name)
+
+        raise ValueError(f"Model '{model_name}' not found in registry.")
 
     def list_models(self) -> list[str]:
         """List all registered model names (thread-safe)."""

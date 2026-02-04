@@ -77,13 +77,13 @@ Deployment (requires a gpu + docker installation):
 - Check that the port is not used by another service.
 
 ```bash
-vlmparse serve --model lightonocr --port 8000 --gpus 1
+vlmparse serve --model lightonocr2 --port 8000 --gpus 1
 ```
 
 then convert:
 
 ```bash
-vlmparse convert --input "*.pdf" --out_folder ./output --model lightonocr --uri http://localhost:8000/v1
+vlmparse convert "*.pdf" --out_folder ./output --uri http://localhost:8000/v1
 ```
 
 You can also list all running servers:
