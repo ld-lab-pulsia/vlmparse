@@ -233,6 +233,6 @@ class BaseConverter:
         """Synchronous wrapper for async_batch."""
         return asyncio.run(self.async_batch(file_paths))
 
-    def aclose(self):
+    async def aclose(self):
         """Override if any async cleanup is needed."""
         pass
