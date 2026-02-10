@@ -22,6 +22,9 @@ jobs:
       - name: Install the project
         run: uv sync --frozen --all-extras --dev
 
+      - name: Run type checker
+        run: uv run ty check src --output-format=github
+
       - name: Run tests
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
