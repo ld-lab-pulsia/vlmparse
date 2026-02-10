@@ -12,6 +12,7 @@ def test_convert(file_path, model, tmp_output_dir):
         return_documents_in_batch_mode=True, debug=True, save_folder=str(tmp_output_dir)
     )
     docs = client.batch([file_path])
+    assert docs is not None, "Batch processing should return documents"
     assert len(docs) == 1
     doc = docs[0]
     assert len(doc.pages) == 2
@@ -19,8 +20,11 @@ def test_convert(file_path, model, tmp_output_dir):
     assert doc.pages[1].text is not None
 
     if model in ["gemini-2.5-flash-lite"]:
-        assert doc.pages[0].completion_tokens > 0
-        assert doc.pages[0].prompt_tokens > 0
+        assert (
+            doc.pages[0].completion_tokens is not None
+            and doc.pages[0].completion_tokens > 0
+        )
+        assert doc.pages[0].prompt_tokens is not None and doc.pages[0].prompt_tokens > 0
 
 
 @pytest.mark.skip(reason="Disabled to avoid excessive API calls")
@@ -31,6 +35,7 @@ def test_convert_mistral_ocr(file_path, model, tmp_output_dir):
         return_documents_in_batch_mode=True, debug=True, save_folder=str(tmp_output_dir)
     )
     docs = client.batch([file_path])
+    assert docs is not None, "Batch processing should return documents"
     assert len(docs) == 1
     doc = docs[0]
     assert len(doc.pages) == 2

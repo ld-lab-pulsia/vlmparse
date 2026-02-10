@@ -61,7 +61,7 @@ class BaseServerConfig(ModelIdentityMixin, ABC):
 
     def update_command_args(
         self,
-        vllm_args: dict | None = None,
+        vllm_args: list[str] | None = None,
         forget_predefined_vllm_args: bool = False,
     ) -> list[str]:
         """Update command arguments. Override in subclasses that support this."""

@@ -12,9 +12,6 @@ def normalize_text(
 ) -> str:
     """Normalise md text"""
 
-    if md_content is None:
-        return None
-
     # Normalize <br> and <br/> to newlines
     md_content = re.sub(r"<br/?>", " ", md_content)
 

@@ -2,7 +2,7 @@ import os
 import traceback
 import zipfile
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional, cast
 
 import orjson
 from PIL import Image
@@ -38,7 +38,7 @@ class Page(VLMParseBaseModel):
     raw_response: str | None = None
     items: list[Item] | None = None
     error: ProcessingError | None = None
-    buffer_image: Optional[Image.Image | str | dict] = None
+    buffer_image: Optional[Image.Image | str | dict[str, Any]] = None
     latency: Optional[float] = None
     """Time taken to process the page in seconds."""
     prompt_tokens: Optional[int] = None
@@ -47,21 +47,28 @@ class Page(VLMParseBaseModel):
     reasoning_tokens: Optional[int] = None
 
     @property
-    def image(self):
-        if isinstance(self.buffer_image, dict):
+    def image(self) -> Optional[PILImage.Image]:
+        buffer = self.buffer_image
+        if isinstance(buffer, dict):
             from vlmparse.build_doc import convert_specific_page_to_image, resize_image
 
+            # Casting solves the 'Top[dict]' or 'key: Never' issue with Pydantic fields
+            d = cast(dict[str, Any], buffer)
             image = convert_specific_page_to_image(
-                self.buffer_image["file_path"],
-                self.buffer_image["page_idx"],
-                self.buffer_image["dpi"],
+                d["file_path"],
+                d["page_idx"],
+                d["dpi"],
             )
-            image = resize_image(image, self.buffer_image["max_image_size"])
+            image = resize_image(image, d.get("max_image_size"))
             self.buffer_image = image
+            return image
 
-        if isinstance(self.buffer_image, str):
-            self.buffer_image = from_base64(self.buffer_image)
-        return self.buffer_image
+        if isinstance(buffer, str):
+            image = from_base64(buffer)
+            self.buffer_image = image
+            return image
+
+        return cast(Optional[PILImage.Image], buffer)
 
     def get_image_with_boxes(self, layout=False):
         from PIL import ImageDraw
@@ -103,7 +110,7 @@ class Document(VLMParseBaseModel):
 
     @property
     def text(self):
-        return "\n\n".join([page.text for page in self.pages])
+        return "\n\n".join([page.text for page in self.pages if page.text is not None])
 
     @property
     def is_error(self):

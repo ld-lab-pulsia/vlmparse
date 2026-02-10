@@ -2,6 +2,7 @@ import asyncio
 from typing import Literal, Optional
 
 from loguru import logger
+from openai.types.completion import CompletionUsage
 from pydantic import Field
 
 from vlmparse.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_tables
@@ -16,7 +17,7 @@ GOOGLE_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 
 class OpenAIConverterConfig(ConverterConfig):
-    api_key: str = ""
+    api_key: str | None = None
     timeout: int | None = 500
     max_retries: int = 1
     preprompt: str | None = None
@@ -32,6 +33,8 @@ class OpenAIConverterConfig(ConverterConfig):
 
 class OpenAIConverterClient(BaseConverter):
     """Client for OpenAI-compatible API servers."""
+
+    config: OpenAIConverterConfig
 
     def get_prompt_key(self) -> str | None:
         """Resolve a prompt key from conversion_mode using class mappings."""
@@ -168,6 +171,7 @@ class OpenAIConverterClient(BaseConverter):
     async def async_call_inside_page(self, page: Page) -> Page:
         """Process a single page using OpenAI-compatible API."""
         image = page.image
+        assert image is not None, "Page image is required for conversion"
         if self.config.preprompt:
             preprompt = [
                 {
@@ -214,7 +218,5 @@ class OpenAIConverterClient(BaseConverter):
         if usage is not None:
             page.prompt_tokens = usage.prompt_tokens
             page.completion_tokens = usage.completion_tokens
-            if hasattr(usage, "reasoning_tokens"):
-                page.reasoning_tokens = usage.reasoning_tokens
 
         return page

@@ -8,7 +8,7 @@ services:
       - |
         apt-get update && apt-get install -y git curl &&
         pip install --no-cache-dir git+https://github.com/huggingface/transformers.git &&
-        vllm serve zai-org/GLM-OCR --allowed-local-media-path / --port 8080 --speculative-config '{"method": "mtp", "num_speculative_tokens": 1}'
+        vllm serve zai-org/GLM-OCR --served-model-name default --allowed-local-media-path / --port 8080 --speculative-config '{"method": "mtp", "num_speculative_tokens": 1}'
     ports:
       - "${VLM_PORT:-8080}:8080"
     volumes:

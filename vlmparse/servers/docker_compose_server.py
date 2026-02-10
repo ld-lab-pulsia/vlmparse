@@ -36,4 +36,7 @@ class ComposeServer(BaseServer):
 
     def _create_server_context(self):
         """Create the Docker Compose server context."""
+        assert isinstance(
+            self.config, DockerComposeServerConfig
+        ), "Config must be a DockerComposeServerConfig"
         return docker_compose_server(config=self.config, cleanup=self.auto_stop)

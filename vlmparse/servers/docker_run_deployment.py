@@ -8,7 +8,7 @@ import docker
 from loguru import logger
 
 if TYPE_CHECKING:
-    from .base_server import BaseServerConfig
+    from .docker_server import DockerServerConfig
 
 
 def _ensure_image_exists(
@@ -21,7 +21,7 @@ def _ensure_image_exists(
         client.images.get(image)
         logger.info(f"Docker image {image} found")
         return
-    except docker.errors.ImageNotFound:
+    except docker.errors.ImageNotFound:  # type: ignore[name-defined]
         logger.info(f"Docker image {image} not found, building...")
 
         if not dockerfile_path.exists():
@@ -49,7 +49,7 @@ def _ensure_image_exists(
                     logger.info(line)
             elif "error" in chunk:
                 logger.error(chunk["error"])
-                raise docker.errors.BuildError(chunk["error"], build_stream) from None
+                raise docker.errors.BuildError(chunk["error"], build_stream) from None  # type: ignore[name-defined]
             elif "status" in chunk:
                 # Handle status updates (e.g., downloading layers)
                 logger.debug(chunk["status"])
@@ -59,14 +59,14 @@ def _ensure_image_exists(
 
 @contextmanager
 def docker_server(
-    config: "BaseServerConfig",
+    config: "DockerServerConfig",
     timeout: int = 1000,
     cleanup: bool = True,
 ):
     """Generic context manager for Docker server deployment.
 
     Args:
-        config: BaseServerConfig (can be any subclass like DockerServerConfig or VLLMDockerServerConfig)
+        config: DockerServerConfig
         timeout: Timeout in seconds to wait for server to be ready
         cleanup: If True, stop and remove container on exit. If False, leave container running
 
@@ -90,7 +90,7 @@ def docker_server(
             try:
                 client.images.get(config.docker_image)
                 logger.info(f"Docker image {config.docker_image} found locally")
-            except docker.errors.ImageNotFound:
+            except docker.errors.ImageNotFound:  # type: ignore[name-defined]
                 logger.info(
                     f"Docker image {config.docker_image} not found locally, pulling..."
                 )
@@ -107,12 +107,12 @@ def docker_server(
         if config.gpu_device_ids is None:
             # Default: Try to use all GPUs if available
             device_requests = [
-                docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])
+                docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])  # type: ignore[name-defined]
             ]
         elif len(config.gpu_device_ids) > 0 and config.gpu_device_ids[0] != "":
             # Use specific GPU devices
             device_requests = [
-                docker.types.DeviceRequest(
+                docker.types.DeviceRequest(  # type: ignore[name-defined]
                     device_ids=config.gpu_device_ids, capabilities=[["gpu"]]
                 )
             ]
@@ -179,7 +179,7 @@ def docker_server(
         while time.time() - start_time < timeout:
             try:
                 container.reload()
-            except docker.errors.NotFound as e:
+            except docker.errors.NotFound as e:  # type: ignore[name-defined]
                 logger.error("Container stopped unexpectedly during startup")
                 raise RuntimeError(
                     "Container crashed during initialization. Check Docker logs for details."

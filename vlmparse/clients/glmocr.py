@@ -138,7 +138,7 @@ class GLMOCRConverter(BaseConverter):
             RuntimeError: If the API returns an error
         """
         headers = {}
-
+        assert self.config.base_url is not None, "Base URL is required for API calls"
         async with httpx.AsyncClient(
             base_url=self.config.base_url, timeout=self.config.timeout, headers=headers
         ) as client:
@@ -163,7 +163,7 @@ class GLMOCRConverter(BaseConverter):
         text = markdown_text or ""
         text = clean_response(text)
         text = html_to_md_keep_tables(text)
-        logger.debug(f"Converted markdown text: {text[:100]}...")
+        logger.debug(f"Converted markdown text:\n{text}")
         page.text = text
 
     def _apply_items(self, page: Page, json_result: list[dict] | None):
@@ -208,6 +208,7 @@ class GLMOCRConverter(BaseConverter):
             Updated Page object with OCR results
         """
         image = page.image
+        assert image is not None, "Page image is required for processing"
 
         # Convert image to base64
         file_content_b64 = await asyncio.to_thread(to_base64, image, "PNG")

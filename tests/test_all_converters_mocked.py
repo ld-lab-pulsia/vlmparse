@@ -189,6 +189,8 @@ class TestConverterBatchProcessing:
             file_paths = [file_path, file_path]
             documents = converter.batch(file_paths)
 
+            assert documents is not None, "Batch processing should return documents"
+
             # Verify results
             assert len(documents) == 2
             for doc in documents:
