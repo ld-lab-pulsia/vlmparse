@@ -33,7 +33,7 @@ def _sanitize_compose_project_name(name: str, fallback: str = "vlmparse") -> str
     return sanitized or fallback
 
 
-def _build_compose_override_yaml(config: DockerComposeServerConfig) -> str | None:
+def _build_compose_override_yaml(config: "DockerComposeServerConfig") -> str | None:
     services_overrides: dict[str, dict] = {}
 
     service_names = config.compose_services or [config.server_service]
@@ -271,7 +271,7 @@ def _stop_compose_logs_stream(
 
 @contextmanager
 def docker_compose_server(
-    config: DockerComposeServerConfig,
+    config: "DockerComposeServerConfig",
     timeout: int = 1000,
     cleanup: bool = True,
 ):
