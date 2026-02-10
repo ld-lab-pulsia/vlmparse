@@ -30,7 +30,7 @@ PDF2MD_PROMPT = r"""Please follow these instructions for the conversion:
 - Do not surround your output with triple backticks.
 - If there is nothing on the image, just return ONLY the tag <blank> without anything else.
 - Convert checked and unchecked boxes to [x] and [ ] respectively.
-- For form fields with individual character boxes, transcribe the text as a continuous string instead of splitting characters into separate table cells or using '|' as a separator.
+- For form fields with individual character boxes, transcribe the text as a continuous string instead of splitting characters into separate table cells or using '|' as a separator. Do not include placeholder characters such as dots (....), underscores (____), or boxes used for filling out the form. Extract only the printed labels and the handwritten text.
 
 Please strictly follow these guidelines to ensure accuracy and consistency in the conversion. Your task is to accurately convert the content of the PDF image into Markdown format without adding any extra explanations or comments."""
 
@@ -61,6 +61,6 @@ PDF2HTML_PROMPT = r"""You are an AI assistant specialized in converting PDF imag
 - If there is nothing on the image, just return ONLY the tag <blank> without anything else.
 - Ignore headers or footers, do not add them to the transcription.
 - Convert checked and unchecked boxes to [x] and [ ] respectively.
-- For form fields with individual character boxes, transcribe the text as a continuous string instead of splitting characters into separate table cells or using '|' as a separator.
+- For form fields with individual character boxes, transcribe the text as a continuous string instead of splitting characters into separate table cells or using '|' as a separator. Do not include placeholder characters such as dots (....), underscores (____), or boxes used for filling out the form. Extract only the printed labels and the handwritten text.
 
 Please strictly follow these guidelines to ensure accuracy and consistency in the conversion. Your task is to accurately convert the content of the PDF image into HTML format without adding any extra explanations or comments."""
