@@ -163,7 +163,7 @@ class GLMOCRConverter(BaseConverter):
         text = markdown_text or ""
         text = clean_response(text)
         text = html_to_md_keep_tables(text)
-        logger.debug(f"Converted markdown text: {text[:100]}...")
+        logger.debug(f"Converted markdown text:\n{text}")
         page.text = text
 
     def _apply_items(self, page: Page, json_result: list[dict] | None):
