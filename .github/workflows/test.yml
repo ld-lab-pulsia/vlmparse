@@ -23,7 +23,7 @@ jobs:
         run: uv sync --frozen --all-extras --dev
 
       - name: Run type checker
-        run: uv run ty check src --output-format=github
+        run: uv run ty check vlmparse --output-format=github
 
       - name: Run tests
         env:
