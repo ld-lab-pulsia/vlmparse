@@ -164,4 +164,4 @@ Note that if you pass an uri of a vllm server to `ConverterWithServer`, the mode
 
 ## Credits
 
-This work was financed by La Poste and led by members of Probayes and OpenValue, two subsidiaries (filiales) of La Poste.
+This work was realised by members of [Probayes](https://www.probayes.com/) and [OpenValue](https://openvalue.co/), two subsidiaries of La Poste.
