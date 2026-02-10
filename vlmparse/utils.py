@@ -7,7 +7,7 @@ from loguru import logger
 from PIL import Image
 
 
-def to_base64(image: Image, extension="PNG"):
+def to_base64(image: Image.Image, extension="PNG"):
     img_byte_arr = BytesIO()
     image.save(img_byte_arr, format=extension)
     img_byte_arr = img_byte_arr.getvalue()

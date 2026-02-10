@@ -43,13 +43,13 @@ def get_model_from_uri(uri: str) -> str:
     client = docker.from_env()
     containers = client.containers.list()
 
-    uri = normalize_uri(uri)
+    uri_tuple = normalize_uri(uri)
 
     for container in containers:
         c_uri = container.labels.get("vlmparse_uri")
         c_model = container.labels.get("vlmparse_model_name")
 
-        if c_uri and uri == normalize_uri(c_uri):
+        if c_uri and uri_tuple == normalize_uri(c_uri):
             # Infer model if not provided
             if model is None and c_model:
                 logger.info(f"Inferred model {c_model} from container")

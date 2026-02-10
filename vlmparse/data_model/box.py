@@ -71,7 +71,13 @@ class BoundingBox(BaseModel):
         if not cond:
             raise InvalidBoundingBoxCoordinates(
                 "InvalidBoundingBoxCoordinates",
-                f"Invalid BoundingBox coordinates: left={field_values['l']}, top={field_values['t']}, right={field_values['r']}, bottom={field_values['b']}",
+                "Invalid BoundingBox coordinates: left={l}, top={t}, right={r}, bottom={b}",
+                {
+                    "l": field_values["l"],
+                    "t": field_values["t"],
+                    "r": field_values["r"],
+                    "b": field_values["b"],
+                },
             )
         return field_values
 

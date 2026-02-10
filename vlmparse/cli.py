@@ -243,7 +243,7 @@ def containers():
         )
         print(table)
 
-    except docker.errors.DockerException as e:
+    except docker.errors.DockerException as e:  # type: ignore[name-defined]
         logger.error(f"Failed to connect to Docker: {e}")
         logger.error(
             "Make sure Docker is running and you have the necessary permissions"
@@ -317,7 +317,7 @@ def stop(
             # Try to get the specified container
             try:
                 target_container = client.containers.get(container)
-            except docker.errors.NotFound:
+            except docker.errors.NotFound:  # type: ignore[name-defined]
                 logger.error(f"Container not found: {container}")
                 return
 
@@ -339,7 +339,7 @@ def stop(
             pass
         logger.info("✓ Container stopped and removed successfully")
 
-    except docker.errors.DockerException as e:
+    except docker.errors.DockerException as e:  # type: ignore[name-defined]
         logger.error(f"Failed to connect to Docker: {e}")
         logger.error(
             "Make sure Docker is running and you have the necessary permissions"
@@ -405,7 +405,7 @@ def log(
             # Try to get the specified container
             try:
                 target_container = client.containers.get(container)
-            except docker.errors.NotFound:
+            except docker.errors.NotFound:  # type: ignore[name-defined]
                 logger.error(f"Container not found: {container}")
                 return
 
@@ -423,7 +423,7 @@ def log(
             logs = target_container.logs().decode("utf-8", errors="replace")
             print(logs)
 
-    except docker.errors.DockerException as e:
+    except docker.errors.DockerException as e:  # type: ignore[name-defined]
         logger.error(f"Failed to connect to Docker: {e}")
         logger.error(
             "Make sure Docker is running and you have the necessary permissions"

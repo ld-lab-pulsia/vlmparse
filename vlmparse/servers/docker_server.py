@@ -32,7 +32,7 @@ class DockerServerConfig(BaseServerConfig):
 
     def update_command_args(
         self,
-        vllm_args: dict | None = None,
+        vllm_args: list[str] | None = None,
         forget_predefined_vllm_args: bool = False,
     ) -> list[str]:
         if vllm_args is not None:
@@ -117,4 +117,7 @@ class ConverterServer(BaseServer):
 
     def _create_server_context(self):
         """Create the Docker server context."""
+        assert isinstance(
+            self.config, DockerServerConfig
+        ), "Server config must be set to create server context"
         return docker_server(config=self.config, cleanup=self.auto_stop)

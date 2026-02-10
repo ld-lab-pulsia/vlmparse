@@ -145,6 +145,7 @@ class PaddleOCRVLConverter(BaseConverter):
         return payload
 
     async def _post_json(self, endpoint: str, payload: dict) -> dict:
+        assert self.config.base_url is not None, "Base URL is required for API calls"
         async with httpx.AsyncClient(
             base_url=self.config.base_url, timeout=self.config.timeout
         ) as client:
@@ -187,6 +188,7 @@ class PaddleOCRVLConverter(BaseConverter):
 
     async def async_call_inside_page(self, page: Page) -> Page:
         image = page.image
+        assert image is not None, "Page image is required for conversion"
         file_content_b64 = await asyncio.to_thread(to_base64, image, "PNG")
         payload = self._build_layout_payload(file_content_b64, 1)
 

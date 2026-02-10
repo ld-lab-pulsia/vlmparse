@@ -55,6 +55,8 @@ class MinerUConverter(BaseConverter):
         """Run async inference with MinerU API."""
         from httpx import AsyncClient
 
+        assert self.config.base_url is not None, "Base URL is required for API calls"
+
         async with AsyncClient(
             base_url=self.config.base_url, timeout=self.config.timeout
         ) as client:

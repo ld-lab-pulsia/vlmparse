@@ -13,7 +13,7 @@ import docker
 from loguru import logger
 
 if TYPE_CHECKING:
-    from .base_server import BaseServerConfig
+    from .docker_compose_server import DockerComposeServerConfig
 
 
 def _sanitize_compose_project_name(name: str, fallback: str = "vlmparse") -> str:
@@ -33,7 +33,7 @@ def _sanitize_compose_project_name(name: str, fallback: str = "vlmparse") -> str
     return sanitized or fallback
 
 
-def _build_compose_override_yaml(config: "BaseServerConfig") -> str | None:
+def _build_compose_override_yaml(config: DockerComposeServerConfig) -> str | None:
     services_overrides: dict[str, dict] = {}
 
     service_names = config.compose_services or [config.server_service]
@@ -271,7 +271,7 @@ def _stop_compose_logs_stream(
 
 @contextmanager
 def docker_compose_server(
-    config: "BaseServerConfig",
+    config: DockerComposeServerConfig,
     timeout: int = 1000,
     cleanup: bool = True,
 ):
@@ -426,7 +426,7 @@ def docker_compose_server(
 
                 try:
                     container.reload()
-                except docker.errors.NotFound as e:
+                except docker.errors.NotFound as e:  # type: ignore[name-defined]
                     logger.error("Container stopped unexpectedly during startup")
                     raise RuntimeError(
                         "Container crashed during initialization. Check Docker logs for details."

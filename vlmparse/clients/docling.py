@@ -1,6 +1,6 @@
 import asyncio
 from io import BytesIO
-from typing import Literal
+from typing import Literal, cast
 
 import httpx
 from loguru import logger
@@ -103,6 +103,8 @@ class DoclingConverter(BaseConverter):
 
     async def async_call_inside_page(self, page: Page) -> Page:
         """Process a single page using Docling Serve API."""
+        assert page.image is not None, "Page image is required for processing"
+        self.config = cast(DoclingConverterConfig, self.config)
         img_bytes = await asyncio.to_thread(image_to_bytes, page.image)
 
         data = self.config.api_kwargs

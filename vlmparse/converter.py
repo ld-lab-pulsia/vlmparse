@@ -162,11 +162,12 @@ class BaseConverter:
 
     def _save_document(self, document: Document):
         """Save document according to save_mode."""
-        if document.is_error:
-            save_folder = Path(self.save_folder) / "errors"
+        if self.save_folder is not None:
+            if document.is_error:
+                save_folder = Path(self.save_folder) / "errors"
 
-        else:
-            save_folder = Path(self.save_folder) / "results"
+            else:
+                save_folder = Path(self.save_folder) / "results"
 
         save_folder.mkdir(parents=True, exist_ok=True)
         doc_name = Path(document.file_path).stem
@@ -211,7 +212,7 @@ class BaseConverter:
         """Process multiple files concurrently with semaphore limit."""
         semaphore = asyncio.Semaphore(self.num_concurrent_files)
 
-        async def worker(file_path: str | Path) -> Document:
+        async def worker(file_path: str | Path) -> Document | None:
             async with semaphore:
                 if self.return_documents_in_batch_mode:
                     return await self.async_call(file_path)
@@ -231,3 +232,7 @@ class BaseConverter:
     def batch(self, file_paths: list[str | Path]) -> list[Document] | None:
         """Synchronous wrapper for async_batch."""
         return asyncio.run(self.async_batch(file_paths))
+
+    def aclose(self):
+        """Override if any async cleanup is needed."""
+        pass

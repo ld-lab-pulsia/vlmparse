@@ -131,7 +131,7 @@ def test_converter_hf_unregistered(mock_docker_reg, mock_converter_reg, mock_sta
     converter = ConverterWithServer(model="unknown", uri="http://foo", provider="hf")
 
     converter.start_server_and_client()
-
+    assert converter.client is not None
     assert isinstance(converter.client.config, OpenAIConverterConfig)
     assert converter.client.config.model_name == "unknown"
     mock_converter_reg.get.assert_not_called()

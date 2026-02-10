@@ -63,6 +63,7 @@ test = [
     "ruff",
     "isort",
     "pre-commit",
+    "ty",
 ]
 
 [tool.setuptools.packages.find]

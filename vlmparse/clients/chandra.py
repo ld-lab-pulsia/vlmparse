@@ -219,6 +219,9 @@ def parse_layout(
 
     for div in top_level_divs:
         bbox = div.get("data-bbox")
+        assert isinstance(
+            bbox, str
+        ), "data-bbox attribute is required and must be a string"
 
         try:
             bbox = json.loads(bbox)
@@ -241,6 +244,7 @@ def parse_layout(
         ]
 
         label = div.get("data-label", "block")
+        assert isinstance(label, str), "Label must be a string"
         content = str(div.decode_contents())
         layout_blocks.append(LayoutBlock(bbox=bbox, label=label, content=content))
 
@@ -318,7 +322,7 @@ class ChandraConverterConfig(OpenAIConverterConfig):
     }
     bbox_scale: int = 1024
     max_retries: int = 0
-    max_failure_retries: int = None
+    max_failure_retries: int | None = None
     completion_kwargs: dict = Field(
         default_factory=lambda: {
             "temperature": 0.0,
@@ -339,6 +343,7 @@ class ChandraConverterClient(OpenAIConverterClient):
 
     async def async_call_inside_page(self, page: Page) -> Page:
         """Process a single page using Chandra logic."""
+        assert page.image is not None, "Page image is required for processing"
         prompt = self.get_prompt_for_mode() or OCR_PROMPT
         prompt = prompt.replace("{bbox_scale}", str(self.config.bbox_scale))
 
@@ -419,8 +424,9 @@ class ChandraConverterClient(OpenAIConverterClient):
         # Convert HTML to MD
         text = html_to_md_keep_tables(text)
         page.text = text
-        page.completion_tokens = usage.completion_tokens
-        page.prompt_tokens = usage.prompt_tokens
+        if usage is not None:
+            page.completion_tokens = usage.completion_tokens
+            page.prompt_tokens = usage.prompt_tokens
         return page
 
 

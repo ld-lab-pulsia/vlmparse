@@ -161,6 +161,7 @@ class DeepSeekOCRConverterClient(OpenAIConverterClient):
 
     async def async_call_inside_page(self, page: Page) -> Page:
         # Prepare messages as in parent class
+        assert page.image is not None, "Page image is required for processing"
         image = page.image
 
         prompt_key = self.get_prompt_key() or "ocr"
@@ -320,6 +321,7 @@ class DeepSeekOCR2ConverterClient(DeepSeekOCRConverterClient):
 
     async def async_call_inside_page(self, page: Page) -> Page:
         # Prepare messages as in parent class
+        assert page.image is not None, "Page image is required for processing"
         image = page.image
 
         prompt_key = self.get_prompt_key() or "ocr"

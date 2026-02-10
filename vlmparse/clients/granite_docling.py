@@ -58,6 +58,7 @@ class GraniteDoclingConverter(OpenAIConverterClient):
     """Client for Granite Docling model."""
 
     async def async_call_inside_page(self, page: Page) -> Page:
+        assert page.image is not None, "Page image is required for processing"
         image = page.image.convert("RGB")
         messages = [
             {

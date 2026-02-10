@@ -12,10 +12,10 @@ from vlmparse.utils import get_file_paths
 
 def start_server(
     model: str,
-    gpus: str,
+    gpus: str | None = None,
     port: None | int = None,
     provider: Literal["registry", "hf"] = "registry",
-    vllm_args: list[str] = {},
+    vllm_args: list[str] | None = None,
     forget_predefined_vllm_args: bool = False,
     auto_stop: bool = False,
 ):
@@ -29,8 +29,14 @@ def start_server(
     container = None
     docker_config = docker_config_registry.get(model)
 
+    if vllm_args is None:
+        vllm_args = []
+
     if port is None:
-        port = DEFAULT_SERVER_PORT
+        port = int(DEFAULT_SERVER_PORT)
+
+    if gpus is None:
+        gpus = "0"
 
     if docker_config is None:
         if provider == "registry":
@@ -84,7 +90,7 @@ class ConverterWithServer:
         port: int | None = None,
         provider: Literal["registry", "hf", "google", "openai"] = "registry",
         concurrency: int = 10,
-        vllm_args: dict | None = None,
+        vllm_args: list[str] | None = None,
         forget_predefined_vllm_args: bool = False,
         return_documents: bool = False,
     ):
@@ -115,6 +121,10 @@ class ConverterWithServer:
             converter_config_registry,
             docker_config_registry,
         )
+
+        assert (
+            self.model is not None
+        ), "Model name must be determined from either 'model' or 'uri'"
 
         start_local_server = False
         if self.uri is None:
@@ -179,7 +189,7 @@ class ConverterWithServer:
     def parse(
         self,
         inputs: str | list[str],
-        out_folder: str = ".",
+        out_folder: str | Path = ".",
         mode: Literal["document", "md", "md_page"] = "document",
         conversion_mode: Literal[
             "ocr",
@@ -195,6 +205,8 @@ class ConverterWithServer:
         retrylast: bool = False,
         completion_kwargs: dict | None = None,
     ):
+        from vlmparse.clients.openai_converter import OpenAIConverterConfig
+
         assert (
             self.client is not None
         ), "Client not initialized. Call start_server_and_client() first."
@@ -233,8 +245,8 @@ class ConverterWithServer:
         if conversion_mode is not None:
             self.client.config.conversion_mode = conversion_mode
 
-        if completion_kwargs is not None and hasattr(
-            self.client.config, "completion_kwargs"
+        if completion_kwargs is not None and isinstance(
+            self.client.config, OpenAIConverterConfig
         ):
             self.client.config.completion_kwargs |= completion_kwargs
 
@@ -248,7 +260,7 @@ class ConverterWithServer:
 
         logger.info(f"Processing {len(file_paths)} files with {self.model} converter")
 
-        documents = self.client.batch(file_paths)
+        documents = self.client.batch(file_paths)  # type: ignore
 
         if documents is not None:
             logger.info(f"Processed {len(documents)} documents to {out_folder}")
@@ -258,4 +270,5 @@ class ConverterWithServer:
         return documents
 
     def get_out_folder(self) -> str | None:
-        return self.client.save_folder
+        if self.client is not None and hasattr(self.client, "save_folder"):
+            return self.client.save_folder
