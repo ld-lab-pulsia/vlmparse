@@ -3830,7 +3830,6 @@ dependencies = [
     { name = "beautifulsoup4" },
     { name = "devtools" },
     { name = "docker" },
-    { name = "fire" },
     { name = "html-to-markdown" },
     { name = "httpx" },
     { name = "loguru" },
@@ -3843,6 +3842,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pypdfium2" },
     { name = "tabulate" },
+    { name = "typer" },
 ]
 
 [package.optional-dependencies]
@@ -3889,7 +3889,6 @@ requires-dist = [
     { name = "devtools", specifier = ">=0.12.2" },
     { name = "docker", specifier = ">=7.1.0" },
     { name = "docling-core", marker = "extra == 'docling-core'" },
-    { name = "fire", specifier = ">=0.7.1" },
     { name = "fire", marker = "extra == 'bench'", specifier = ">=0.7.1" },
     { name = "fuzzysearch", marker = "extra == 'bench'", specifier = ">=0.8.1" },
     { name = "html-to-markdown", specifier = ">=1.9.0" },
@@ -3924,6 +3923,7 @@ requires-dist = [
     { name = "streamlit", marker = "extra == 'st-app'", specifier = ">=1.49.0" },
     { name = "tabulate", specifier = ">=0.9.0" },
     { name = "ty", marker = "extra == 'test'" },
+    { name = "typer", specifier = ">=0.19.2" },
     { name = "unidecode", marker = "extra == 'bench'", specifier = ">=1.4.0" },
 ]
 provides-extras = ["dev", "docling-core", "st-app", "bench", "test"]
