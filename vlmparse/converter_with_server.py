@@ -189,7 +189,7 @@ class ConverterWithServer:
     def parse(
         self,
         inputs: str | list[str],
-        out_folder: str | Path = ".",
+        out_folder: str | Path | None = ".",
         mode: Literal["document", "md", "md_page"] = "document",
         conversion_mode: Literal[
             "ocr",
@@ -211,10 +211,11 @@ class ConverterWithServer:
             self.client is not None
         ), "Client not initialized. Call start_server_and_client() first."
         file_paths = get_file_paths(inputs)
-        assert (
-            out_folder is not None
-        ), "out_folder must be provided if retrylast is True"
+
         if retrylast:
+            assert (
+                out_folder is not None
+            ), "out_folder must be provided if retrylast is True"
             retry = Path(out_folder)
             previous_runs = sorted(os.listdir(retry))
             if len(previous_runs) > 0:
@@ -235,9 +236,10 @@ class ConverterWithServer:
             logger.debug(f"Number of files after filtering: {len(file_paths)}")
 
         else:
-            out_folder = Path(out_folder) / (
-                datetime.datetime.now().strftime("%Y-%m-%dT%Hh%Mm%Ss")
-            )
+            if out_folder is not None:
+                out_folder = Path(out_folder) / (
+                    datetime.datetime.now().strftime("%Y-%m-%dT%Hh%Mm%Ss")
+                )
 
         if dpi is not None:
             self.client.config.dpi = int(dpi)
@@ -253,8 +255,9 @@ class ConverterWithServer:
         if debug:
             self.client.debug = debug
 
-        self.client.save_folder = out_folder
-        self.client.save_mode = mode
+        if out_folder is not None:
+            self.client.save_folder = out_folder
+            self.client.save_mode = mode
         self.client.num_concurrent_files = self.concurrency if not debug else 1
         self.client.num_concurrent_pages = self.concurrency if not debug else 1
 
