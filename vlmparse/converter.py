@@ -59,6 +59,7 @@ class BaseConverter:
         self.debug = debug
         self.return_documents_in_batch_mode = return_documents_in_batch_mode
         self.save_page_images = save_page_images
+        self.page_semaphore = asyncio.Semaphore(self.num_concurrent_pages)
 
     async def async_call_inside_page(self, page: Page) -> Page:
         raise NotImplementedError
@@ -93,10 +94,8 @@ class BaseConverter:
             num_pages = get_page_count(file_path)
             document.pages = [Page() for _ in range(num_pages)]
 
-            semaphore = asyncio.Semaphore(self.num_concurrent_pages)
-
             async def worker(page_idx: int, page: Page):
-                async with semaphore:
+                async with self.page_semaphore:
                     try:
                         page = await asyncio.to_thread(
                             self.add_page_image, page, file_path, page_idx
