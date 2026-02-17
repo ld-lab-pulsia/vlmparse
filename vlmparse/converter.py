@@ -64,6 +64,12 @@ class BaseConverter:
     async def async_call_inside_page(self, page: Page) -> Page:
         raise NotImplementedError
 
+    async def async_call_inside_page_with_rendering(
+        self, page: Page, file_path: str | Path, page_idx: int
+    ) -> Page:
+        page = await asyncio.to_thread(self.add_page_image, page, file_path, page_idx)
+        return await self.async_call_inside_page(page)
+
     def add_page_image(self, page: Page, file_path, page_idx):
         if Path(file_path).suffix.lower() in IMAGE_EXTENSIONS:
             image = Image.open(file_path)
@@ -97,12 +103,10 @@ class BaseConverter:
             async def worker(page_idx: int, page: Page):
                 async with self.page_semaphore:
                     try:
-                        page = await asyncio.to_thread(
-                            self.add_page_image, page, file_path, page_idx
-                        )
-
                         tic = time.perf_counter()
-                        page = await self.async_call_inside_page(page)
+                        page = await self.async_call_inside_page_with_rendering(
+                            page, file_path, page_idx
+                        )
                         toc = time.perf_counter()
                         page.latency = toc - tic
                         logger.debug(
