@@ -49,7 +49,7 @@ def get_model_from_uri(uri: str) -> str:
         c_uri = container.labels.get("vlmparse_uri")
         c_model = container.labels.get("vlmparse_model_name")
 
-        if c_uri and uri_tuple == normalize_uri(c_uri):
+        if c_uri and uri_tuple[2] == normalize_uri(c_uri)[2]:
             # Infer model if not provided
             if model is None and c_model:
                 logger.info(f"Inferred model {c_model} from container")

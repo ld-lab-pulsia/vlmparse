@@ -60,7 +60,7 @@ for server_config_cls in SERVER_CONFIGS:
     model_name = get_default(server_config_cls, "model_name")
     names = [n for n in aliases + [model_name] if isinstance(n, str)]
     for name in names:
-        docker_config_registry.register(name, lambda cls=server_config_cls: cls())
+        docker_config_registry.register(name, lambda cls=server_config_cls: cls())  # type: ignore
 
 
 class ConverterConfigRegistry:
@@ -101,7 +101,7 @@ class ConverterConfigRegistry:
             names.append(model_name.split("/")[-1])
 
         def factory(uri: str | None, cls=server_config_cls) -> ConverterConfig:
-            server = cls()
+            server = cls()  # type: ignore
             client_config = server.client_config
             # Override base_url if provided
             if uri is not None:

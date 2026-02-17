@@ -21,7 +21,7 @@ dependencies = [
     "orjson>=3.11.3",
     "pillow>=11.3.0",
     "pydantic",
-    "pypdfium2>=4.30.0",
+    "pypdfium2>=5.0.0",
     "lxml>=6.0.2",
     "tabulate>=0.9.0",
     "beautifulsoup4>=4.14.2",
