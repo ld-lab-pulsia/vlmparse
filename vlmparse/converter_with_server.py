@@ -81,6 +81,44 @@ def start_server(
     return base_url, container, provider, docker_config
 
 
+def get_client_config(
+    model: str, uri: str | None, provider: Literal["registry", "hf", "google", "openai"]
+):
+    from vlmparse.clients.openai_converter import OpenAIConverterConfig
+    from vlmparse.registries import converter_config_registry
+
+    if uri is not None and model is None and provider in ["registry", "hf"]:
+        model = get_model_from_uri(uri)
+
+    if provider == "hf":
+        client_config = OpenAIConverterConfig(model_name=model, base_url=uri)
+
+    elif provider == "registry":
+        client_config = converter_config_registry.get(model, uri=uri)
+
+    elif provider == "google":
+        from vlmparse.registries import GOOGLE_API_BASE_URL
+
+        client_config = OpenAIConverterConfig(
+            model_name=model,
+            base_url=GOOGLE_API_BASE_URL if uri is None else uri,
+            api_key=os.getenv("GOOGLE_API_KEY"),
+            default_model_name=model,
+        )
+
+    elif provider == "openai":
+        client_config = OpenAIConverterConfig(
+            model_name=model,
+            base_url=uri,
+            api_key=os.getenv("OPENAI_API_KEY"),
+            default_model_name=model,
+        )
+
+    else:
+        raise ValueError(f"Unsupported provider: {provider}")
+    return client_config
+
+
 class ConverterWithServer:
     def __init__(
         self,
@@ -112,11 +150,7 @@ class ConverterWithServer:
         self.server = None
         self.client = None
 
-        if self.uri is not None and self.model is None:
-            self.model = get_model_from_uri(self.uri)
-
     def start_server_and_client(self):
-        from vlmparse.clients.openai_converter import OpenAIConverterConfig
         from vlmparse.registries import (
             converter_config_registry,
             docker_config_registry,
@@ -155,17 +189,8 @@ class ConverterWithServer:
                 self.client = converter_config_registry.get(self.model).get_client(
                     return_documents_in_batch_mode=self.return_documents
                 )
-
-        elif self.provider == "hf":
-            client_config = OpenAIConverterConfig(
-                model_name=self.model, base_url=self.uri
-            )
-            self.client = client_config.get_client(
-                return_documents_in_batch_mode=self.return_documents
-            )
-
         else:
-            client_config = converter_config_registry.get(self.model, uri=self.uri)
+            client_config = get_client_config(self.model, self.uri, self.provider)
 
             self.client = client_config.get_client(
                 return_documents_in_batch_mode=self.return_documents
