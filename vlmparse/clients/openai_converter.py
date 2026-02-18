@@ -1,8 +1,10 @@
 import asyncio
+import os
 from typing import Literal, Optional
 
 from loguru import logger
 from openai.types.completion import CompletionUsage
+from openai.types.responses import ResponseUsage
 from pydantic import Field
 
 from vlmparse.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_tables
@@ -94,13 +96,17 @@ class OpenAIConverterClient(BaseConverter):
             from openai import AsyncAzureOpenAI, AsyncOpenAI
 
             if self.config.is_azure:
+                assert (
+                    self.config.base_url is not None
+                ), "Azure OpenAI requires a base URL"
+
                 self._model = AsyncAzureOpenAI(
                     base_url=self.config.base_url,
                     api_key=self.config.api_key,
                     timeout=self.config.timeout,
                     max_retries=self.config.max_retries,
-                    api_version=getattr(
-                        self.config, "api_version", "2025-04-01-preview"
+                    api_version=os.getenv(
+                        "AZURE_OPENAI_API_VERSION", "2025-04-01-preview"
                     ),
                 )
             else:
@@ -146,7 +152,7 @@ class OpenAIConverterClient(BaseConverter):
 
     async def _get_chat_completion(
         self, messages: list[dict], completion_kwargs: dict | None = None
-    ) -> tuple[str, Optional["CompletionUsage"]]:  # noqa: F821
+    ) -> tuple[str, Optional[CompletionUsage | ResponseUsage]]:  # noqa: F821
         """Helper to handle chat completion with optional streaming."""
         if completion_kwargs is None:
             completion_kwargs = self.config.completion_kwargs
@@ -249,7 +255,7 @@ class OpenAIConverterClient(BaseConverter):
         text = html_to_md_keep_tables(text)
         page.text = text
         if usage is not None:
-            if self.config.use_response_api:
+            if isinstance(usage, ResponseUsage):
                 page.prompt_tokens = usage.input_tokens
                 page.completion_tokens = usage.output_tokens
             else:

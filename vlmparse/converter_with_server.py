@@ -126,7 +126,6 @@ def get_client_config(
             else os.getenv("AZURE_OPENAI_API_KEY"),
             is_azure=True,
             default_model_name=model,
-            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2025-04-01-preview"),
             use_response_api=use_response_api,
         )
 
