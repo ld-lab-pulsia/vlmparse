@@ -18,6 +18,7 @@ GOOGLE_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 class OpenAIConverterConfig(ConverterConfig):
     api_key: str | None = None
+    is_azure: bool = False
     timeout: int | None = 500
     max_retries: int = 1
     preprompt: str | None = None
@@ -26,6 +27,7 @@ class OpenAIConverterConfig(ConverterConfig):
     prompt_mode_map: dict[str, str] = Field(default_factory=dict)
     completion_kwargs: dict = Field(default_factory=dict)
     stream: bool = False
+    use_response_api: bool = False
 
     def get_client(self, **kwargs) -> "OpenAIConverterClient":
         return OpenAIConverterClient(config=self, **kwargs)
@@ -89,14 +91,25 @@ class OpenAIConverterClient(BaseConverter):
         loop = asyncio.get_running_loop()
         if self._model is None or self._model_loop is not loop:
             await self._close_model()
-            from openai import AsyncOpenAI
+            from openai import AsyncAzureOpenAI, AsyncOpenAI
 
-            self._model = AsyncOpenAI(
-                base_url=self.config.base_url,
-                api_key=self.config.api_key,
-                timeout=self.config.timeout,
-                max_retries=self.config.max_retries,
-            )
+            if self.config.is_azure:
+                self._model = AsyncAzureOpenAI(
+                    base_url=self.config.base_url,
+                    api_key=self.config.api_key,
+                    timeout=self.config.timeout,
+                    max_retries=self.config.max_retries,
+                    api_version=getattr(
+                        self.config, "api_version", "2025-04-01-preview"
+                    ),
+                )
+            else:
+                self._model = AsyncOpenAI(
+                    base_url=self.config.base_url,
+                    api_key=self.config.api_key,
+                    timeout=self.config.timeout,
+                    max_retries=self.config.max_retries,
+                )
             self._model_loop = loop
         return self._model
 
@@ -139,34 +152,47 @@ class OpenAIConverterClient(BaseConverter):
             completion_kwargs = self.config.completion_kwargs
 
         model = await self._get_async_model()
-
-        if self.config.stream:
-            response_stream = await model.chat.completions.create(
+        if self.config.use_response_api:
+            response_obj = await model.responses.create(
                 model=self.config.default_model_name,
-                messages=messages,
-                stream=True,
+                input=messages,
                 **completion_kwargs,
             )
-            response_parts = []
-            async for chunk in response_stream:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    response_parts.append(chunk.choices[0].delta.content)
 
-            return "".join(response_parts), None
+            out = [o for o in response_obj.output if o.type == "message"][0]
+
+            if out.content[0].text is None:
+                raise ValueError("Response is None, finish reason: ")
+
+            return out.content[0].text, response_obj.usage
         else:
-            response_obj = await model.chat.completions.create(
-                model=self.config.default_model_name,
-                messages=messages,
-                **completion_kwargs,
-            )
+            if self.config.stream:
+                response_stream = await model.responses.create(
+                    model=self.config.default_model_name,
+                    input=messages,
+                    stream=True,
+                    **completion_kwargs,
+                )
+                response_parts = []
+                async for chunk in response_stream:
+                    if chunk.choices and chunk.choices[0].delta.content:
+                        response_parts.append(chunk.choices[0].delta.content)
 
-            if response_obj.choices[0].message.content is None:
-                raise ValueError(
-                    "Response is None, finish reason: "
-                    + response_obj.choices[0].finish_reason
+                return "".join(response_parts), None
+            else:
+                response_obj = await model.chat.completions.create(
+                    model=self.config.default_model_name,
+                    messages=messages,
+                    **completion_kwargs,
                 )
 
-            return response_obj.choices[0].message.content, response_obj.usage
+                if response_obj.choices[0].message.content is None:
+                    raise ValueError(
+                        "Response is None, finish reason: "
+                        + response_obj.choices[0].finish_reason
+                    )
+
+                return response_obj.choices[0].message.content, response_obj.usage
 
     async def async_call_inside_page(self, page: Page) -> Page:
         """Process a single page using OpenAI-compatible API."""
@@ -183,11 +209,23 @@ class OpenAIConverterClient(BaseConverter):
             preprompt = []
 
         selected_prompt = self.get_prompt_for_mode()
+        if self.config.use_response_api:
+            text_key = "input_text"
+            image_payload = {
+                "type": "input_image",
+                "image_url": f"data:image/png;base64,{to_base64(image)}",
+            }
+        else:
+            text_key = "text"
+            image_payload = {
+                "type": "image_url",
+                "image_url": {"url": f"data:image/png;base64,{to_base64(image)}"},
+            }
         if selected_prompt is not None:
-            postprompt = [{"type": "text", "text": selected_prompt}]
+            postprompt = [{"type": text_key, "text": selected_prompt}]
         else:
             postprompt = (
-                [{"type": "text", "text": self.config.postprompt}]
+                [{"type": text_key, "text": self.config.postprompt}]
                 if isinstance(self.config.postprompt, str) and self.config.postprompt
                 else []
             )
@@ -197,12 +235,7 @@ class OpenAIConverterClient(BaseConverter):
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/png;base64,{to_base64(image)}"
-                        },
-                    },
+                    image_payload,
                     *postprompt,
                 ],
             },
@@ -216,7 +249,11 @@ class OpenAIConverterClient(BaseConverter):
         text = html_to_md_keep_tables(text)
         page.text = text
         if usage is not None:
-            page.prompt_tokens = usage.prompt_tokens
-            page.completion_tokens = usage.completion_tokens
+            if self.config.use_response_api:
+                page.prompt_tokens = usage.input_tokens
+                page.completion_tokens = usage.output_tokens
+            else:
+                page.prompt_tokens = usage.prompt_tokens
+                page.completion_tokens = usage.completion_tokens
 
         return page
