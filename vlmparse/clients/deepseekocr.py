@@ -212,10 +212,7 @@ class DeepSeekOCRConverterClient(OpenAIConverterClient):
 
         page.text = outputs.strip()
         logger.debug(page.text)
-        if usage is not None:
-            page.prompt_tokens = usage.prompt_tokens
-            page.completion_tokens = usage.completion_tokens
-
+        page = self.add_usage(page, usage)
         return page
 
 
@@ -379,8 +376,5 @@ class DeepSeekOCR2ConverterClient(DeepSeekOCRConverterClient):
 
         page.text = outputs.strip()
         logger.debug(page.text)
-        if usage is not None:
-            page.prompt_tokens = usage.prompt_tokens
-            page.completion_tokens = usage.completion_tokens
-
+        page = self.add_usage(page, usage)
         return page

@@ -82,7 +82,11 @@ def start_server(
 
 
 def get_client_config(
-    model: str, uri: str | None, provider: Literal["registry", "hf", "google", "openai"]
+    model: str,
+    uri: str | None,
+    provider: Literal["registry", "hf", "google", "openai", "azure"] = "registry",
+    api_key: str | None = None,
+    use_response_api: bool = False,
 ):
     from vlmparse.clients.openai_converter import OpenAIConverterConfig
     from vlmparse.registries import converter_config_registry
@@ -102,7 +106,7 @@ def get_client_config(
         client_config = OpenAIConverterConfig(
             model_name=model,
             base_url=GOOGLE_API_BASE_URL if uri is None else uri,
-            api_key=os.getenv("GOOGLE_API_KEY"),
+            api_key=api_key if api_key is not None else os.getenv("GOOGLE_API_KEY"),
             default_model_name=model,
         )
 
@@ -110,8 +114,19 @@ def get_client_config(
         client_config = OpenAIConverterConfig(
             model_name=model,
             base_url=uri,
-            api_key=os.getenv("OPENAI_API_KEY"),
+            api_key=api_key if api_key is not None else os.getenv("OPENAI_API_KEY"),
             default_model_name=model,
+        )
+    elif provider == "azure":
+        client_config = OpenAIConverterConfig(
+            model_name=model,
+            base_url=uri if uri is not None else os.getenv("AZURE_OPENAI_ENDPOINT"),
+            api_key=api_key
+            if api_key is not None
+            else os.getenv("AZURE_OPENAI_API_KEY"),
+            is_azure=True,
+            default_model_name=model,
+            use_response_api=use_response_api,
         )
 
     else:
@@ -126,11 +141,12 @@ class ConverterWithServer:
         uri: str | None = None,
         gpus: str | None = None,
         port: int | None = None,
-        provider: Literal["registry", "hf", "google", "openai"] = "registry",
+        provider: Literal["registry", "hf", "google", "openai", "azure"] = "registry",
         concurrency: int = 10,
         vllm_args: list[str] | None = None,
         forget_predefined_vllm_args: bool = False,
         return_documents: bool = False,
+        use_response_api: bool = False,
     ):
         if model is None and uri is None:
             raise ValueError("Either 'model' or 'uri' must be provided")
@@ -149,6 +165,7 @@ class ConverterWithServer:
         self.return_documents = return_documents
         self.server = None
         self.client = None
+        self.use_response_api = use_response_api
 
     def start_server_and_client(self):
         from vlmparse.registries import (
@@ -190,7 +207,12 @@ class ConverterWithServer:
                     return_documents_in_batch_mode=self.return_documents
                 )
         else:
-            client_config = get_client_config(self.model, self.uri, self.provider)
+            client_config = get_client_config(
+                self.model,
+                self.uri,
+                self.provider,
+                use_response_api=self.use_response_api,
+            )
 
             self.client = client_config.get_client(
                 return_documents_in_batch_mode=self.return_documents

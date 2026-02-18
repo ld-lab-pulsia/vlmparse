@@ -99,7 +99,7 @@ def convert(
             "image_description (describe the image), formula (formula extraction), chart (chart recognition)"
         ),
     ),
-    provider: Literal["registry", "hf", "google", "openai"] = typer.Option(
+    provider: Literal["registry", "hf", "google", "openai", "azure"] = typer.Option(
         "registry",
         help="Server type for the model. Defaults to 'registry'.",
     ),
@@ -113,6 +113,13 @@ def convert(
     ),
     concurrency: int = typer.Option(10, help="Number of parallel requests"),
     dpi: int | None = typer.Option(None, help="DPI to use for the conversion"),
+    use_response_api: bool = typer.Option(
+        False,
+        help=(
+            "If True, uses the response API for conversion which returns a more detailed usage breakdown. This is mandatory for gpt-5 model on azure."
+            "This is only applicable for compatible servers and may require additional configuration on the server side."
+        ),
+    ),
     debug: bool = typer.Option(False, help="Run in debug mode"),
     _return_documents: bool = typer.Option(False, hidden=True),
 ):
@@ -143,6 +150,7 @@ def convert(
         provider=provider,
         concurrency=concurrency,
         return_documents=_return_documents,
+        use_response_api=use_response_api,
     ) as converter_with_server:
         return converter_with_server.parse(
             inputs=inputs,

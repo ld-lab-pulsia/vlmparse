@@ -288,6 +288,5 @@ class DotsOCRConverter(OpenAIConverterClient):
         text = html_to_md_keep_tables(text)
         page.text = text
 
-        page.completion_tokens = usage.completion_tokens
-        page.prompt_tokens = usage.prompt_tokens
+        page = self.add_usage(page, usage)
         return page
