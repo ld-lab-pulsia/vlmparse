@@ -424,9 +424,7 @@ class ChandraConverterClient(OpenAIConverterClient):
         # Convert HTML to MD
         text = html_to_md_keep_tables(text)
         page.text = text
-        if usage is not None:
-            page.completion_tokens = usage.completion_tokens
-            page.prompt_tokens = usage.prompt_tokens
+        page = self.add_usage(page, usage)
         return page
 
 

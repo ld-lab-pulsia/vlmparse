@@ -254,6 +254,12 @@ class OpenAIConverterClient(BaseConverter):
 
         text = html_to_md_keep_tables(text)
         page.text = text
+        page = self.add_usage(page, usage)
+
+        return page
+
+    @staticmethod
+    def add_usage(page, usage):
         if usage is not None:
             if isinstance(usage, ResponseUsage):
                 page.prompt_tokens = usage.input_tokens
@@ -261,5 +267,4 @@ class OpenAIConverterClient(BaseConverter):
             else:
                 page.prompt_tokens = usage.prompt_tokens
                 page.completion_tokens = usage.completion_tokens
-
         return page

@@ -82,9 +82,7 @@ class GraniteDoclingConverter(OpenAIConverterClient):
 
         page.raw_response = doctags
         page.text = _doctags_to_markdown(doctags, image)
-        if usage is not None:
-            page.prompt_tokens = usage.prompt_tokens
-            page.completion_tokens = usage.completion_tokens
+        page = self.add_usage(page, usage)
         return page
 
 
