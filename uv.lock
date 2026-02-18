@@ -3882,7 +3882,7 @@ wheels = [
 
 [[package]]
 name = "vlmparse"
-version = "0.1.12"
+version = "0.1.13"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
