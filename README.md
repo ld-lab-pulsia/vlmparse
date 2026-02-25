@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[\[📜 arXiv coming soon\]] | [[Dataset (🤗Hugging Face)]](https://huggingface.co/datasets/pulsia/fr-bench-pdf2md) | [[pypi]](https://pypi.org/project/vlmparse/) | [[vlmparse]](https://github.com/ld-lab-pulsia/vlmparse) | [[Benchmark]](https://github.com/ld-lab-pulsia/benchpdf2md) | [[Leaderboard]](https://huggingface.co/spaces/pulsia/fr-bench-pdf2md)
+[\[[📜 arXiv](https://arxiv.org/abs/2602.11960)\]] | [[Dataset (🤗Hugging Face)]](https://huggingface.co/datasets/pulsia/fr-bench-pdf2md) | [[pypi]](https://pypi.org/project/vlmparse/) | [[vlmparse]](https://github.com/ld-lab-pulsia/vlmparse) | [[Benchmark]](https://github.com/ld-lab-pulsia/benchpdf2md) | [[Leaderboard]](https://huggingface.co/spaces/pulsia/fr-bench-pdf2md)
 
 </div>
 
