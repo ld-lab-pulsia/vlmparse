@@ -173,10 +173,6 @@ class ConverterWithServer:
             docker_config_registry,
         )
 
-        assert (
-            self.model is not None
-        ), "Model name must be determined from either 'model' or 'uri'"
-
         start_local_server = False
         if self.uri is None:
             if self.provider == "hf":
