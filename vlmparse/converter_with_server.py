@@ -82,7 +82,7 @@ def start_server(
 
 
 def get_client_config(
-    model: str,
+    model: str | None,
     uri: str | None,
     provider: Literal["registry", "hf", "google", "openai", "azure"] = "registry",
     api_key: str | None = None,
@@ -93,6 +93,10 @@ def get_client_config(
 
     if uri is not None and model is None and provider in ["registry", "hf"]:
         model = get_model_from_uri(uri)
+
+    assert (
+        model is not None
+    ), "Model name could not be determined from parameters. Please provide a model name or a URI that includes the model name."
 
     if provider == "hf":
         client_config = OpenAIConverterConfig(model_name=model, base_url=uri)
@@ -175,6 +179,9 @@ class ConverterWithServer:
 
         start_local_server = False
         if self.uri is None:
+            assert (
+                self.model is not None
+            ), "Model must be specified if uri is not provided"
             if self.provider == "hf":
                 start_local_server = True
             elif self.provider == "registry":
@@ -182,6 +189,9 @@ class ConverterWithServer:
                     start_local_server = True
 
         if start_local_server:
+            assert (
+                self.model is not None
+            ), "Model must be specified to start local server"
             server_arg = "hf" if self.provider == "hf" else "registry"
             _, _, self.server, docker_config = start_server(
                 model=self.model,
