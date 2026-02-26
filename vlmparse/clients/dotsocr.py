@@ -1,6 +1,5 @@
 import json
 import math
-from pathlib import Path
 from typing import ClassVar
 
 from loguru import logger
@@ -17,15 +16,11 @@ from vlmparse.data_model.document import BoundingBox, Item, Page
 from vlmparse.servers.docker_server import DEFAULT_MODEL_NAME, VLLMDockerServerConfig
 from vlmparse.utils import to_base64
 
-DOCKERFILE_DIR = Path(__file__).parent.parent.parent / "docker_pipelines"
-
 
 class DotsOCRDockerServerConfig(VLLMDockerServerConfig):
     """Configuration for DotsOCR model."""
 
     model_name: str = "rednote-hilab/dots.ocr"
-    docker_image: str = "dotsocr:latest"
-    dockerfile_dir: str = str(DOCKERFILE_DIR / "dotsocr")
     command_args: list[str] = Field(
         default_factory=lambda: [
             "--tensor-parallel-size",
@@ -37,11 +32,11 @@ class DotsOCRDockerServerConfig(VLLMDockerServerConfig):
             "--served-model-name",
             DEFAULT_MODEL_NAME,
             "--trust-remote-code",
-            # "--limit-mm-per-prompt",
-            # '{"image": 1}',
-            # "--no-enable-prefix-caching",
-            # "--max-model-len",
-            # "16384",
+            "--limit-mm-per-prompt",
+            '{"image": 1}',
+            "--no-enable-prefix-caching",
+            "--max-model-len",
+            "16384",
         ]
     )
     add_model_key_to_server: bool = True
@@ -93,7 +88,7 @@ class DotsOCRConverterConfig(OpenAIConverterConfig):
     completion_kwargs: dict | None = {
         "temperature": 0.1,
         "top_p": 1.0,
-        "max_completion_tokens": 16384,
+        "max_completion_tokens": 16000,
     }
     aliases: list[str] = Field(default_factory=lambda: ["dotsocr"])
     dpi: int = 200
@@ -293,26 +288,7 @@ class DotsOCRConverter(OpenAIConverterClient):
 
 class DotsOCR1p5DockerServerConfig(DotsOCRDockerServerConfig):
     model_name: str = "kristaller486/dots.ocr-1.5"
-    docker_image: str = "vllm/vllm-openai:latest"
     aliases: list[str] = Field(default_factory=lambda: ["dotsocr1.5"])
-    command_args: list[str] = Field(
-        default_factory=lambda: [
-            "--tensor-parallel-size",
-            "1",
-            "--gpu-memory-utilization",
-            "0.8",
-            "--chat-template-content-format",
-            "string",
-            "--served-model-name",
-            DEFAULT_MODEL_NAME,
-            "--trust-remote-code",
-            # "--limit-mm-per-prompt",
-            # '{"image": 1}',
-            # "--no-enable-prefix-caching",
-            # "--max-model-len",
-            # "16384",
-        ]
-    )
 
     @property
     def client_config(self):
