@@ -101,9 +101,10 @@ class VLLMDockerServerConfig(DockerServerConfig):
     def get_environment(self) -> dict | None:
         """Setup environment variables for VLLM."""
         if self.hf_home_folder is not None:
+            container_hf_home = "/root/.cache/huggingface"
             return {
-                "HF_HOME": self.hf_home_folder,
-                "TRITON_CACHE_DIR": self.hf_home_folder,
+                "HF_HOME": container_hf_home,
+                "TRITON_CACHE_DIR": container_hf_home,
             }
         return None
 
