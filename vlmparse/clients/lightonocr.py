@@ -63,3 +63,21 @@ class LightonOCR21BServerConfig(LightOnOCRDockerServerConfig):
 class LightonOCR21BConverterConfig(LightOnOCRConverterConfig):
     model_name: str = "lightonai/LightOnOCR-2-1B"
     aliases: list[str] = Field(default_factory=lambda: ["lightonocr2"])
+
+
+class LightonOCR21BboxServerConfig(LightOnOCRDockerServerConfig):
+    model_name: str = "lightonai/LightOnOCR-2-1B-bbox"
+    aliases: list[str] = Field(default_factory=lambda: ["lightonocr2bbox"])
+
+    @property
+    def client_config(self):
+        return LightonOCR21BBboxConverterConfig(
+            **self._create_client_kwargs(
+                f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}"
+            )
+        )
+
+
+class LightonOCR21BBboxConverterConfig(LightOnOCRConverterConfig):
+    model_name: str = "lightonai/LightOnOCR-2-1B-bbox"
+    aliases: list[str] = Field(default_factory=lambda: ["lightonocr2bbox"])

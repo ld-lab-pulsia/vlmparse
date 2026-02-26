@@ -7,11 +7,15 @@ from vlmparse.clients.deepseekocr import (
     DeepSeekOCRDockerServerConfig,
 )
 from vlmparse.clients.docling import DoclingDockerServerConfig
-from vlmparse.clients.dotsocr import DotsOCRDockerServerConfig
+from vlmparse.clients.dotsocr import (
+    DotsOCR1p5DockerServerConfig,
+    DotsOCRDockerServerConfig,
+)
 from vlmparse.clients.glmocr import GLMOCRDockerServerConfig
 from vlmparse.clients.granite_docling import GraniteDoclingDockerServerConfig
 from vlmparse.clients.hunyuanocr import HunyuanOCRDockerServerConfig
 from vlmparse.clients.lightonocr import (
+    LightonOCR21BboxServerConfig,
     LightonOCR21BServerConfig,
     LightOnOCRDockerServerConfig,
 )
@@ -52,6 +56,8 @@ SERVER_CONFIGS: list[type[DockerServerConfig | DockerComposeServerConfig]] = [
     DeepSeekOCR2DockerServerConfig,
     GraniteDoclingDockerServerConfig,
     LightonOCR21BServerConfig,
+    LightonOCR21BboxServerConfig,
+    DotsOCR1p5DockerServerConfig,
 ]
 
 # Register docker server configs
