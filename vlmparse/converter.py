@@ -178,14 +178,14 @@ class BaseConverter:
         if self.save_mode == "document":
             zip_path = save_folder / f"{doc_name}.zip"
             document.to_zip(zip_path)
-            logger.info(f"Saved document to {zip_path}")
+            logger.debug(f"Saved document to {zip_path}")
 
         elif self.save_mode == "md":
             md_path = save_folder / f"{doc_name}.md"
             text_content = "\n\n".join([page.text or "" for page in document.pages])
             with open(md_path, "w", encoding="utf-8") as f:
                 f.write(text_content)
-            logger.info(f"Saved markdown to {md_path}")
+            logger.debug(f"Saved markdown to {md_path}")
 
         elif self.save_mode == "md_page":
             doc_folder = save_folder / doc_name
@@ -195,7 +195,7 @@ class BaseConverter:
                 page_path = doc_folder / f"page_{i:04d}.md"
                 with open(page_path, "w", encoding="utf-8") as f:
                     f.write(page_text)
-            logger.info(f"Saved {len(document.pages)} pages to {doc_folder}")
+            logger.debug(f"Saved {len(document.pages)} pages to {doc_folder}")
 
         else:
             logger.warning(f"Unknown save_mode: {self.save_mode}, skipping save")

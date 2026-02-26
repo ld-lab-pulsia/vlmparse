@@ -314,14 +314,14 @@ class ConverterWithServer:
         self.client.num_concurrent_files = self.concurrency if not debug else 1
         self.client.num_concurrent_pages = self.concurrency if not debug else 1
 
-        logger.info(f"Processing {len(file_paths)} files with {self.model} converter")
+        logger.debug(f"Processing {len(file_paths)} files with {self.model} converter")
 
         documents = self.client.batch(file_paths)  # type: ignore
 
         if documents is not None:
-            logger.info(f"Processed {len(documents)} documents to {out_folder}")
+            logger.debug(f"Processed {len(documents)} documents to {out_folder}")
         else:
-            logger.info(f"Processed {len(file_paths)} documents to {out_folder}")
+            logger.debug(f"Processed {len(file_paths)} documents to {out_folder}")
 
         return documents
 

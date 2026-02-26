@@ -259,7 +259,7 @@ class DotsOCRConverter(OpenAIConverterClient):
         _, response, _, usage = await self._parse_image_vllm(
             image, prompt_mode=prompt_key
         )
-        logger.info("Response: " + str(response))
+        logger.debug("Response: " + str(response))
 
         items = None
         if prompt_key == "prompt_layout_all_en":

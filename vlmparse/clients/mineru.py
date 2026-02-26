@@ -95,7 +95,7 @@ class MinerUConverter(BaseConverter):
 
         # Call MinerU API
         response = await self._parse_image_with_api(image)
-        logger.info("Response: " + str(response))
+        logger.debug("Response: " + str(response))
 
         contents = [item.get("content", "") for item in response]
         text = "\n\n".join([content for content in contents if content is not None])
