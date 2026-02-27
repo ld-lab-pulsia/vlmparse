@@ -156,7 +156,7 @@ Converter with automatic server management:
 ```python
 from vlmparse.converter_with_server import ConverterWithServer
 
-with ConverterWithServer(model="mineru2.5") as converter_with_server:
+with ConverterWithServer(model="mineru25") as converter_with_server:
     documents = converter_with_server.parse(inputs=["file1.pdf", "file2.pdf"], out_folder="./output")
 ```
 
