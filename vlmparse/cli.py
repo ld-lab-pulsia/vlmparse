@@ -113,6 +113,12 @@ def convert(
     ),
     concurrency: int = typer.Option(10, help="Number of parallel requests"),
     dpi: int | None = typer.Option(None, help="DPI to use for the conversion"),
+    max_image_size: int | None = typer.Option(
+        None,
+        help=(
+            "Maximum size (in pixels) for the longest edge of images during conversion. "
+        ),
+    ),
     use_response_api: bool = typer.Option(
         False,
         help=(
