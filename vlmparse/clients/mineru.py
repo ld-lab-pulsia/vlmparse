@@ -32,7 +32,7 @@ class MinerUConverterConfig(ConverterConfig):
     """Configuration for MinerU API converter."""
 
     model_name: str = "opendatalab/MinerU2.5-2509-1.2B"
-    aliases: list[str] = Field(default_factory=lambda: ["mineru25"])
+    aliases: list[str] = Field(default_factory=lambda: ["mineru25", "mineru2.5"])
     timeout: int = 600
 
     def get_client(self, **kwargs) -> "MinerUConverter":
