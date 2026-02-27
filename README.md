@@ -61,13 +61,13 @@ Note that you can bypass the previous installation step and just add uvx before 
 With a general VLM (requires setting your api key as an environment variable):
 
 ```bash
-vlmparse convert "*.pdf" --out_folder ./output --model gemini-2.5-flash-lite
+vlmparse convert "*.pdf" -o ./output --model gemini-2.5-flash-lite
 ```
 
 Convert with auto deployment of a small vlm (or any huggingface VLM model, requires a gpu + docker installation):
 
 ```bash
-vlmparse convert "*.pdf" --out_folder ./output --model nanonets/Nanonets-OCR2-3B
+vlmparse convert "*.pdf" -o ./output --model nanonets/Nanonets-OCR2-3B
 ```
 
 ### Deploy a local model server
@@ -77,13 +77,13 @@ Deployment (requires a gpu + docker installation):
 - Check that the port is not used by another service.
 
 ```bash
-vlmparse serve lightonocr2 --port 8000 --gpus 1
+vlmparse serve lightonocr2 --port 8000 --gpu 1
 ```
 
 then convert:
 
 ```bash
-vlmparse convert "*.pdf" --out_folder ./output --uri http://localhost:8000/v1
+vlmparse convert "*.pdf" -o ./output --uri http://localhost:8000/v1
 ```
 
 You can also list all running servers:
