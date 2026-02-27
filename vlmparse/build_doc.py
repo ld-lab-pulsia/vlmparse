@@ -37,7 +37,7 @@ def convert_pdfium_to_images(file_path, dpi=175):
         cur_size, limit_size = map(int, re.findall(r"\d+", str(e)))
         factor = custom_ceil(cur_size / limit_size, precision=1)
         new_dpi = dpi // factor
-        logger.info(
+        logger.debug(
             "Retrying {file_path} with reduced DPI: {old_dpi} -> {new_dpi}",
             file_path=str(file_path),
             old_dpi=dpi,
@@ -65,7 +65,7 @@ def resize_image(image, max_image_size):
                 int(image.size[1] * ratio),
             )
             image = image.resize(new_size)
-            logger.info(f"Resized image to {new_size}")
+            logger.debug(f"Resized image to {new_size}")
     return image
 
 

@@ -183,7 +183,7 @@ class DeepSeekOCRConverterClient(OpenAIConverterClient):
 
         # Get raw response using parent's method
         response, usage = await self._get_chat_completion(messages)
-        logger.info("Response length: " + str(len(response)))
+        logger.debug("Response length: " + str(len(response)))
         page.raw_response = response
 
         if prompt_key == "layout":
@@ -340,7 +340,7 @@ class DeepSeekOCR2ConverterClient(DeepSeekOCRConverterClient):
 
         # Get raw response using parent's method
         response, usage = await self._get_chat_completion(messages)
-        logger.info("Response length: " + str(len(response)))
+        logger.debug("Response length: " + str(len(response)))
         page.raw_response = response
 
         if prompt_key == "layout":

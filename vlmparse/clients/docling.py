@@ -120,7 +120,7 @@ class DoclingConverter(BaseConverter):
             response.raise_for_status()
 
             result = response.json()
-            logger.info(f"Docling API response status: {response.status_code}")
+            logger.debug(f"Docling API response status: {response.status_code}")
 
             # Extract text from the response
             # The response structure depends on the output format
@@ -133,7 +133,7 @@ class DoclingConverter(BaseConverter):
             else:  # json or other formats
                 text = str(result)
 
-            logger.info(f"Extracted text length: {len(text)}")
+            logger.debug(f"Extracted text length: {len(text)}")
 
             # Clean and convert the response
             text = clean_response(text)

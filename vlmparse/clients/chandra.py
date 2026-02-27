@@ -401,7 +401,7 @@ class ChandraConverterClient(OpenAIConverterClient):
             else:
                 break
 
-        logger.info("Response length: " + str(len(result_content)))
+        logger.debug("Response length: " + str(len(result_content)))
         page.raw_response = result_content
         text = clean_response(result_content)
 
@@ -416,7 +416,7 @@ class ChandraConverterClient(OpenAIConverterClient):
                     text, image, bbox_scale=self.config.bbox_scale
                 )
                 page.items = layout_blocks_to_items(layout_blocks)
-                logger.info(f"Parsed {len(page.items)} layout blocks")
+                logger.debug(f"Parsed {len(page.items)} layout blocks")
             except Exception as e:
                 logger.warning(f"Error parsing layout blocks: {e}")
                 page.items = []

@@ -52,7 +52,7 @@ def get_model_from_uri(uri: str) -> str:
         if c_uri and uri_tuple[2] == normalize_uri(c_uri)[2]:
             # Infer model if not provided
             if model is None and c_model:
-                logger.info(f"Inferred model {c_model} from container")
+                logger.debug(f"Inferred model {c_model} from container")
                 model = c_model
             break
     if model is None:

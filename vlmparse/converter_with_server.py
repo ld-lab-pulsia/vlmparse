@@ -1,5 +1,6 @@
 import datetime
 import os
+import time
 from pathlib import Path
 from typing import Literal
 
@@ -254,6 +255,7 @@ class ConverterWithServer:
         ]
         | None = None,
         dpi: int | None = None,
+        max_image_size: int | None = None,
         debug: bool = False,
         retrylast: bool = False,
         completion_kwargs: dict | None = None,
@@ -296,6 +298,8 @@ class ConverterWithServer:
 
         if dpi is not None:
             self.client.config.dpi = int(dpi)
+        if max_image_size is not None:
+            self.client.config.max_image_size = int(max_image_size)
 
         if conversion_mode is not None:
             self.client.config.conversion_mode = conversion_mode
@@ -314,14 +318,15 @@ class ConverterWithServer:
         self.client.num_concurrent_files = self.concurrency if not debug else 1
         self.client.num_concurrent_pages = self.concurrency if not debug else 1
 
-        logger.info(f"Processing {len(file_paths)} files with {self.model} converter")
+        logger.debug(f"Processing {len(file_paths)} files with {self.model} converter")
+        tic = time.perf_counter()
 
         documents = self.client.batch(file_paths)  # type: ignore
 
-        if documents is not None:
-            logger.info(f"Processed {len(documents)} documents to {out_folder}")
-        else:
-            logger.info(f"Processed {len(file_paths)} documents to {out_folder}")
+        toc = time.perf_counter()
+        logger.debug(
+            f"Processed {len(file_paths)} documents to {out_folder} in {toc - tic:.2f} seconds"
+        )
 
         return documents
 
