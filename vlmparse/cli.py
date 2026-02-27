@@ -10,13 +10,19 @@ app = typer.Typer(help="Parse PDF documents with VLMs.", pretty_exceptions_enabl
 @app.command("serve")
 def serve(
     model: str = typer.Argument(..., help="Model name"),
-    port: int | None = typer.Option(None, help="VLLM server port (default: 8056)"),
-    gpus: str | None = typer.Option(
+    port: int | None = typer.Option(
+        None, "-p", "--port", help="VLLM server port (default: 8056)"
+    ),
+    gpu: str | None = typer.Option(
         None,
+        "-g",
+        "--gpu",
         help='Comma-separated GPU device IDs (e.g., "0" or "0,1,2"). If not specified, all GPUs will be used.',
     ),
     provider: Literal["registry", "hf"] = typer.Option(
-        "registry", help="provider type for the model. 'registry' (default) or 'hf'."
+        "registry",
+        "--provider",
+        help="provider type for the model. 'registry' (default) or 'hf'.",
     ),
     vllm_args: list[str] | None = typer.Option(
         None,
@@ -46,7 +52,7 @@ def serve(
 
     base_url, container, _, _ = start_server(
         model=model,
-        gpus=gpus,
+        gpus=gpu,
         port=port,
         provider=provider,
         vllm_args=vllm_args,
@@ -63,23 +69,34 @@ def serve(
 @app.command("convert")
 def convert(
     inputs: str = typer.Argument(..., help="List of folders to process"),
-    out_folder: str = typer.Option(".", help="Output folder for parsed documents"),
+    out_folder: str = typer.Option(
+        ".", "-o", "--out-folder", help="Output folder for parsed documents"
+    ),
     model: str | None = typer.Option(
-        None, help="Model name. If not specified, inferred from the URI."
+        None,
+        "-m",
+        "--model",
+        help="Model name. If not specified, inferred from the URI.",
     ),
     uri: str | None = typer.Option(
         None,
+        "-u",
+        "--uri",
         help=(
             "URI of the server. If not specified and the pipe is vllm, "
             "a local server will be deployed."
         ),
     ),
-    gpus: str | None = typer.Option(
+    gpu: str | None = typer.Option(
         None,
+        "-g",
+        "--gpu",
         help='Comma-separated GPU device IDs (e.g., "0" or "0,1,2"). If not specified, GPU 0 will be used.',
     ),
-    mode: Literal["document", "md", "md_page"] = typer.Option(
+    save_mode: Literal["document", "md", "md_page"] = typer.Option(
         "document",
+        "-s",
+        "--save-mode",
         help=(
             "Output mode - document (save as JSON zip), md (save as markdown file), "
             "md_page (save as folder of markdown pages)"
@@ -94,6 +111,8 @@ def convert(
         "chart",
     ] = typer.Option(
         "ocr",
+        "-c",
+        "--conversion-mode",
         help=(
             "Conversion mode - ocr (plain), ocr_layout (OCR with layout), table (table-centric), "
             "image_description (describe the image), formula (formula extraction), chart (chart recognition)"
@@ -101,6 +120,8 @@ def convert(
     ),
     provider: Literal["registry", "hf", "google", "openai", "azure"] = typer.Option(
         "registry",
+        "-p",
+        "--provider",
         help="Server type for the model. Defaults to 'registry'.",
     ),
     with_vllm_server: bool = typer.Option(
@@ -111,10 +132,15 @@ def convert(
             "Note that if the model is in the registry and uri is None, the server will be deployed."
         ),
     ),
-    concurrency: int = typer.Option(10, help="Number of parallel requests"),
-    dpi: int | None = typer.Option(None, help="DPI to use for the conversion"),
+    concurrency: int = typer.Option(
+        10, "-n", "--concurrency", help="Number of parallel requests"
+    ),
+    dpi: int | None = typer.Option(
+        None, "-d", "--dpi", help="DPI to use for the conversion"
+    ),
     max_image_size: int | None = typer.Option(
         None,
+        "--max-image-size",
         help=(
             "Maximum size (in pixels) for the longest edge of images during conversion. "
         ),
@@ -152,7 +178,7 @@ def convert(
     with ConverterWithServer(
         model=model,
         uri=uri,
-        gpus=gpus,
+        gpus=gpu,
         provider=provider,
         concurrency=concurrency,
         return_documents=_return_documents,
@@ -161,7 +187,7 @@ def convert(
         return converter_with_server.parse(
             inputs=inputs,
             out_folder=out_folder,
-            mode=mode,
+            mode=save_mode,
             conversion_mode=conversion_mode,
             dpi=dpi,
             debug=debug,
@@ -365,8 +391,10 @@ def log(
     container: str | None = typer.Argument(
         None, help="Container ID or name. If not specified, auto-selects."
     ),
-    follow: bool = typer.Option(True, help="Follow log output"),
-    tail: int = typer.Option(500, help="Number of lines to show from the end"),
+    follow: bool = typer.Option(True, "-f", "--follow", help="Follow log output"),
+    tail: int = typer.Option(
+        500, "-t", "--tail", help="Number of lines to show from the end"
+    ),
 ):
     """Show logs from a Docker container.
 

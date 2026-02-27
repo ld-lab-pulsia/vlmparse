@@ -62,7 +62,7 @@ class TestServeCommand:
         with mock_docker_operations() as (mock_registry, mock_config, mock_server, _):
             result = runner.invoke(
                 app,
-                ["serve", "lightonocr", "--port", "8056", "--gpus", "0,1,2"],
+                ["serve", "lightonocr", "--port", "8056", "--gpu", "0,1,2"],
             )
             assert result.exit_code == 0, result.output
 
@@ -73,7 +73,7 @@ class TestServeCommand:
     def test_serve_single_gpu(self, runner, mock_docker_operations):
         """Test serve command with single GPU."""
         with mock_docker_operations() as (mock_registry, mock_config, mock_server, _):
-            result = runner.invoke(app, ["serve", "lightonocr", "--gpus", "0"])
+            result = runner.invoke(app, ["serve", "lightonocr", "--gpu", "0"])
             assert result.exit_code == 0, result.output
 
             # Verify single GPU was parsed correctly
@@ -269,7 +269,7 @@ class TestConvertCommand:
                     str(tmp_output_dir),
                     "--model",
                     "lightonocr",
-                    "--gpus",
+                    "--gpu",
                     "0,1",
                     "--debug",
                 ],
