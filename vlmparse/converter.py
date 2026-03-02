@@ -1,5 +1,4 @@
 import asyncio
-import threading
 import time
 from pathlib import Path
 from typing import Literal
@@ -14,9 +13,6 @@ from .base_model import VLMParseBaseModel
 from .build_doc import convert_specific_page_to_image, get_page_count, resize_image
 from .constants import IMAGE_EXTENSIONS, PDF_EXTENSION
 from .data_model.document import Document, Page, ProcessingError
-
-# Add a lock to ensure PDFium is accessed by only one thread/task at a time
-PDFIUM_LOCK = threading.Lock()
 
 
 class ConverterConfig(VLMParseBaseModel):
@@ -77,12 +73,11 @@ class BaseConverter:
                 image = image.convert("L").convert("RGB")
 
         elif Path(file_path).suffix.lower() == PDF_EXTENSION:
-            with PDFIUM_LOCK:
-                image = convert_specific_page_to_image(
-                    file_path,
-                    page_idx,
-                    dpi=self.config.dpi,
-                )
+            image = convert_specific_page_to_image(
+                file_path,
+                page_idx,
+                dpi=self.config.dpi,
+            )
 
         else:
             raise ValueError(

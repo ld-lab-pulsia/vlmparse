@@ -1,4 +1,5 @@
 import re
+import threading
 from pathlib import Path
 
 import numpy as np
@@ -8,12 +9,16 @@ from loguru import logger
 
 from .constants import PDF_EXTENSION
 
+# Add a lock to ensure PDFium is accessed by only one thread/task at a time
+PDFIUM_LOCK = threading.Lock()
+
 
 def convert_pdfium(file_path, dpi):
     pil_images = []
-    with pdfium.PdfDocument(file_path) as pdf:
-        for page in pdf:
-            pil_images.append(page.render(scale=dpi / 72).to_pil())
+    with PDFIUM_LOCK:
+        with pdfium.PdfDocument(file_path) as pdf:
+            for page in pdf:
+                pil_images.append(page.render(scale=dpi / 72).to_pil())
     return pil_images
 
 
@@ -49,10 +54,11 @@ def convert_pdfium_to_images(file_path, dpi=175):
 
 
 def convert_specific_page_to_image(file_path, page_number, dpi=175):
-    with pdfium.PdfDocument(file_path) as pdf:
-        page = pdf.get_page(page_number)
-        image = page.render(scale=dpi / 72).to_pil()
-        image = image.convert("L").convert("RGB") if image.mode != "RGB" else image
+    with PDFIUM_LOCK:
+        with pdfium.PdfDocument(file_path) as pdf:
+            page = pdf.get_page(page_number)
+            image = page.render(scale=dpi / 72).to_pil()
+            image = image.convert("L").convert("RGB") if image.mode != "RGB" else image
     return image
 
 
@@ -71,7 +77,8 @@ def resize_image(image, max_image_size):
 
 def get_page_count(file_path):
     if Path(file_path).suffix.lower() == PDF_EXTENSION:
-        with pdfium.PdfDocument(file_path) as pdf:
-            return len(pdf)
+        with PDFIUM_LOCK:
+            with pdfium.PdfDocument(file_path) as pdf:
+                return len(pdf)
     else:
         return 1
