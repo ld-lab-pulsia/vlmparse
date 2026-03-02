@@ -11,6 +11,7 @@ from vlmparse.clients.dotsocr import (
     DotsOCR1p5DockerServerConfig,
     DotsOCRDockerServerConfig,
 )
+from vlmparse.clients.fireredocr import FireRedOCRDockerServerConfig
 from vlmparse.clients.glmocr import GLMOCRDockerServerConfig
 from vlmparse.clients.granite_docling import GraniteDoclingDockerServerConfig
 from vlmparse.clients.hunyuanocr import HunyuanOCRDockerServerConfig
@@ -58,6 +59,7 @@ SERVER_CONFIGS: list[type[DockerServerConfig | DockerComposeServerConfig]] = [
     LightonOCR21BServerConfig,
     LightonOCR21BboxServerConfig,
     DotsOCR1p5DockerServerConfig,
+    FireRedOCRDockerServerConfig,
 ]
 
 # Register docker server configs
