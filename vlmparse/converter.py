@@ -49,13 +49,23 @@ class BaseConverter:
     ):
         self.config = config
         self.num_concurrent_files = num_concurrent_files
-        self.num_concurrent_pages = num_concurrent_pages
+        self.num_concurrent_pages = (
+            num_concurrent_pages  # triggers setter → creates page_semaphore
+        )
         self.save_folder = save_folder
         self.save_mode = save_mode
         self.debug = debug
         self.return_documents_in_batch_mode = return_documents_in_batch_mode
         self.save_page_images = save_page_images
-        self.page_semaphore = asyncio.Semaphore(self.num_concurrent_pages)
+
+    @property
+    def num_concurrent_pages(self) -> int:
+        return self._num_concurrent_pages
+
+    @num_concurrent_pages.setter
+    def num_concurrent_pages(self, value: int) -> None:
+        self._num_concurrent_pages = value
+        self.page_semaphore = asyncio.Semaphore(value)
 
     async def async_call_inside_page(self, page: Page) -> Page:
         raise NotImplementedError
