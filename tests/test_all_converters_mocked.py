@@ -37,6 +37,7 @@ ALL_MODELS = [
     "granite-docling",
     "deepseekocr2",
     "fireredocr",
+    "ocrverse",
 ]
 
 
