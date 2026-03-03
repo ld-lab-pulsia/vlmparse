@@ -69,6 +69,7 @@ def test_convert_mistral_ocr(file_path, model, tmp_output_dir):
         "glmocr",
         "dotsocr1.5",
         "fireredocr",
+        "ocrverse",
     ],
 )
 def test_converter_with_server_with_docker(file_path, model, tmp_output_dir):

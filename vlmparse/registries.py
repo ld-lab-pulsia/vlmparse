@@ -23,6 +23,7 @@ from vlmparse.clients.lightonocr import (
 from vlmparse.clients.mineru import MinerUDockerServerConfig
 from vlmparse.clients.mistral_converter import MistralOCRConverterConfig
 from vlmparse.clients.nanonetocr import NanonetOCR2DockerServerConfig
+from vlmparse.clients.ocrverse import OCRVerseDockerServerConfig
 from vlmparse.clients.olmocr import OlmOCRDockerServerConfig
 from vlmparse.clients.openai_converter import OpenAIConverterConfig
 from vlmparse.clients.paddleocrvl import PaddleOCRVLDockerServerConfig
@@ -60,6 +61,7 @@ SERVER_CONFIGS: list[type[DockerServerConfig | DockerComposeServerConfig]] = [
     LightonOCR21BboxServerConfig,
     DotsOCR1p5DockerServerConfig,
     FireRedOCRDockerServerConfig,
+    OCRVerseDockerServerConfig,
 ]
 
 # Register docker server configs
