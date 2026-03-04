@@ -41,7 +41,7 @@ class FireRedOCRDockerServerConfig(VLLMDockerServerConfig):
             "--max-num-seqs",
             "5",
             "--limit-mm-per-prompt",
-            '{"image": 50}',
+            '{"image": 1}',
         ]
     )
     aliases: list[str] = Field(default_factory=lambda: ["fireredocr", "firered-ocr"])

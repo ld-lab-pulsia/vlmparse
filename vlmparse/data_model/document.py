@@ -31,6 +31,8 @@ class Item(VLMParseBaseModel):
     category: str
     box: BoundingBox
     text: str
+    class_name: str | None = None
+    confidence: float | None = None
 
 
 class Page(VLMParseBaseModel):
@@ -90,10 +92,8 @@ class Page(VLMParseBaseModel):
                     outline=(255, 0, 0),
                     width=5,
                 )
-
-                image = draw_text_of_box(
-                    image, box.l, box.t, item.category, font_size=40
-                )
+                box_text = item.class_name or item.category
+                image = draw_text_of_box(image, box.l, box.t, box_text, font_size=40)
         return image
 
     def to_markdown(self, **kwargs):
