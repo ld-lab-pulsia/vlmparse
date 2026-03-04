@@ -10,7 +10,8 @@ from pydantic import Field
 from vlmparse.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_tables
 from vlmparse.clients.pipe_utils.utils import clean_response
 from vlmparse.converter import BaseConverter, ConverterConfig
-from vlmparse.data_model.document import Page
+from vlmparse.data_model.box import BoundingBox
+from vlmparse.data_model.document import Item, Page
 from vlmparse.servers.docker_server import DockerServerConfig
 
 
@@ -31,26 +32,20 @@ class DoclingDockerServerConfig(DockerServerConfig):
         default_factory=lambda: {
             "DOCLING_SERVE_HOST": "0.0.0.0",
             "DOCLING_SERVE_PORT": "5001",
-            "LOG_LEVEL": "DEBUG",  # Enable verbose logging
-            # Performance Tuning
-            # "UVICORN_WORKERS": "4",  # Increase web server workers (Default: 1)
-            "DOCLING_SERVE_ENG_LOC_NUM_WORKERS": "16",  # Increase processing workers (Default: 2)
-            "DOCLING_NUM_THREADS": "32",  # Increase torch threads (Default: 4)
+            "LOG_LEVEL": "DEBUG",
+            "DOCLING_SERVE_ENG_LOC_NUM_WORKERS": "16",
+            "DOCLING_NUM_THREADS": "32",
         }
     )
 
     def model_post_init(self, __context):
-        """Set docker_image and gpu_device_ids based on cpu_only if not explicitly provided."""
         if not self.docker_image:
             if self.cpu_only:
                 self.docker_image = "quay.io/docling-project/docling-serve-cpu:latest"
             else:
                 self.docker_image = "quay.io/docling-project/docling-serve:latest"
-
-        # For CPU-only mode, explicitly disable GPU by setting empty list
         if self.cpu_only and self.gpu_device_ids is None:
             self.gpu_device_ids = []
-
         if self.enable_ui:
             self.command_args.append("--enable-ui")
 
@@ -64,18 +59,202 @@ class DoclingConverterConfig(ConverterConfig):
 
     model_name: str = "docling"
     timeout: int = 300
-    api_kwargs: dict = {"output_format": "markdown", "image_export_mode": "referenced"}
+    api_kwargs: dict = {
+        "to_formats": ["md", "json"],
+        "image_export_mode": "placeholder",
+        "do_picture_classification": True,
+    }
 
     def get_client(self, **kwargs) -> "DoclingConverter":
         return DoclingConverter(config=self, **kwargs)
 
 
 def image_to_bytes(image: Image.Image) -> bytes:
-    # Convert image to bytes for file upload
     img_byte_arr = BytesIO()
     image.save(img_byte_arr, format="PNG")
-    img_bytes = img_byte_arr.getvalue()
-    return img_bytes
+    return img_byte_arr.getvalue()
+
+
+def _resolve_ref(doc_json: dict, ref: str) -> dict | None:
+    """Resolve a $ref like '#/texts/0' or '#/tables/0' into the actual item dict."""
+    try:
+        parts = ref.lstrip("#/").split("/")
+        obj = doc_json
+        for part in parts:
+            obj = obj[int(part)] if isinstance(obj, list) else obj[part]
+        return obj
+    except (KeyError, IndexError, ValueError):
+        return None
+
+
+def _iter_body_items(doc_json: dict):
+    """Yield leaf doc items in body reading order, resolving groups recursively."""
+
+    def _iter_children(children: list):
+        for child_ref in children:
+            ref = child_ref.get("$ref", "")
+            item = _resolve_ref(doc_json, ref)
+            if item is None:
+                continue
+            # Groups have children but no prov — recurse into them
+            if "prov" not in item or not item.get("prov"):
+                yield from _iter_children(item.get("children", []))
+            else:
+                yield item
+
+    yield from _iter_children(doc_json.get("body", {}).get("children", []))
+
+
+def _convert_bbox(bbox: dict, page_height: float | None) -> BoundingBox | None:
+    """Convert a docling bbox dict (BOTTOMLEFT) to a vlmparse BoundingBox (TOPLEFT)."""
+    try:
+        l = bbox["l"]
+        t = bbox["t"]
+        r = bbox["r"]
+        b = bbox["b"]
+        if bbox.get("coord_origin") == "BOTTOMLEFT" and page_height:
+            new_t = page_height - t
+            new_b = page_height - b
+            t, b = min(new_t, new_b), max(new_t, new_b)
+        return BoundingBox(l=max(l, 0), t=max(t, 0), r=max(r, 0), b=max(b, 0))
+    except Exception as e:
+        logger.warning(f"Could not convert bbox {bbox}: {e}")
+        return None
+
+
+def table_to_html(table_item: dict) -> str:
+    """Render a docling table item (with structured cell data) as an HTML table."""
+    data = table_item.get("data", {})
+    if not data:
+        return ""
+
+    num_rows = data.get("num_rows", 0)
+    num_cols = data.get("num_cols", 0)
+    cells = data.get("table_cells", [])
+
+    if not cells or not num_rows or not num_cols:
+        return ""
+
+    # Build a sparse grid: (row, col) -> cell dict, tracking occupied slots
+    occupied: set[tuple[int, int]] = set()
+    sorted_cells = sorted(
+        cells,
+        key=lambda c: (
+            c.get("start_row_offset_idx", 0),
+            c.get("start_col_offset_idx", 0),
+        ),
+    )
+
+    # Group cells by row
+    rows: dict[int, list[dict]] = {}
+    for cell in sorted_cells:
+        row = cell.get("start_row_offset_idx", 0)
+        rows.setdefault(row, []).append(cell)
+
+    html = ["<table>"]
+    for row_idx in range(num_rows):
+        html.append("<tr>")
+        col_cursor = 0
+        for cell in rows.get(row_idx, []):
+            start_col = cell.get("start_col_offset_idx", 0)
+            row_span = cell.get("row_span", 1)
+            col_span = cell.get("col_span", 1)
+            text = cell.get("text", "")
+            is_header = cell.get("column_header", False) or cell.get(
+                "row_header", False
+            )
+            tag = "th" if is_header else "td"
+
+            # Skip cells already occupied by a previous rowspan
+            while (row_idx, col_cursor) in occupied:
+                col_cursor += 1
+
+            attrs = ""
+            if row_span > 1:
+                attrs += f' rowspan="{row_span}"'
+            if col_span > 1:
+                attrs += f' colspan="{col_span}"'
+
+            html.append(f"<{tag}{attrs}>{text}</{tag}>")
+
+            # Mark occupied slots
+            for r in range(row_idx, row_idx + row_span):
+                for c in range(start_col, start_col + col_span):
+                    occupied.add((r, c))
+            col_cursor = start_col + col_span
+
+        html.append("</tr>")
+    html.append("</table>")
+    return "\n".join(html)
+
+
+def extract_items_from_docling_json(
+    doc_json: dict, page_height: float | None
+) -> list[Item]:
+    """Extract layout Items with bounding boxes in body reading order."""
+    items = []
+    for doc_item in _iter_body_items(doc_json):
+        label = doc_item.get("label", "text")
+        text = doc_item.get("orig") or doc_item.get("text") or ""
+
+        # Extract top predicted class from picture classification annotations
+        class_name: str | None = None
+        confidence: float | None = None
+        if label == "picture":
+            for annotation in doc_item.get("annotations", []):
+                if annotation.get("kind") == "classification":
+                    predicted = annotation.get("predicted_classes", [])
+                    if predicted:
+                        class_name = predicted[0].get("class_name")
+                        confidence = predicted[0].get("confidence")
+                    break
+
+        for prov in doc_item.get("prov", []):
+            bbox_dict = prov.get("bbox")
+            if not bbox_dict:
+                continue
+            box = _convert_bbox(bbox_dict, page_height)
+            if box is None:
+                continue
+            items.append(
+                Item(
+                    category=label,
+                    text=text,
+                    box=box,
+                    class_name=class_name,
+                    confidence=confidence,
+                )
+            )
+
+    return items
+
+
+def extract_text_from_docling_json(doc_json: dict) -> str:
+    """Reconstruct markdown text in reading order; tables are rendered as HTML."""
+    parts = []
+    for doc_item in _iter_body_items(doc_json):
+        label = doc_item.get("label", "")
+        text = doc_item.get("orig") or doc_item.get("text") or ""
+
+        if label == "table":
+            html = table_to_html(doc_item)
+            if html:
+                parts.append(html)
+        elif label == "section_header":
+            level = doc_item.get("level", 1)
+            if text.strip():
+                parts.append(f"{'#' * level} {text}")
+        elif label == "list_item":
+            if text.strip():
+                marker = doc_item.get("marker") or "-"
+                parts.append(f"{marker} {text}")
+        elif label == "picture":
+            parts.append("![image]")
+        else:
+            if text.strip():
+                parts.append(text)
+
+    return "\n\n".join(parts)
 
 
 class DoclingConverter(BaseConverter):
@@ -122,20 +301,23 @@ class DoclingConverter(BaseConverter):
             result = response.json()
             logger.debug(f"Docling API response status: {response.status_code}")
 
-            # Extract text from the response
-            # The response structure depends on the output format
-            if self.config.api_kwargs["output_format"] == "markdown":
-                text = result["document"]["md_content"]
+            doc_json = result["document"]["json_content"]
 
-            elif self.config.api_kwargs["output_format"] == "text":
-                text = result["document"]["md_content"]
+            # pages is a dict with string keys e.g. {'1': {'size': {...}, ...}}
+            page_height: float | None = None
+            pages = doc_json.get("pages", {})
+            if pages:
+                first_page = next(iter(pages.values()))
+                page_height = first_page.get("size", {}).get("height")
 
-            else:  # json or other formats
-                text = str(result)
+            # Extract layout items with bounding boxes in reading order
+            page.items = extract_items_from_docling_json(doc_json, page_height)
+            logger.debug(f"Extracted {len(page.items)} layout items")
 
+            # Extract text in reading order (tables rendered as HTML)
+            text = extract_text_from_docling_json(doc_json)
             logger.debug(f"Extracted text length: {len(text)}")
 
-            # Clean and convert the response
             text = clean_response(text)
             text = html_to_md_keep_tables(text)
             page.text = text
