@@ -19,7 +19,7 @@ GOOGLE_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 
 class OpenAIConverterConfig(ConverterConfig):
-    api_key: str | None = None
+    api_key: str = ""
     is_azure: bool = False
     timeout: int | None = 500
     max_retries: int = 1
