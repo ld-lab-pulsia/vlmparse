@@ -168,7 +168,7 @@ for gemini_model in [
         lambda uri=None, model=gemini_model: OpenAIConverterConfig(
             model_name=model,
             base_url=GOOGLE_API_BASE_URL if uri is None else uri,
-            api_key=os.getenv("GOOGLE_API_KEY", None),
+            api_key=os.getenv("GOOGLE_API_KEY", ""),
             default_model_name=model,
         ),
     )
@@ -182,7 +182,7 @@ for openai_model in [
         lambda uri=None, model=openai_model: OpenAIConverterConfig(
             model_name=model,
             base_url=None,
-            api_key=os.getenv("OPENAI_API_KEY", None),
+            api_key=os.getenv("OPENAI_API_KEY", ""),
             default_model_name=model,
         ),
     )
@@ -192,6 +192,6 @@ for mistral_model in ["mistral-ocr-latest", "mistral-ocr"]:
         mistral_model,
         lambda uri=None, model=mistral_model: MistralOCRConverterConfig(
             base_url="https://api.mistral.ai/v1" if uri is None else uri,
-            api_key=os.getenv("MISTRAL_API_KEY", None),
+            api_key=os.getenv("MISTRAL_API_KEY", ""),
         ),
     )

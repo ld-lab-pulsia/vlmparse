@@ -108,27 +108,42 @@ def get_client_config(
     elif provider == "google":
         from vlmparse.registries import GOOGLE_API_BASE_URL
 
+        api_key = api_key if api_key is not None else os.getenv("GOOGLE_API_KEY")
+        if api_key is None:
+            assert (
+                os.getenv("GOOGLE_API_KEY") is not None
+            ), "Google API key must be provided via parameter or environment variable"
+            api_key = os.getenv("GOOGLE_API_KEY", "")
+
         client_config = OpenAIConverterConfig(
             model_name=model,
             base_url=GOOGLE_API_BASE_URL if uri is None else uri,
-            api_key=api_key if api_key is not None else os.getenv("GOOGLE_API_KEY"),
+            api_key=api_key,
             default_model_name=model,
         )
 
     elif provider == "openai":
+        if api_key is None:
+            assert (
+                os.getenv("OPENAI_API_KEY") is not None
+            ), "OpenAI API key must be provided via parameter or environment variable"
+            api_key = os.getenv("OPENAI_API_KEY", "")
         client_config = OpenAIConverterConfig(
             model_name=model,
             base_url=uri,
-            api_key=api_key if api_key is not None else os.getenv("OPENAI_API_KEY"),
+            api_key=api_key,
             default_model_name=model,
         )
     elif provider == "azure":
+        if api_key is None:
+            assert (
+                os.getenv("AZURE_OPENAI_API_KEY") is not None
+            ), "Azure OpenAI API key must be provided via parameter or environment variable"
+            api_key = os.getenv("AZURE_OPENAI_API_KEY", "")
         client_config = OpenAIConverterConfig(
             model_name=model,
             base_url=uri if uri is not None else os.getenv("AZURE_OPENAI_ENDPOINT"),
-            api_key=api_key
-            if api_key is not None
-            else os.getenv("AZURE_OPENAI_API_KEY"),
+            api_key=api_key,
             is_azure=True,
             default_model_name=model,
             use_response_api=use_response_api,
