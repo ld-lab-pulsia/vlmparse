@@ -196,6 +196,7 @@ def extract_items_from_docling_json(
     for doc_item in _iter_body_items(doc_json):
         label = doc_item.get("label", "text")
         text = doc_item.get("orig") or doc_item.get("text") or ""
+        self_ref = doc_item.get("self_ref")
 
         # Extract top predicted class from picture classification annotations
         class_name: str | None = None
@@ -221,10 +222,35 @@ def extract_items_from_docling_json(
                     category=label,
                     text=text,
                     box=box,
+                    id=self_ref,
                     class_name=class_name,
                     confidence=confidence,
                 )
             )
+
+        # Add captions as separate items referencing this figure
+        if label in ("picture", "table") and self_ref:
+            for cap_ref in doc_item.get("captions", []):
+                ref = cap_ref.get("$ref", "")
+                cap_item = _resolve_ref(doc_json, ref)
+                if cap_item is None:
+                    continue
+                cap_text = cap_item.get("orig") or cap_item.get("text") or ""
+                for prov in cap_item.get("prov", []):
+                    bbox_dict = prov.get("bbox")
+                    if not bbox_dict:
+                        continue
+                    box = _convert_bbox(bbox_dict, page_height)
+                    if box is None:
+                        continue
+                    items.append(
+                        Item(
+                            category="caption",
+                            text=cap_text,
+                            box=box,
+                            parent=self_ref,
+                        )
+                    )
 
     return items
 

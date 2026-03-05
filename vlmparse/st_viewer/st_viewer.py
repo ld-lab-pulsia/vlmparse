@@ -21,7 +21,53 @@ def render_sidebar_controls(doc, file_path):
     return {
         "page_no": st.number_input("Page", 0, len(doc.pages) - 1, 0),
         "plot_layouts": st.checkbox("Plot layouts", value=True),
+        "show_items": st.checkbox("Show items", value=False),
     }
+
+
+def _crop_image(image, box):
+    """Return a PIL crop of *image* for the given BoundingBox."""
+    if box.coord_origin == "BOTTOMLEFT":
+        box = box.to_top_left_origin(image.size[1])
+
+    if box.relative and box.reference is not None:
+        box = box.to_absolute(box.reference)
+
+    l = max(0, int(box.l))
+    t = max(0, int(box.t))
+    r = min(image.size[0], int(box.r))
+    b = min(image.size[1], int(box.b))
+    return image.crop((l, t, r, b))
+
+
+def render_items(page):
+    """Render page items one by one.
+
+    - All items: their text is displayed.
+    - Items with category='picture': the image crop is displayed alongside the text.
+    """
+    items = page.items
+    image = page.image
+
+    if not items:
+        st.info("No items available for this page.")
+        return
+
+    for item in items:
+        if item.category == "picture":
+            col_img, col_txt = st.columns([1, 2])
+            with col_img:
+                if image is not None:
+                    try:
+                        st.image(_crop_image(image, item.box))
+                    except Exception as exc:
+                        st.warning(f"Could not crop image: {exc}")
+                else:
+                    st.caption("No image available.")
+            with col_txt:
+                st.markdown(item.text, unsafe_allow_html=True)
+        else:
+            st.markdown(item.text, unsafe_allow_html=True)
 
 
 def run_streamlit(folder: str) -> None:
@@ -37,16 +83,20 @@ def run_streamlit(folder: str) -> None:
     with st.sidebar:
         settings = render_sidebar_controls(doc, file_path)
 
+    page = doc.pages[settings["page_no"]]
+
     col1, col2 = st.columns(2)
     with col1:
         with st.container(height=700):
-            st.markdown(doc.pages[settings["page_no"]].text, unsafe_allow_html=True)
-
+            if settings["show_items"] and page.items:
+                render_items(page)
+            else:
+                st.markdown(page.text, unsafe_allow_html=True)
     with col2:
         if settings["plot_layouts"]:
-            st.image(doc.pages[settings["page_no"]].get_image_with_boxes(layout=True))
+            st.image(page.get_image_with_boxes(layout=True))
         else:
-            st.image(doc.pages[settings["page_no"]].image)
+            st.image(page.image)
 
 
 def parse_args() -> argparse.Namespace:

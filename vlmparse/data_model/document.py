@@ -31,8 +31,12 @@ class Item(VLMParseBaseModel):
     category: str
     box: BoundingBox
     text: str
+    id: str | None = None
+    """Self-ref of this item (e.g. '#/pictures/0'), used to link captions."""
     class_name: str | None = None
     confidence: float | None = None
+    parent: str | None = None
+    """Self-ref of the parent figure/table (set on caption items)."""
 
 
 class Page(VLMParseBaseModel):
