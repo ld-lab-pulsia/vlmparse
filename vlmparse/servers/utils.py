@@ -1,6 +1,7 @@
 from urllib.parse import parse_qsl, urlparse
 
 import docker
+import docker.errors
 from loguru import logger
 
 
@@ -73,6 +74,122 @@ def _get_container_labels(container) -> dict[str, str]:
         pass
 
     return labels
+
+
+def _get_container_vlmparse_network(container) -> str | None:
+    """Return the name of the first vlmparse* Docker network the container belongs to."""
+    try:
+        networks = container.attrs.get("NetworkSettings", {}).get("Networks", {})
+        for net_name in networks:
+            if net_name.startswith("vlmparse"):
+                return net_name
+    except Exception:
+        pass
+    return None
+
+
+def _get_vlmparse_groups(running_only: bool = False) -> tuple[dict, set]:
+    """Return ``(groups, network_keys)`` for all vlmparse deployments.
+
+    *groups* maps a group key to a list of containers belonging to that group.
+    *network_keys* is the subset of group keys that correspond to Docker networks
+    (i.e. ContainerGroupServer deployments).
+
+    Discovery priority:
+    1. Containers connected to a Docker network whose name starts with ``vlmparse``.
+    2. Remaining containers whose name starts with ``vlmparse``, grouped by their
+       Docker Compose project label or by container name when standalone.
+    3. Remaining containers that belong to a compose project starting with ``vlmparse``.
+    """
+    client = docker.from_env()
+    containers_list = (
+        client.containers.list() if running_only else client.containers.list(all=True)
+    )
+    groups: dict[str, list] = {}
+    assigned: set[str] = set()
+    network_keys: set[str] = set()
+
+    # 1. vlmparse Docker network groups
+    try:
+        vlmparse_networks = [
+            n for n in client.networks.list() if n.name.startswith("vlmparse")
+        ]
+    except Exception:
+        vlmparse_networks = []
+
+    for c in containers_list:
+        net_name = _get_container_vlmparse_network(c)
+        if net_name:
+            groups.setdefault(net_name, []).append(c)
+            network_keys.add(net_name)
+            assigned.add(c.id)
+
+    # Also sweep running containers reported directly by each network (covers edge
+    # cases where container.attrs may be stale).
+    for network in vlmparse_networks:
+        try:
+            network.reload()
+            for c in network.containers:
+                if c.id not in assigned:
+                    groups.setdefault(network.name, []).append(c)
+                    network_keys.add(network.name)
+                    assigned.add(c.id)
+        except Exception:
+            pass
+
+    # 2. Remaining containers – compose projects or standalone
+    for c in containers_list:
+        if c.id in assigned:
+            continue
+        lbl = _get_container_labels(c)
+        project = lbl.get("com.docker.compose.project") or lbl.get(
+            "vlmparse_compose_project"
+        )
+        if c.name.startswith("vlmparse"):
+            key = project if project else c.name
+            groups.setdefault(key, []).append(c)
+            assigned.add(c.id)
+        elif project and project.startswith("vlmparse"):
+            groups.setdefault(project, []).append(c)
+            assigned.add(c.id)
+
+    return groups, network_keys
+
+
+def _stop_network_group(network_name: str) -> bool:
+    """Stop all containers in *network_name* and remove the Docker network.
+
+    Returns True if the network was found and a stop was attempted.
+    """
+    client = docker.from_env()
+    try:
+        network = client.networks.get(network_name)
+    except docker.errors.NotFound:
+        return False
+
+    network.reload()
+    containers = list(network.containers)
+    logger.info(
+        f"Stopping network group '{network_name}' ({len(containers)} container(s))..."
+    )
+    for c in containers:
+        try:
+            c.stop(timeout=10)
+        except Exception:
+            pass
+        try:
+            c.remove(force=True)
+        except Exception:
+            pass
+
+    try:
+        network.remove()
+        logger.info(f"✓ Removed Docker network '{network_name}'")
+    except Exception as e:
+        logger.warning(f"Could not remove network '{network_name}': {e}")
+
+    logger.info("✓ Network group stopped and removed successfully")
+    return True
 
 
 def _stop_compose_stack_for_container(target_container) -> bool:

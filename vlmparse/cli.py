@@ -196,90 +196,58 @@ def convert(
 
 @app.command("list")
 def containers():
-    """List all containers whose name begins with vlmparse."""
+    """List all vlmparse deployments (networks, compose stacks, and containers)."""
     import docker
 
-    from vlmparse.servers.utils import _get_container_labels
+    from vlmparse.servers.utils import _get_container_labels, _get_vlmparse_groups
 
     try:
-        client = docker.from_env()
-        all_containers = client.containers.list(all=True)
+        groups, _network_keys = _get_vlmparse_groups(running_only=False)
 
-        if not all_containers:
-            logger.info("No containers found")
+        if not groups:
+            logger.info("No vlmparse containers or networks found")
             return
 
-        # Group containers by compose project or as standalone
-        projects = {}  # project_name -> list of containers
-
-        for container in all_containers:
-            labels = _get_container_labels(container)
-            project = labels.get("com.docker.compose.project") or labels.get(
-                "vlmparse_compose_project"
-            )
-
-            # Include if name starts with vlmparse OR if it's in a vlmparse compose project
-            if container.name.startswith("vlmparse"):
-                if project:
-                    projects.setdefault(project, []).append(container)
-                else:
-                    projects[container.name] = [container]
-            elif project and project.startswith("vlmparse"):
-                projects.setdefault(project, []).append(container)
-
-        if not projects:
-            logger.info("No vlmparse containers found")
-            return
-
-        # Prepare table data - one row per project/standalone container
+        # One table row per group
         table_data = []
-        for project_name, project_containers in projects.items():
-            # Find the main container with vlmparse labels
-            main_container = project_containers[0]
-            for c in project_containers:
-                labels = _get_container_labels(c)
-                if labels.get("vlmparse_uri"):
+        for group_key, group_containers in groups.items():
+            # Find the primary container (the one with vlmparse_uri label)
+            main_container = group_containers[0]
+            for c in group_containers:
+                lbl = _get_container_labels(c)
+                if lbl.get("vlmparse_uri"):
                     main_container = c
                     break
 
             labels = _get_container_labels(main_container)
 
-            # Extract port mappings from all containers in the project
             ports = []
-            for container in project_containers:
-                if container.ports:
-                    for _, host_bindings in container.ports.items():
+            for c in group_containers:
+                if c.ports:
+                    for _, host_bindings in c.ports.items():
                         if host_bindings:
                             for binding in host_bindings:
-                                ports.append(f"{binding['HostPort']}")
-
+                                ports.append(binding["HostPort"])
             port_str = ", ".join(sorted(set(ports))) if ports else "N/A"
+
             uri = labels.get("vlmparse_uri", "N/A")
             gpu = labels.get("vlmparse_gpus", "N/A")
 
-            # Get all statuses
-            statuses = list(set(c.status for c in project_containers))
+            statuses = list(set(c.status for c in group_containers))
             status_str = (
                 statuses[0] if len(statuses) == 1 else f"mixed ({', '.join(statuses)})"
             )
 
-            # Name: show project name if compose, otherwise container name
-            is_compose = labels.get("com.docker.compose.project") or labels.get(
-                "vlmparse_compose_project"
-            )
-            name = project_name if is_compose else main_container.name
+            table_data.append([group_key, status_str, port_str, gpu, uri])
 
-            table_data.append([name, status_str, port_str, gpu, uri])
-
-        # Display as table
         from tabulate import tabulate
 
         headers = ["Name", "Status", "Port(s)", "GPU", "URI"]
         table = tabulate(table_data, headers=headers, tablefmt="grid")
 
-        total = sum(len(containers) for containers in projects.values())
+        total = sum(len(c) for c in groups.values())
         logger.info(
-            f"\nFound {len(projects)} vlmparse deployment(s) ({total} container(s)):\n"
+            f"\nFound {len(groups)} vlmparse deployment(s) ({total} container(s)):\n"
         )
         print(table)
 
@@ -292,80 +260,85 @@ def containers():
 
 @app.command("stop")
 def stop(
-    container: str | None = typer.Argument(None, help="Container ID or name to stop"),
+    container: str | None = typer.Argument(
+        None, help="Container ID/name or network name to stop"
+    ),
 ):
-    """Stop a Docker container by its ID or name.
+    """Stop a vlmparse deployment.
 
-    If the selected container belongs to a Docker Compose project, the whole
-    compose stack is stopped and removed.
+    Accepts a container ID/name, a Docker network name, or auto-selects when
+    only one vlmparse deployment is running.  For ContainerGroupServer
+    deployments the whole network (containers + network) is torn down.  For
+    Docker Compose stacks the full stack is brought down.
 
     Args:
-        container: Container ID or name to stop. If not specified, automatically stops the container if only one vlmparse container is running.
+        container: Container ID/name or network name to stop. If not specified,
+            automatically stops the deployment when exactly one is running.
     """
     import docker
 
-    from vlmparse.servers.utils import _stop_compose_stack_for_container
+    from vlmparse.servers.utils import (
+        _get_container_vlmparse_network,
+        _get_vlmparse_groups,
+        _stop_compose_stack_for_container,
+        _stop_network_group,
+    )
 
     try:
         client = docker.from_env()
+        target_container = None
 
-        # If no container specified, try to auto-select
         if container is None:
-            from vlmparse.servers.utils import _get_container_labels
+            # Auto-select among running deployments
+            groups, network_keys = _get_vlmparse_groups(running_only=True)
 
-            all_containers = client.containers.list()
-
-            # Group containers by compose project or as standalone
-            projects = {}  # project_name -> list of containers
-            for c in all_containers:
-                labels = _get_container_labels(c)
-                project = labels.get("com.docker.compose.project") or labels.get(
-                    "vlmparse_compose_project"
-                )
-
-                # Include if name starts with vlmparse OR if it's in a vlmparse compose project
-                if c.name.startswith("vlmparse"):
-                    if project:
-                        projects.setdefault(project, []).append(c)
-                    else:
-                        projects[c.name] = [c]
-                elif project and project.startswith("vlmparse"):
-                    projects.setdefault(project, []).append(c)
-
-            if len(projects) == 0:
-                logger.error("No vlmparse containers found")
+            if len(groups) == 0:
+                logger.error("No vlmparse containers or networks found")
                 return
-            elif len(projects) > 1:
+            elif len(groups) > 1:
                 logger.error(
-                    f"Multiple vlmparse deployments found ({len(projects)}). "
-                    "Please specify a container ID or name:"
+                    f"Multiple vlmparse deployments found ({len(groups)}). "
+                    "Please specify a container ID, name, or network name:"
                 )
-                for project_name, containers in projects.items():
-                    if len(containers) > 1:
-                        logger.info(
-                            f"  - {project_name} ({len(containers)} containers)"
-                        )
-                    else:
-                        logger.info(
-                            f"  - {containers[0].name} ({containers[0].short_id})"
-                        )
+                for key, conts in groups.items():
+                    logger.info(f"  - {key} ({len(conts)} container(s))")
                 return
             else:
-                # Only one project/deployment, pick any container from it
-                target_container = list(projects.values())[0][0]
+                group_key = next(iter(groups))
+                if group_key in network_keys:
+                    _stop_network_group(group_key)
+                    return
+                target_container = groups[group_key][0]
         else:
-            # Try to get the specified container
+            # Check if the argument is a Docker network starting with vlmparse
+            try:
+                network = client.networks.get(container)
+                if network.name.startswith("vlmparse"):
+                    _stop_network_group(network.name)
+                    return
+            except docker.errors.NotFound:  # type: ignore[name-defined]
+                pass
+
+            # Try to resolve as a container
             try:
                 target_container = client.containers.get(container)
             except docker.errors.NotFound:  # type: ignore[name-defined]
-                logger.error(f"Container not found: {container}")
+                logger.error(f"Container or network not found: {container}")
                 return
 
-        # If the container is part of a docker-compose stack, bring the whole stack down.
+        # --- target_container is resolved; apply stop strategies in order ---
+
+        # 1. Docker Compose stack
         if _stop_compose_stack_for_container(target_container):
             return
 
-        # Stop + remove the container
+        # 2. ContainerGroupServer network group
+        net_name = _get_container_vlmparse_network(target_container)
+        if net_name:
+            _stop_network_group(net_name)
+            return
+
+        # 3. Standalone container
         logger.info(
             f"Stopping container: {target_container.name} ({target_container.short_id})"
         )
@@ -458,7 +431,8 @@ def log(
                 for log_line in target_container.logs(
                     stream=True, follow=True, tail=tail
                 ):
-                    print(log_line.decode("utf-8", errors="replace"), end="")
+                    if "POST" not in log_line.decode("utf-8", errors="replace"):
+                        print(log_line.decode("utf-8", errors="replace"), end="")
             except KeyboardInterrupt:
                 logger.info("\nStopped following logs")
         else:

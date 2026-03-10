@@ -13,6 +13,7 @@ from vlmparse.clients.dotsocr import (
 )
 from vlmparse.clients.fireredocr import FireRedOCRDockerServerConfig
 from vlmparse.clients.glmocr import GLMOCRDockerServerConfig
+from vlmparse.clients.glmocr_vlmparse import GLMOCRVlmparseDockerServerConfig
 from vlmparse.clients.granite_docling import GraniteDoclingDockerServerConfig
 from vlmparse.clients.hunyuanocr import HunyuanOCRDockerServerConfig
 from vlmparse.clients.lightonocr import (
@@ -28,6 +29,7 @@ from vlmparse.clients.olmocr import OlmOCRDockerServerConfig
 from vlmparse.clients.openai_converter import OpenAIConverterConfig
 from vlmparse.clients.paddleocrvl import PaddleOCRVLDockerServerConfig
 from vlmparse.converter import ConverterConfig
+from vlmparse.servers.container_group_server import ContainerGroupServerConfig
 from vlmparse.servers.docker_compose_server import DockerComposeServerConfig
 from vlmparse.servers.docker_server import DockerServerConfig
 from vlmparse.servers.server_registry import docker_config_registry
@@ -43,12 +45,15 @@ def get_default(cls, field_name):
 
 
 # All server configs - single source of truth
-SERVER_CONFIGS: list[type[DockerServerConfig | DockerComposeServerConfig]] = [
+SERVER_CONFIGS: list[
+    type[DockerServerConfig | DockerComposeServerConfig | ContainerGroupServerConfig]
+] = [
     ChandraDockerServerConfig,
     LightOnOCRDockerServerConfig,
     DotsOCRDockerServerConfig,
     PaddleOCRVLDockerServerConfig,
     GLMOCRDockerServerConfig,
+    GLMOCRVlmparseDockerServerConfig,
     NanonetOCR2DockerServerConfig,
     HunyuanOCRDockerServerConfig,
     DoclingDockerServerConfig,
@@ -96,7 +101,9 @@ class ConverterConfigRegistry:
 
     def register_from_server(
         self,
-        server_config_cls: type[DockerServerConfig | DockerComposeServerConfig],
+        server_config_cls: type[
+            DockerServerConfig | DockerComposeServerConfig | ContainerGroupServerConfig
+        ],
     ):
         """Register converter config derived from a server config class.
 
@@ -112,11 +119,9 @@ class ConverterConfigRegistry:
 
         def factory(uri: str | None, cls=server_config_cls) -> ConverterConfig:
             server = cls()  # type: ignore
-            client_config = server.client_config
-            # Override base_url if provided
             if uri is not None:
-                client_config = client_config.model_copy(update={"base_url": uri})
-            return client_config
+                return server.client_config_for_uri(uri)
+            return server.client_config
 
         with self._lock:
             for name in names:
