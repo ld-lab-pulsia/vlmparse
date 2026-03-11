@@ -83,8 +83,11 @@ class GLMOCRConverterConfig(ConverterConfig):
     enable_layout: bool = True
 
     # GLM-OCR model parameters
-    max_tokens: int = 16384
-    temperature: float = 0.01
+    max_tokens: int = 4096
+    temperature: float = 0.8
+    top_p: float = 0.9
+    top_k: int = 50
+    repetition_penalty: float = 1.1
     image_format: str = "JPEG"
     min_pixels: int = 12544
     max_pixels: int = 71372800
@@ -115,7 +118,12 @@ class GLMOCRConverter(BaseConverter):
         data_uri = f"data:image/png;base64,{file_content_b64}"
 
         payload: dict[str, Any] = {
-            "images": [data_uri]  # GLM-OCR expects a list
+            "images": [data_uri],  # GLM-OCR expects a list
+            "max_tokens": self.config.max_tokens,
+            "temperature": self.config.temperature,
+            "top_p": self.config.top_p,
+            "top_k": self.config.top_k,
+            "repetition_penalty": self.config.repetition_penalty,
         }
 
         # Apply any request overrides
@@ -176,6 +184,11 @@ class GLMOCRConverter(BaseConverter):
         if not json_result:
             return
 
+        image = page.image
+        if image is None:
+            return
+
+        img_width, img_height = image.size
         items: list[Item] = []
 
         for block in json_result:
@@ -184,7 +197,11 @@ class GLMOCRConverter(BaseConverter):
                 # If no bbox, skip this item
                 continue
 
-            x1, y1, x2, y2 = bbox
+            # bbox_2d is in 0-1000 normalized coordinates; convert to pixels
+            x1 = bbox[0] * img_width / 1000
+            y1 = bbox[1] * img_height / 1000
+            x2 = bbox[2] * img_width / 1000
+            y2 = bbox[3] * img_height / 1000
             text = block.get("content") or ""
             label = block.get("label") or ""
 

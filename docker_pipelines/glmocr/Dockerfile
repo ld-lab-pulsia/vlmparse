@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
 # Clone GLM-OCR repository and install in editable mode
 # Note: The pyproject.toml has packages=["glmocr"] which excludes submodules,
 # so we need to install in editable mode to preserve the directory structure
-RUN git clone https://github.com/zai-org/GLM-OCR.git /app/GLM-OCR && \
+RUN git clone https://github.com/zai-org/GLM-OCR.git@Manitchahar:fix/layout-config-defaults /app/GLM-OCR && \
     cd /app/GLM-OCR && \
     pip install --no-cache-dir -e . && \
     pip install --no-cache-dir git+https://github.com/huggingface/transformers.git

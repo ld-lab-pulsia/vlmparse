@@ -1,40 +1,307 @@
-# GLM-OCR Configuration for Docker deployment
+# GLM-OCR Configuration
+#
+# This file contains all configuration options for the GLM-OCR SDK.
+# Default values are shown. Uncomment and modify as needed.
 
-# Server (for glmocr.server)
+# Server settings (for glmocr.server)
 server:
   host: "0.0.0.0"
   port: 5002
   debug: false
 
-# Logging
+# Logging settings
 logging:
-  level: INFO  # DEBUG enables profiling
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  # DEBUG enables profiling output with timing information
+  level: INFO
+  # format: "[%(levelname)s] %(name)s: %(message)s"  # custom format (optional)
 
-# Pipeline
+# Pipeline settings
 pipeline:
-  # OCR API connection (vLLM server)
+  # ============================================================================
+  # MaaS Mode (Zhipu Cloud API)
+  # ============================================================================
+  # When enabled, the SDK forwards requests directly to Zhipu's cloud API
+  # without local processing. The cloud service handles layout detection,
+  # OCR, and result formatting internally.
+  #
+  # Use this mode when:
+  # - You don't have a GPU or don't want to self-host
+  # - You want the simplest setup (just need an API key)
+  # - You want to use the exact same service as Zhipu's cloud offering
+  #
+  # Note: When maas.enabled=true, the ocr_api and layout settings below are ignored.
+  maas:
+    enabled: false # Set to true to use MaaS mode
+    api_url: https://open.bigmodel.cn/api/paas/v4/layout_parsing
+    model: glm-ocr
+    api_key: null # Required! Get from https://open.bigmodel.cn
+    verify_ssl: true
+    connect_timeout: 30
+    request_timeout: 300
+    retry_max_attempts: 2
+    retry_backoff_base_seconds: 0.5
+    retry_backoff_max_seconds: 8.0
+    retry_jitter_ratio: 0.2
+    retry_status_codes: [429, 500, 502, 503, 504]
+    connection_pool_size: 16
+
+  # ============================================================================
+  # Self-hosted Mode (vLLM / SGLang)
+  # ============================================================================
+  # When maas.enabled=false, the SDK uses the settings below to connect to
+  # a self-hosted vLLM or SGLang service running the GLM-OCR model.
+  #
+  # Use this mode when:
+  # - You have GPU resources and want full control
+  # - You need offline/air-gapped operation
+  # - You want to customize the pipeline (layout detection, prompts, etc.)
+
+  # OCR API client configuration (for self-hosted vLLM/SGLang/Ollama)
   ocr_api:
+    # Basic connection
+    # Use the Docker Compose service name so the glmocr-api container can
+    # reach the vllm server (127.0.0.1 would resolve to the api container itself).
     api_host: glmocr-vllm-server
     api_port: 8080
-    api_key: null
-    connect_timeout: 300
-    request_timeout: 300
 
-  # Page loader settings
+    # Model name included in API requests.
+    # Required for mlx_vlm.server (e.g. "mlx-community/GLM-OCR-bf16").
+    # Set to `glm-ocr` to match `--served-model-name` when using vLLM/SGLang.
+    # For Ollama, set to your model name (e.g. "glm-ocr:latest").
+    model: glm-ocr
+
+    # URL construction: {api_scheme}://{api_host}:{api_port}{api_path}
+    # Or set api_url directly to override
+    api_scheme: null # null = auto (https if port 443, else http)
+    api_path: /v1/chat/completions
+    # Note: If using Ollama and encountering 502 errors with vision requests,
+    # try switching to "ollama_generate" mode with api_path: /api/generate
+    api_url: null # full URL override (optional)
+
+    # API mode: "openai" (default) or "ollama_generate"
+    # - "openai": Use OpenAI-compatible /v1/chat/completions endpoint (vLLM/SGLang/Ollama)
+    # - "ollama_generate": Use Ollama's native /api/generate endpoint
+    api_mode: openai
+
+    # Authentication (for MaaS providers like Zhipu, OpenAI, etc.)
+    api_key: null # or set GLMOCR_API_KEY env var
+    headers: {} # additional HTTP headers
+
+    # SSL/TLS
+    verify_ssl: false
+
+    # Timeouts (seconds)
+    connect_timeout: 30
+    request_timeout: 120
+
+    # Retry settings (helps with transient 429/5xx and overloaded OCR servers)
+    retry_max_attempts: 2
+    retry_backoff_base_seconds: 0.5
+    retry_backoff_max_seconds: 8.0
+    retry_jitter_ratio: 0.2
+    retry_status_codes: [429, 500, 502, 503, 504]
+
+    # HTTP connection pool size (default 128). Set >= max_workers to avoid
+    # "Connection pool is full" when layout mode runs concurrent requests.
+    connection_pool_size: 128
+
+  # Maximum parallel workers for region recognition (layout mode)
+  # Lower values to reduce 503 errors on busy OCR servers
+  max_workers: 32
+  # Queue sizes
+  page_maxsize: 100
+  region_maxsize: 800
+
+  # Page loader: handles image/PDF loading and API request building
   page_loader:
-    max_tokens: 16384
-    temperature: 0.01
-    image_format: JPEG
-    min_pixels: 12544
-    max_pixels: 71372800
+    # Generation parameters
+    max_tokens: 4096
+    temperature: 0.8
+    top_p: 0.9
+    top_k: 50
+    repetition_penalty: 1.1
 
-  # Result formatting
+    # Image processing
+    t_patch_size: 2
+    patch_expand_factor: 1
+    image_expect_length: 6144
+    image_format: JPEG # JPEG, PNG, WEBP
+    min_pixels: 12544 # 112 * 112
+    max_pixels: 71372800 # 14 * 14 * 4 * 1280
+
+    # Default prompt for OCR (used when no custom prompt provided)
+    default_prompt: >
+      Recognize the text in the image and output in Markdown format.
+      Preserve the original layout (headings/paragraphs/tables/formulas).
+      Do not fabricate content that does not exist in the image.
+
+    # Task-specific prompts (used in layout mode)
+    task_prompt_mapping:
+      text: "Text Recognition:"
+      table: "Table Recognition:"
+      formula: "Formula Recognition:"
+
+    # PDF processing (pypdfium2 only)
+    pdf_dpi: 200
+    pdf_max_pages: null # null = no limit
+    pdf_verbose: false
+
+  # Result formatter: post-processing and output formatting
   result_formatter:
-    output_format: both  # json, markdown, or both
+    # Filter nested regions (remove overlapping smaller regions)
+    filter_nested: true
+    min_overlap_ratio: 0.8
 
-  # Layout detection (optional)
-  enable_layout: false
-  
-  # MaaS API (disabled for self-hosted)
-  maas:
-    enabled: false
+    # Output format: json, markdown, or both
+    output_format: both
+
+    # Label to visualization category mapping (for layout visualization)
+    label_visualization_mapping:
+      table:
+        - table
+      formula:
+        - display_formula
+        - inline_formula
+      image:
+        - chart
+        - image
+      text:
+        - abstract
+        - algorithm
+        - content
+        - doc_title
+        - figure_title
+        - paragraph_title
+        - reference_content
+        - text
+        - vertical_text
+        - vision_footnote
+        - seal
+        - formula_number
+
+  # Enable layout detection mode
+  # - true: detect document regions (tables, figures, text blocks) then OCR each
+  # - false: direct OCR on the whole image
+  enable_layout: true
+
+  # Layout detection settings (used when enable_layout=true)
+  layout:
+    # PP-DocLayoutV3 model directory
+    # Can be a local folder or a Hugging Face model id
+    # (Use *_safetensors for Transformers; PaddlePaddle/PP-DocLayoutV3 is a PaddleOCR export)
+    model_dir: PaddlePaddle/PP-DocLayoutV3_safetensors
+
+    # Detection threshold
+    threshold: 0.3
+    # threshold_by_class:           # per-class threshold override
+    #   0: 0.5
+    #   1: 0.3
+    #   text: 0.5
+    #   table: 0.2
+
+    # Processing
+    # batch_size: max images per model forward pass (reduce to 1 if OOM)
+    batch_size: 1
+    workers: 1
+    cuda_visible_devices: "0"
+    # img_size: null                # resize input (optional)
+
+    # Post-processing
+    layout_nms: true
+    layout_unclip_ratio:
+      - 1.0
+      - 1.0
+
+    # Merge mode for overlapping bboxes: "large" or "small"
+    # Can be a single value or per-class dict
+    layout_merge_bboxes_mode:
+      0: large # abstract
+      1: large # algorithm
+      2: large # aside_text
+      3: large # chart
+      4: large # content
+      5: large # display_formula
+      6: large # doc_title
+      7: large # figure_title
+      8: large # footer
+      9: large # footer
+      10: large # footnote
+      11: large # formula_number
+      12: large # header
+      13: large # header
+      14: large # image
+      15: large # inline_formula
+      16: large # number
+      17: large # paragraph_title
+      18: small # reference
+      19: large # reference_content
+      20: large # seal
+      21: large # table
+      22: large # text
+      23: large # vertical_text
+      24: large # vision_footnote
+
+    # Map detected labels to OCR task types
+    # - text/table/formula: OCR with corresponding prompt
+    # - skip: keep region but don't OCR (e.g., images)
+    # - abandon: discard region entirely
+    label_task_mapping:
+      text:
+        - abstract
+        - algorithm
+        - content
+        - doc_title
+        - figure_title
+        - paragraph_title
+        - reference_content
+        - text
+        - vertical_text
+        - vision_footnote
+        - seal
+        - formula_number
+      table:
+        - table
+      formula:
+        - display_formula
+        - inline_formula
+      skip:
+        - chart
+        - image
+      abandon:
+        - header
+        - footer
+        - number
+        - footnote
+        - aside_text
+        - reference
+        - footer_image
+        - header_image
+
+    # Map label index to label name
+    id2label:
+      0: abstract
+      1: algorithm
+      2: aside_text
+      3: chart
+      4: content
+      5: display_formula
+      6: doc_title
+      7: figure_title
+      8: footer
+      9: footer_image
+      10: footnote
+      11: formula_number
+      12: header
+      13: header_image
+      14: image
+      15: inline_formula
+      16: number
+      17: paragraph_title
+      18: reference
+      19: reference_content
+      20: seal
+      21: table
+      22: text
+      23: vertical_text
+      24: vision_footnote

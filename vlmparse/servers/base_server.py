@@ -1,11 +1,15 @@
 """Base classes for server configurations and server lifecycle management."""
 
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 from loguru import logger
 from pydantic import Field
 
 from .model_identity import ModelIdentityMixin
+
+if TYPE_CHECKING:
+    from vlmparse.converter import ConverterConfig
 
 
 class BaseServerConfig(ModelIdentityMixin, ABC):
@@ -41,6 +45,15 @@ class BaseServerConfig(ModelIdentityMixin, ABC):
     def client_config(self):
         """Override in subclasses to return appropriate client config."""
         raise NotImplementedError
+
+    def client_config_for_uri(self, uri: str) -> "ConverterConfig":
+        """Build a client config targeting a specific URI.
+
+        For single-service configs the URI is used directly.  Multi-service
+        subclasses (e.g. ContainerGroupServerConfig) should override this to
+        derive all auxiliary service URLs from the same host and scheme.
+        """
+        return self.client_config.model_copy(update={"base_url": uri})
 
     def get_client(self, **kwargs):
         """Get a client instance configured for this server."""
