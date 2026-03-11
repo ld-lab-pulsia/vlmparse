@@ -35,6 +35,9 @@ dev = [
 docling_core = [
     "docling-core",
 ]
+docling-parse = [
+    "docling-parse",
+]
 st_app = [
     "streamlit>=1.49.0",
 ]

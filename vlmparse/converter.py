@@ -30,6 +30,11 @@ class ConverterConfig(VLMParseBaseModel):
         "formula",
         "chart",
     ] = "ocr"
+    add_native_text: bool = False
+    add_uri_to_items: bool = True
+    """When True, overlapping native TextCells with hyperlink URIs are used to
+    annotate matching words in each Item's text as markdown links.
+    Automatically triggers native text-cell extraction (like add_native_text)."""
 
     def get_client(self, **kwargs) -> "BaseConverter":
         return BaseConverter(config=self, **kwargs)
@@ -73,7 +78,28 @@ class BaseConverter:
     async def async_call_inside_page_with_rendering(
         self, page: Page, file_path: str | Path, page_idx: int
     ) -> Page:
-        page = await asyncio.to_thread(self.add_page_image, page, file_path, page_idx)
+        if self.config.add_native_text or self.config.add_uri_to_items:
+            from .data_model.box import BoundingBox
+            from .docling_extractor import extract_page_text_cells
+
+            page, (cells, pdf_w, pdf_h) = await asyncio.gather(
+                asyncio.to_thread(self.add_page_image, page, file_path, page_idx),
+                asyncio.to_thread(extract_page_text_cells, file_path, page_idx),
+            )
+            if cells is not None and pdf_w and pdf_h:
+                img = page.image
+                if img is not None:
+                    scale_x = img.width / pdf_w
+                    scale_y = img.height / pdf_h
+                    for cell in cells:
+                        b = cell.box
+                        cell.box = BoundingBox(
+                            l=b.l * scale_x,
+                            t=b.t * scale_y,
+                            r=b.r * scale_x,
+                            b=b.b * scale_y,
+                        )
+                page.text_cells = cells
         return await self.async_call_inside_page(page)
 
     def add_page_image(self, page: Page, file_path, page_idx):
@@ -112,6 +138,10 @@ class BaseConverter:
                         page = await self.async_call_inside_page_with_rendering(
                             page, file_path, page_idx
                         )
+                        if self.config.add_uri_to_items:
+                            from .uri_annotator import annotate_page_items_with_uris
+
+                            annotate_page_items_with_uris(page)
                         toc = time.perf_counter()
                         page.latency = toc - tic
                         logger.debug(
