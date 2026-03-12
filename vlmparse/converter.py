@@ -261,6 +261,7 @@ class BaseConverter:
         try:
             documents = await asyncio.gather(*tasks)
             if self.return_documents_in_batch_mode:
+                documents = [doc for doc in documents if doc is not None]
                 return documents
         finally:
             # Close async resources before the event loop ends

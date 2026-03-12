@@ -40,7 +40,10 @@ def extract_page_text_cells(
         return None, None, None
 
     try:
-        from docling_parse.pdf_parsers import DecodePageConfig, pdf_parser
+        from docling_parse.pdf_parsers import (  # type: ignore[import]
+            DecodePageConfig,
+            pdf_parser,
+        )
     except ImportError:
         logger.warning(
             "docling-parse is not installed; skipping native text extraction; install with `pip install vlmparse[docling-parse]`"
