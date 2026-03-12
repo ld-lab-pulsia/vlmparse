@@ -13,6 +13,7 @@ from vlmparse.base_model import VLMParseBaseModel
 from vlmparse.utils import from_base64, to_base64
 
 from .box import BoundingBox
+from .category_mapping import map_to_unified_category
 
 
 class ProcessingError(VLMParseBaseModel):
@@ -37,6 +38,16 @@ class Item(VLMParseBaseModel):
     confidence: float | None = None
     parent: str | None = None
     """Self-ref of the parent figure/table (set on caption items)."""
+
+    def unified_category(self) -> str:
+        """Normalised category mapped to a common vocabulary across all backends.
+
+        Possible values: table, image, text, footer, header, list_item, title,
+        footnote, caption, formula, other.
+        Auto-computed from *category* when not explicitly set.
+        """
+        if self.unified_category is None:
+            return map_to_unified_category(self.category)
 
 
 class TextCell(VLMParseBaseModel):
