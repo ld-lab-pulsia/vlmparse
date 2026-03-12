@@ -39,7 +39,7 @@ class Item(VLMParseBaseModel):
     parent: str | None = None
     """Self-ref of the parent figure/table (set on caption items)."""
 
-    def unified_category(self) -> str:
+    def unified_category(self) -> str | None:
         """Normalised category mapped to a common vocabulary across all backends.
 
         Possible values: table, image, text, footer, header, list_item, title,
