@@ -135,7 +135,7 @@ def run_streamlit(folder: str) -> None:
             elif settings["show_items"] and page.items:
                 render_items(page)
             else:
-                st.markdown(page.text, unsafe_allow_html=True)
+                st.markdown(page.to_markdown(), unsafe_allow_html=True)
     with col2:
         if settings["overlay_text_cells"] and page.text_cells:
             st.image(get_image_with_text_cells(page))
