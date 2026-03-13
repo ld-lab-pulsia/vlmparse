@@ -22,6 +22,8 @@ def render_sidebar_controls(doc, file_path):
         "page_no": st.number_input("Page", 0, len(doc.pages) - 1, 0),
         "plot_layouts": st.checkbox("Plot layouts", value=True),
         "show_items": st.checkbox("Show items", value=False),
+        "show_text_cells": st.checkbox("Show native text cells", value=False),
+        "overlay_text_cells": st.checkbox("Overlay text cells on image", value=False),
     }
 
 
@@ -70,6 +72,46 @@ def render_items(page):
             st.markdown(item.text, unsafe_allow_html=True)
 
 
+def render_text_cells(page):
+    """Render native docling-parse text cells as a table."""
+    cells = page.text_cells
+    if not cells:
+        st.info("No native text cells available for this page.")
+        return
+    rows = [
+        {
+            "text": cell.text,
+            "l": round(cell.box.l, 1),
+            "t": round(cell.box.t, 1),
+            "r": round(cell.box.r, 1),
+            "b": round(cell.box.b, 1),
+        }
+        for cell in cells
+    ]
+    st.dataframe(rows, use_container_width=True)
+
+
+def get_image_with_text_cells(page):
+    """Return the page image with native text-cell bounding boxes drawn in blue."""
+    from PIL import ImageDraw
+
+    image = page.image
+    if image is None or not page.text_cells:
+        return image
+
+    image = image.copy()
+    draw = ImageDraw.Draw(image)
+
+    for cell in page.text_cells:
+        b = cell.box
+        draw.rectangle(
+            (int(b.l), int(b.t), int(b.r), int(b.b)),
+            outline=(0, 0, 255),
+            width=2,
+        )
+    return image
+
+
 def run_streamlit(folder: str) -> None:
     with st.sidebar:
         file_path = file_selector(folder)
@@ -88,12 +130,16 @@ def run_streamlit(folder: str) -> None:
     col1, col2 = st.columns(2)
     with col1:
         with st.container(height=700):
-            if settings["show_items"] and page.items:
+            if settings["show_text_cells"] and page.text_cells:
+                render_text_cells(page)
+            elif settings["show_items"] and page.items:
                 render_items(page)
             else:
-                st.markdown(page.text, unsafe_allow_html=True)
+                st.markdown(page.to_markdown(), unsafe_allow_html=True)
     with col2:
-        if settings["plot_layouts"]:
+        if settings["overlay_text_cells"] and page.text_cells:
+            st.image(get_image_with_text_cells(page))
+        elif settings["plot_layouts"]:
             st.image(page.get_image_with_boxes(layout=True))
         else:
             st.image(page.image)

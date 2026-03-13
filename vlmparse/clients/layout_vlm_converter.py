@@ -4,15 +4,39 @@ from __future__ import annotations
 
 import asyncio
 import math
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from loguru import logger
 from PIL import Image
 
 from vlmparse.converter import BaseConverter, ConverterConfig
-from vlmparse.data_model.document import BoundingBox, Item, Page
+from vlmparse.data_model.document import BoundingBox, Item, Page, TextCell
 from vlmparse.utils import to_base64
+
+NativeTextStrategy = Literal["always", "any_overlap", "edge_overlap"]
+
+
+def _assemble_text_cells(cells: list[TextCell]) -> str:
+    """Reconstruct reading-order text from a list of word-level TextCells."""
+    if not cells:
+        return ""
+    # Sort top-to-bottom, left-to-right
+    cells = sorted(cells, key=lambda c: (c.box.t, c.box.l))
+    lines: list[list[TextCell]] = []
+    current: list[TextCell] = [cells[0]]
+    for cell in cells[1:]:
+        prev = current[-1]
+        prev_cy = (prev.box.t + prev.box.b) / 2
+        cell_cy = (cell.box.t + cell.box.b) / 2
+        cell_h = max(cell.box.b - cell.box.t, 1)
+        if abs(cell_cy - prev_cy) < cell_h * 0.6:
+            current.append(cell)
+        else:
+            lines.append(sorted(current, key=lambda c: c.box.l))
+            current = [cell]
+    lines.append(sorted(current, key=lambda c: c.box.l))
+    return "\n".join(" ".join(c.to_markdown() for c in line) for line in lines)
 
 
 class LayoutVLMConverterConfig(ConverterConfig):
@@ -38,6 +62,17 @@ class LayoutVLMConverterConfig(ConverterConfig):
     top_k: int | None = None
     repetition_penalty: float | None = None
     timeout: int = 300
+    native_text_strategy: NativeTextStrategy = "always"
+    """How to use docling-parse native text for *text* regions.
+
+    - ``"always"``      – always call the VLM (default, no change).
+    - ``"any_overlap"`` – skip VLM if any native text cell overlaps the region.
+    - ``"edge_overlap"``– skip VLM only when cells are present at the left,
+                          right **and** top edges of the region (indicating the
+                          box is fully covered with selectable text).
+
+    Not applied to table, formula or image/chart regions.
+    """
 
     def get_client(self, **kwargs) -> "LayoutVLMConverter":
         return LayoutVLMConverter(config=self, **kwargs)
@@ -129,6 +164,42 @@ class LayoutVLMConverter(BaseConverter):
             image = image.resize((w_bar, h_bar), Image.Resampling.BICUBIC)
         return image
 
+    def _collect_native_text(
+        self,
+        bbox: list,
+        text_cells: list[TextCell],
+    ) -> str | None:
+        """Return assembled native text for *bbox* according to the configured
+        strategy, or ``None`` if the VLM should be called instead."""
+        strategy = self.config.native_text_strategy
+        if strategy == "always" or not text_cells:
+            return None
+
+        x1, y1, x2, y2 = bbox
+        overlapping = [
+            cell
+            for cell in text_cells
+            if cell.box.r > x1
+            and cell.box.l < x2
+            and cell.box.b > y1
+            and cell.box.t < y2
+        ]
+        if not overlapping:
+            return None
+
+        if strategy == "any_overlap":
+            return _assemble_text_cells(overlapping)
+
+        # edge_overlap: require cells at left, right AND top edges
+        tol_x = (x2 - x1) * 0.05
+        tol_y = (y2 - y1) * 0.05
+        has_left = any(cell.box.l <= x1 + tol_x for cell in overlapping)
+        has_right = any(cell.box.r >= x2 - tol_x for cell in overlapping)
+        has_top = any(cell.box.t <= y1 + tol_y for cell in overlapping)
+        if has_left and has_right and has_top:
+            return _assemble_text_cells(overlapping)
+        return None
+
     async def _recognize_region(self, image: "Image.Image", prompt: str | None) -> str:
         """Send a cropped region to the VLM and return the generated text."""
         image = await asyncio.to_thread(self._smart_resize_image, image)
@@ -204,9 +275,21 @@ class LayoutVLMConverter(BaseConverter):
             return page
 
         # Crop + recognize in parallel (skip regions get empty text)
+        n_skipped = 0
+        n_native = 0
+        n_vlm = 0
+
         async def process_region(label: str, bbox: list, task: str) -> str:
+            nonlocal n_skipped, n_native, n_vlm
             if task == "skip":
+                n_skipped += 1
                 return ""
+            if task == "text" and page.text_cells:
+                native = self._collect_native_text(bbox, page.text_cells)
+                if native is not None:
+                    n_native += 1
+                    return native
+            n_vlm += 1
             x1, y1, x2, y2 = bbox
             cropped = image.crop((x1, y1, x2, y2))
             return await self._recognize_region(cropped, self._get_prompt(label))
@@ -215,7 +298,14 @@ class LayoutVLMConverter(BaseConverter):
             *[process_region(label, bbox, task) for label, bbox, task in classified]
         )
         t2 = time.perf_counter()
-        logger.debug(f"VLM (parallel, {len(regions)} regions): {t2-t1:.3f}s")
+        logger.debug(
+            "VLM (parallel, {n_vlm} regions): {dt:.3f}s  "
+            "[native={n_native}, skipped={n_skipped}]",
+            n_vlm=n_vlm,
+            dt=t2 - t1,
+            n_native=n_native,
+            n_skipped=n_skipped,
+        )
         items = []
         for (label, bbox, _), text in zip(classified, texts, strict=False):
             x1, y1, x2, y2 = bbox
@@ -228,5 +318,4 @@ class LayoutVLMConverter(BaseConverter):
             )
 
         page.items = items
-        page.text = "\n\n".join(item.text for item in items if item.text)
         return page

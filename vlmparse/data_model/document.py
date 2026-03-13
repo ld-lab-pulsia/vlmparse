@@ -13,6 +13,7 @@ from vlmparse.base_model import VLMParseBaseModel
 from vlmparse.utils import from_base64, to_base64
 
 from .box import BoundingBox
+from .category_mapping import map_to_unified_category
 
 
 class ProcessingError(VLMParseBaseModel):
@@ -38,11 +39,42 @@ class Item(VLMParseBaseModel):
     parent: str | None = None
     """Self-ref of the parent figure/table (set on caption items)."""
 
+    def unified_category(self) -> str | None:
+        """Normalised category mapped to a common vocabulary across all backends.
+
+        Possible values: table, image, text, footer, header, list_item, title,
+        footnote, caption, formula, other.
+        Auto-computed from *category* when not explicitly set.
+        """
+        if self.unified_category is None:
+            return map_to_unified_category(self.category)
+
+
+class TextCell(VLMParseBaseModel):
+    """A native text cell extracted by docling-parse (before VLM processing).
+
+    Coordinates are in TOPLEFT origin, expressed in PDF points.
+    To map to image pixels: scale by (image_width / pdf_page_width) and
+    (image_height / pdf_page_height) respectively.
+    """
+
+    box: BoundingBox
+    text: str
+    uri: str | None = None
+    """Hyperlink URI associated with this cell, if any."""
+
+    def to_markdown(self):
+        if self.uri:
+            return f"[{self.text}]({self.uri})"
+        return self.text
+
 
 class Page(VLMParseBaseModel):
     text: str | None = None
     raw_response: str | None = None
     items: list[Item] | None = None
+    text_cells: list[TextCell] | None = None
+    """Native text cells extracted by docling-parse, in image-pixel space (TOPLEFT)."""
     error: ProcessingError | None = None
     buffer_image: Optional[Image.Image | str | dict[str, Any]] = None
     latency: Optional[float] = None
@@ -101,7 +133,11 @@ class Page(VLMParseBaseModel):
         return image
 
     def to_markdown(self, **kwargs):
-        return self.text if self.text is not None else ""
+        if self.text is not None:
+            return self.text
+        if self.items is not None:
+            return "\n\n".join(item.text for item in self.items if item.text)
+        return ""
 
 
 class Document(VLMParseBaseModel):
