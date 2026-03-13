@@ -53,38 +53,41 @@ def extract_page_text_cells(
     try:
         parser = pdf_parser("fatal")
         key = str(file_path)
-        parser.load_document(key, key)
+        loaded = False
+        try:
+            parser.load_document(key, key)
+            loaded = True
 
-        config = DecodePageConfig()
-        config.create_word_cells = True
+            config = DecodePageConfig()
+            config.create_word_cells = True
 
-        decoder = parser.get_page_decoder(key, page_idx, config)
+            decoder = parser.get_page_decoder(key, page_idx, config)
 
-        media_bbox = decoder.get_page_dimension().get_media_bbox()
-        pdf_page_width = float(media_bbox[2] - media_bbox[0])
-        pdf_page_height = float(media_bbox[3] - media_bbox[1])
+            media_bbox = decoder.get_page_dimension().get_media_bbox()
+            pdf_page_width = float(media_bbox[2] - media_bbox[0])
+            pdf_page_height = float(media_bbox[3] - media_bbox[1])
 
-        raw_cells = decoder.get_word_cells()
-        cells: list[TextCell] = []
-        for i in range(len(raw_cells)):
-            cell = raw_cells[i]
-            # docling-parse uses BOTTOMLEFT origin; convert to TOPLEFT.
-            l = float(cell.x0)
-            r = float(cell.x1)
-            t = pdf_page_height - float(cell.y1)
-            b = pdf_page_height - float(cell.y0)
-            if l < r and t < b and cell.text.strip():
-                cells.append(
-                    TextCell(
-                        box=BoundingBox(l=l, t=t, r=r, b=b),
-                        text=cell.text,
+            raw_cells = decoder.get_word_cells()
+            cells: list[TextCell] = []
+            for i in range(len(raw_cells)):
+                cell = raw_cells[i]
+                # docling-parse uses BOTTOMLEFT origin; convert to TOPLEFT.
+                l = float(cell.x0)
+                r = float(cell.x1)
+                t = pdf_page_height - float(cell.y1)
+                b = pdf_page_height - float(cell.y0)
+                if l < r and t < b and cell.text.strip():
+                    cells.append(
+                        TextCell(
+                            box=BoundingBox(l=l, t=t, r=r, b=b),
+                            text=cell.text,
+                        )
                     )
-                )
 
-        # --- hyperlink parsing & merging ---
-        # Each hyperlink covers a rectangular area (BOTTOMLEFT origin).
-        # Collect all word cells whose centre falls inside a hyperlink bbox,
-        # then merge them into a single TextCell carrying the URI.
+            # --- hyperlink parsing & merging ---
+            # Each hyperlink covers a rectangular area (BOTTOMLEFT origin).
+            # Collect all word cells whose centre falls inside a hyperlink bbox,
+            # then merge them into a single TextCell carrying the URI.
         raw_hyperlinks = decoder.get_page_hyperlinks()
         hyperlinks: list[dict] = []
         for i in range(len(raw_hyperlinks)):
@@ -146,3 +149,6 @@ def extract_page_text_cells(
             page_idx=page_idx,
         )
         return None, None, None
+        finally:
+            if loaded:
+                parser.unload_document(key)
