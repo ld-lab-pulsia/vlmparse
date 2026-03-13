@@ -31,7 +31,7 @@ class ConverterConfig(VLMParseBaseModel):
         "chart",
     ] = "ocr"
     add_native_text: bool = False
-    add_uri_to_items: bool = True
+    add_uri_to_items: bool = False
     """When True, overlapping native TextCells with hyperlink URIs are used to
     annotate matching words in each Item's text as markdown links.
     Automatically triggers native text-cell extraction (like add_native_text)."""
