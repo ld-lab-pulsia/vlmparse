@@ -83,8 +83,8 @@ class BaseConverter:
             from .data_model.box import BoundingBox
             from .docling_extractor import extract_page_text_cells
 
-            cells, pdf_w, pdf_h = await asyncio.gather(
-                asyncio.to_thread(extract_page_text_cells, file_path, page_idx),
+            cells, pdf_w, pdf_h = await asyncio.to_thread(
+                extract_page_text_cells, file_path, page_idx
             )
             if cells is not None and pdf_w and pdf_h:
                 img = page.image
