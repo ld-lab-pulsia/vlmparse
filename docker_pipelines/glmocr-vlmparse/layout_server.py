@@ -8,10 +8,9 @@ Environment variables:
     LAYOUT_MODEL_DIR    HuggingFace model id or local path
                         (default: PaddlePaddle/PP-DocLayoutV3_safetensors)
     LAYOUT_THRESHOLD    Confidence threshold (default: 0.3)
-    LAYOUT_BATCH_SIZE   Max images per model forward pass (default: 8)
+    LAYOUT_BATCH_SIZE   Max images per model forward pass (default: 4)
+    WORKERS_PER_DEVICE  Number of worker processes per device (default: 2)
     LAYOUT_PORT         Server port (default: 8090)
-    LAYOUT_COMPILE      Use torch.compile(dynamic=True) to eliminate
-                        per-batch-size CUDA recompilation (default: 1)
 """
 
 import base64
@@ -37,7 +36,6 @@ LAYOUT_MODEL_DIR = os.environ.get(
     "LAYOUT_MODEL_DIR", "PaddlePaddle/PP-DocLayoutV3_safetensors"
 )
 THRESHOLD = float(os.environ.get("LAYOUT_THRESHOLD", "0.3"))
-LAYOUT_COMPILE = os.environ.get("LAYOUT_COMPILE", "0") not in ("0", "false", "False")
 MEASURE_TIMES = False  # Set to False to disable detailed timing logs
 
 
@@ -54,35 +52,6 @@ class LayoutDetectorAPI(ls.LitAPI):
         if device != "cpu":
             self.model = self.model.to(self.precision)
         self.id2label = self.model.config.id2label
-        if LAYOUT_COMPILE:
-            # dynamic=True: one compiled kernel handles all batch sizes,
-            # eliminating per-shape CUDA JIT recompilation (~1100–1400 ms spikes).
-            # Use cudagraphs if g++ is unavailable (no C++ compiler needed);
-            # install g++ in the Docker image to use the faster inductor backend.
-            import shutil
-
-            backend = "inductor" if shutil.which("g++") else "cudagraphs"
-            self.model = torch.compile(self.model, dynamic=True, backend=backend)
-            logger.info("torch.compile(dynamic=True, backend=%s) enabled.", backend)
-
-        # Warmup: trigger kernel compilation (inductor: ~2 min first time) during
-        # setup so it never blocks a live request. Subsequent startups use the cache.
-        logger.info("Running warmup pass (may take a few minutes on first run)...")
-        # CHW uint8 dummy tensor – mirrors what decode_request now produces.
-        dummy_tensor = torch.zeros((3, 800, 800), dtype=torch.uint8)
-        for batch_size in range(1, 9):
-            all_tensors = [
-                dummy_tensor.to(device=device, non_blocking=True)
-            ] * batch_size
-            dummy_inputs = self.processor(images=all_tensors, return_tensors="pt")
-            dummy_inputs = {
-                k: v.to(device=self.device, dtype=self.precision, non_blocking=True)
-                for k, v in dummy_inputs.items()
-            }
-            with torch.inference_mode():
-                self.model(**dummy_inputs)
-
-        logger.info("Warmup complete.")
 
     def decode_request(self, request):
         """Decode a single request: base64 image → raw CHW uint8 tensor (CPU).
@@ -192,7 +161,7 @@ if __name__ == "__main__":
         api_path="/predict",
         max_batch_size=int(os.environ.get("LAYOUT_BATCH_SIZE", "4")),
         batch_timeout=0.01,
-        workers_per_device=2,
+        workers_per_device=int(os.environ.get("WORKERS_PER_DEVICE", "2")),
     )
     server.run(
         port=int(os.environ.get("LAYOUT_PORT", "8090")),

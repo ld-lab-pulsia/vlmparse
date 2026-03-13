@@ -99,9 +99,9 @@ def annotate_item_with_uris(
             continue
         start, end = pos
         # Skip if this range overlaps with an already-recorded match
-        if any(start < me and end > ms for ms, me, _ in matches):
+        if any(start < me and end > ms for ms, me, _ in matches) or cell.uri is None:
             continue
-        matches.append((start, end, cell.uri))  # type: ignore[arg-type]
+        matches.append((start, end, cell.uri))
 
     if not matches:
         return text
