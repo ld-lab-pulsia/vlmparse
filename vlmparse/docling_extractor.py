@@ -15,6 +15,9 @@ from vlmparse.data_model.box import BoundingBox
 from vlmparse.data_model.document import TextCell
 
 
+_DOCLING_PARSE_MISSING_WARNED = False
+
+
 def extract_page_text_cells(
     file_path: str | Path, page_idx: int
 ) -> tuple[list[TextCell], float, float] | tuple[None, None, None]:
@@ -45,9 +48,12 @@ def extract_page_text_cells(
             pdf_parser,
         )
     except ImportError:
-        logger.warning(
-            "docling-parse is not installed; skipping native text extraction; install with `pip install vlmparse[docling-parse]`"
-        )
+        global _DOCLING_PARSE_MISSING_WARNED
+        if not _DOCLING_PARSE_MISSING_WARNED:
+            logger.warning(
+                "docling-parse is not installed; skipping native text extraction; install with `pip install vlmparse[docling-parse]`"
+            )
+            _DOCLING_PARSE_MISSING_WARNED = True
         return None, None, None
 
     try:
