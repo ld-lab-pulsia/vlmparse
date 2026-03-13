@@ -78,12 +78,12 @@ class BaseConverter:
     async def async_call_inside_page_with_rendering(
         self, page: Page, file_path: str | Path, page_idx: int
     ) -> Page:
+        page = await asyncio.to_thread(self.add_page_image, page, file_path, page_idx)
         if self.config.add_native_text or self.config.add_uri_to_items:
             from .data_model.box import BoundingBox
             from .docling_extractor import extract_page_text_cells
 
-            page, (cells, pdf_w, pdf_h) = await asyncio.gather(
-                asyncio.to_thread(self.add_page_image, page, file_path, page_idx),
+            cells, pdf_w, pdf_h = await asyncio.gather(
                 asyncio.to_thread(extract_page_text_cells, file_path, page_idx),
             )
             if cells is not None and pdf_w and pdf_h:
