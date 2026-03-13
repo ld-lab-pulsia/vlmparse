@@ -128,8 +128,8 @@ class LayoutDetectorAPI(ls.LitAPI):
             logger.debug(
                 "stack+to_device (batch=%d): %.1f ms", batch_size, (t1 - t0) * 1000
             )
-        for k, v in stacked.items():
-            logger.debug("  input %s: %s", k, list(v.shape))
+            for k, v in stacked.items():
+                logger.debug("  input %s: %s", k, list(v.shape))
 
         with torch.inference_mode():
             outputs = self.model(**stacked)
