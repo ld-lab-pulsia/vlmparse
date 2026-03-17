@@ -46,8 +46,7 @@ class Item(VLMParseBaseModel):
         footnote, caption, formula, other.
         Auto-computed from *category* when not explicitly set.
         """
-        if self.unified_category is None:
-            return map_to_unified_category(self.category)
+        return map_to_unified_category(self.category)
 
 
 class TextCell(VLMParseBaseModel):

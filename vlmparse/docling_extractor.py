@@ -144,7 +144,6 @@ def extract_page_text_cells(
             cells = merged_cells + remaining
         # --- end hyperlink merging ---
 
-        parser.unload_document(key)
         return cells, pdf_page_width, pdf_page_height
 
     except Exception:
