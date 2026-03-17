@@ -37,6 +37,7 @@ docling_core = [
 ]
 docling-parse = [
     "docling-parse",
+    "rapidfuzz>=3.14.0",
 ]
 st_app = [
     "streamlit>=1.49.0",

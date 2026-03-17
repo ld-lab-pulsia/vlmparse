@@ -1,6 +1,8 @@
 """Annotate Item text with markdown URI links from native text cells."""
 
-import difflib
+from collections import defaultdict
+
+from rapidfuzz import fuzz
 
 from .data_model.document import Item, Page, TextCell
 
@@ -11,7 +13,7 @@ def _find_fuzzy_match(
     """Find the best fuzzy match position of *query* inside *text*.
 
     Tries an exact case-insensitive substring first; falls back to a sliding-
-    window SequenceMatcher scan.  Returns ``(start, end)`` character indices
+    window rapidfuzz scan.  Returns ``(start, end)`` character indices
     into *text*, or ``None`` if no match meets *threshold*.
     """
     lower_text = text.lower()
@@ -26,14 +28,12 @@ def _find_fuzzy_match(
     if qlen > len(text):
         return None
 
-    best_ratio = threshold
+    best_ratio = threshold * 100  # rapidfuzz uses 0-100 scale
     best_pos: tuple[int, int] | None = None
 
     for i in range(len(text) - qlen + 1):
         window = text[i : i + qlen]
-        ratio = difflib.SequenceMatcher(
-            None, window.lower(), lower_query, autojunk=False
-        ).ratio()
+        ratio = fuzz.ratio(window.lower(), lower_query)
         if ratio > best_ratio:
             best_ratio = ratio
             best_pos = (i, i + qlen)
@@ -119,6 +119,74 @@ def annotate_item_with_uris(
     return "".join(parts)
 
 
+def _build_uri_phrases(uri_cells: list[TextCell]) -> list[tuple[str, str]]:
+    """Group URI cells by URI and concatenate their texts into phrases.
+
+    Returns a list of ``(phrase_text, uri)`` sorted longest-first so that
+    longer phrases get matching priority.
+    """
+    groups: dict[str, list[TextCell]] = defaultdict(list)
+    for cell in uri_cells:
+        if cell.uri:
+            groups[cell.uri].append(cell)
+
+    phrases: list[tuple[str, str]] = []
+    for uri, cells in groups.items():
+        # Sort by vertical then horizontal position
+        cells.sort(key=lambda c: (c.box.t, c.box.l))
+        phrase = " ".join(c.text.strip() for c in cells if c.text.strip())
+        if phrase:
+            phrases.append((phrase, uri))
+
+    phrases.sort(key=lambda x: len(x[0]), reverse=True)
+    return phrases
+
+
+def annotate_page_text_with_uris(
+    page: Page,
+    fuzzy_threshold: float = 0.7,
+) -> None:
+    """Annotate ``page.text`` with URI markdown links, in-place.
+
+    Builds phrases by grouping URI text-cells that share the same URI,
+    fuzzy-matches each phrase against ``page.text``, and replaces the
+    matched span with ``[matched_text](uri)``.
+    """
+    if not page.text or not page.text_cells:
+        return
+
+    uri_cells = [c for c in page.text_cells if c.uri]
+    if not uri_cells:
+        return
+
+    phrases = _build_uri_phrases(uri_cells)
+    text = page.text
+    matches: list[tuple[int, int, str]] = []
+
+    for phrase, uri in phrases:
+        pos = _find_fuzzy_match(text, phrase, fuzzy_threshold)
+        if pos is None:
+            continue
+        start, end = pos
+        if any(start < me and end > ms for ms, me, _ in matches):
+            continue
+        matches.append((start, end, uri))
+
+    if not matches:
+        return
+
+    matches.sort(key=lambda x: x[0])
+    parts: list[str] = []
+    prev = 0
+    for start, end, uri in matches:
+        parts.append(text[prev:start])
+        parts.append(f"[{text[start:end]}]({uri})")
+        prev = end
+    parts.append(text[prev:])
+
+    page.text = "".join(parts)
+
+
 def annotate_page_items_with_uris(
     page: Page,
     overlap_threshold: float = 0.3,
@@ -126,17 +194,22 @@ def annotate_page_items_with_uris(
 ) -> None:
     """Annotate all items on *page* with URI markdown links, in-place.
 
-    Requires ``page.items`` and ``page.text_cells`` to be populated.
+    Requires ``page.text_cells`` to be populated.
     TextCells without a URI are ignored.
+    Annotates both ``page.items`` (box-overlap matching) and
+    ``page.text`` (phrase-level fuzzy matching).
     """
-    if not page.items or not page.text_cells:
+    if not page.text_cells:
         return
 
     uri_cells = [c for c in page.text_cells if c.uri]
     if not uri_cells:
         return
 
-    for item in page.items:
-        item.text = annotate_item_with_uris(
-            item, uri_cells, overlap_threshold, fuzzy_threshold
-        )
+    if page.items:
+        for item in page.items:
+            item.text = annotate_item_with_uris(
+                item, uri_cells, overlap_threshold, fuzzy_threshold
+            )
+
+    annotate_page_text_with_uris(page, fuzzy_threshold)
