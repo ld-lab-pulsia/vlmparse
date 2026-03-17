@@ -65,7 +65,9 @@ class LayoutDetectorAPI(ls.LitAPI):
         arr = np.frombuffer(image_data, np.uint8)
         image = cv2.imdecode(arr, cv2.IMREAD_COLOR)
         if image is None:
-            raise ValueError("Failed to decode image: invalid or unsupported image data.")
+            raise ValueError(
+                "Failed to decode image: invalid or unsupported image data."
+            )
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         original_size = (image.shape[1], image.shape[0])  # (width, height)
         # HWC numpy uint8 → CHW torch uint8; preprocessing deferred to predict()
