@@ -23,10 +23,10 @@ def _build_device_requests(gpu_device_ids: list[str] | None) -> list | None:
     if gpu_device_ids and gpu_device_ids[0] != "":
         # Specific GPUs
         return [
-            docker.types.DeviceRequest(
+            docker.types.DeviceRequest(  # type: ignore[attr-defined]
                 device_ids=gpu_device_ids, capabilities=[["gpu"]]
             )
-        ]  # type: ignore[attr-defined]
+        ]
     # Empty list → CPU only
     return None
 

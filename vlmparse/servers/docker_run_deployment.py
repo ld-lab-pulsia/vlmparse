@@ -141,7 +141,7 @@ def docker_server(
             gpu_label = ",".join(config.gpu_device_ids)
 
         # Start container
-        container_kwargs = {
+        container_kwargs: dict = {
             "image": config.docker_image,
             "ports": {f"{container_port}/tcp": config.docker_port},
             "detach": True,
