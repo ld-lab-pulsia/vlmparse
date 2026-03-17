@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Annotated, Any, Literal, Union
+from pathlib import Path
+from typing import Annotated, Literal, Union
 
 from pydantic import Field
 
@@ -12,13 +13,13 @@ from .data_model.document import Page
 class PageProcessor(ABC):
     """Base class for page pre/post processors.
 
-    Subclasses must implement ``__call__`` which receives a :class:`Page`
-    and optional keyword context (e.g. ``file_path``, ``page_idx``) and
-    returns the (possibly mutated) page.
+    Subclasses must implement ``__call__`` which receives a :class:`Page`,
+    a ``file_path`` and a ``page_idx`` and returns the (possibly mutated)
+    page.
     """
 
     @abstractmethod
-    def __call__(self, page: Page, **context: Any) -> Page: ...
+    def __call__(self, page: Page, file_path: str | Path, page_idx: int) -> Page: ...
 
 
 class AsyncPageProcessor(ABC):
@@ -30,7 +31,9 @@ class AsyncPageProcessor(ABC):
     """
 
     @abstractmethod
-    async def __call__(self, page: Page, **context: Any) -> Page: ...
+    async def __call__(
+        self, page: Page, file_path: str | Path, page_idx: int
+    ) -> Page: ...
 
 
 class PageProcessorConfig(VLMParseBaseModel):
@@ -61,12 +64,7 @@ class PageProcessorConfig(VLMParseBaseModel):
 class ExtractTextCellsProcessor(PageProcessor):
     """Extract native PDF text cells and scale their boxes to image space."""
 
-    def __call__(self, page: Page, **context: Any) -> Page:
-        file_path = context.get("file_path")
-        page_idx = context.get("page_idx")
-        if file_path is None or page_idx is None:
-            return page
-
+    def __call__(self, page: Page, file_path: str | Path, page_idx: int) -> Page:
         from .data_model.box import BoundingBox
         from .docling_extractor import extract_page_text_cells
 
@@ -104,7 +102,7 @@ class ExtractTextCellsConfig(PageProcessorConfig):
 class UriAnnotatorProcessor(PageProcessor):
     """Annotate page items and text with hyperlink URIs from text cells."""
 
-    def __call__(self, page: Page, **context: Any) -> Page:
+    def __call__(self, page: Page, file_path: str | Path, page_idx: int) -> Page:
         from .uri_annotator import annotate_page_items_with_uris
 
         annotate_page_items_with_uris(page)

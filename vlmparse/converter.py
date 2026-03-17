@@ -75,25 +75,30 @@ class BaseConverter:
         raise NotImplementedError
 
     async def _run_processors(
-        self, procs: list[PageProcessorConfigs], page: Page, context: dict
+        self,
+        procs: list[PageProcessorConfigs],
+        page: Page,
+        file_path: str | Path,
+        page_idx: int,
     ) -> Page:
         """Run a list of processor configs on a page."""
         for proc_config in procs:
             processor = proc_config.get_processor()
             if isinstance(processor, AsyncPageProcessor):
-                page = await processor(page, **context)
+                page = await processor(page, file_path, page_idx)
             elif proc_config.to_thread:
-                page = await asyncio.to_thread(processor, page, **context)
+                page = await asyncio.to_thread(processor, page, file_path, page_idx)
             else:
-                page = processor(page, **context)
+                page = processor(page, file_path, page_idx)
         return page
 
     async def async_call_inside_page_with_rendering(
         self, page: Page, file_path: str | Path, page_idx: int
     ) -> Page:
         page = await asyncio.to_thread(self.add_page_image, page, file_path, page_idx)
-        context = {"file_path": file_path, "page_idx": page_idx}
-        page = await self._run_processors(self.config.page_preproc, page, context)
+        page = await self._run_processors(
+            self.config.page_preproc, page, file_path, page_idx
+        )
         return await self.async_call_inside_page(page)
 
     def add_page_image(self, page: Page, file_path, page_idx):
@@ -132,9 +137,11 @@ class BaseConverter:
                         page = await self.async_call_inside_page_with_rendering(
                             page, file_path, page_idx
                         )
-                        context = {"file_path": file_path, "page_idx": page_idx}
                         page = await self._run_processors(
-                            self.config.page_postproc, page, context
+                            self.config.page_postproc,
+                            page,
+                            file_path,
+                            page_idx,
                         )
                         toc = time.perf_counter()
                         page.latency = toc - tic
