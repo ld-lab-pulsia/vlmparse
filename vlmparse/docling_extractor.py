@@ -55,10 +55,13 @@ def extract_page_text_cells(
             _DOCLING_PARSE_MISSING_WARNED = True
         return None, None, None
 
+    loaded = False
+    parser = None
+    key: str | None = None
+
     try:
         parser = pdf_parser("fatal")
         key = str(file_path)
-        loaded = False
 
         parser.load_document(key, key)
         loaded = True
@@ -154,5 +157,5 @@ def extract_page_text_cells(
         )
         return None, None, None
     finally:
-        if loaded:
+        if loaded and parser is not None and key is not None:
             parser.unload_document(key)

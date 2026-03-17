@@ -1,5 +1,6 @@
 """Annotate Item text with markdown URI links from native text cells."""
 
+import urllib.parse
 from collections import defaultdict
 
 from rapidfuzz import fuzz
@@ -39,6 +40,16 @@ def _find_fuzzy_match(
             best_pos = (i, i + qlen)
 
     return best_pos
+
+
+def _escape_uri_for_markdown(uri: str) -> str:
+    """Return *uri* percent-encoded for safe use in markdown link destinations.
+
+    Escapes characters like spaces and ``)`` that would otherwise terminate
+    the markdown link, while preserving common URL punctuation.
+    """
+    # Do not escape common URL characters, but ensure ')' and spaces are encoded.
+    return urllib.parse.quote(uri, safe=":/?#[]@!$&'(*+,;=%")
 
 
 def annotate_item_with_uris(
@@ -112,7 +123,8 @@ def annotate_item_with_uris(
     prev = 0
     for start, end, uri in matches:
         parts.append(text[prev:start])
-        parts.append(f"[{text[start:end]}]({uri})")
+        safe_uri = _escape_uri_for_markdown(uri)
+        parts.append(f"[{text[start:end]}]({safe_uri})")
         prev = end
     parts.append(text[prev:])
 
