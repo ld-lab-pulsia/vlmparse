@@ -51,7 +51,13 @@ class DoclingDockerServerConfig(DockerServerConfig):
 
     @property
     def client_config(self):
-        return DoclingConverterConfig(base_url=f"http://localhost:{self.docker_port}")
+        from vlmparse.model_endpoint_config import ModelEndpointConfig
+
+        return DoclingConverterConfig(
+            endpoint=ModelEndpointConfig(
+                base_url=f"http://localhost:{self.docker_port}"
+            )
+        )
 
 
 class DoclingConverterConfig(ConverterConfig):
@@ -313,7 +319,7 @@ class DoclingConverter(BaseConverter):
         img_bytes = await asyncio.to_thread(image_to_bytes, page.image)
 
         data = self.config.api_kwargs
-        url = f"{self.config.base_url}/v1/convert/file"
+        url = f"{self.config.endpoint.base_url}/v1/convert/file"
         logger.debug(f"Calling Docling API at: {url}")
         files = {"files": ("image.png", img_bytes, "image/png")}
 

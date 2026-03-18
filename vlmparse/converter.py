@@ -7,7 +7,7 @@ from loguru import logger
 from PIL import Image
 from pydantic import Field
 
-from vlmparse.servers.docker_server import DEFAULT_MODEL_NAME
+from vlmparse.model_endpoint_config import ModelEndpointConfig
 
 from .base_model import VLMParseBaseModel
 from .build_doc import convert_specific_page_to_image, get_page_count, resize_image
@@ -19,10 +19,9 @@ from .page_processor import AsyncPageProcessor, PageProcessorConfigs
 class ConverterConfig(VLMParseBaseModel):
     model_name: str
     aliases: list[str] = Field(default_factory=list)
+    endpoint: ModelEndpointConfig = Field(default_factory=ModelEndpointConfig)
     dpi: int = Field(default=175, ge=30, le=600)
     max_image_size: int | None = Field(default=4000, ge=50)
-    base_url: str | None = None
-    default_model_name: str = DEFAULT_MODEL_NAME
     conversion_mode: Literal[
         "ocr",
         "ocr_layout",

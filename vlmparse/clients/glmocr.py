@@ -146,9 +146,13 @@ class GLMOCRConverter(BaseConverter):
             RuntimeError: If the API returns an error
         """
         headers = {}
-        assert self.config.base_url is not None, "Base URL is required for API calls"
+        assert (
+            self.config.endpoint.base_url is not None
+        ), "Base URL is required for API calls"
         async with httpx.AsyncClient(
-            base_url=self.config.base_url, timeout=self.config.timeout, headers=headers
+            base_url=self.config.endpoint.base_url,
+            timeout=self.config.timeout,
+            headers=headers,
         ) as client:
             response = await client.post(endpoint, json=payload)
 

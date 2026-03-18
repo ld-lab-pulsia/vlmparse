@@ -1,60 +1,20 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Annotated, Literal, Union
 
 from pydantic import Field
 
-from .base_model import VLMParseBaseModel
-from .data_model.document import Page
+from .page_processor_base import AsyncPageProcessor, PageProcessor, PageProcessorConfig
 
+# Re-export so existing imports like `from vlmparse.page_processor import AsyncPageProcessor` keep working
+__all__ = [
+    "AsyncPageProcessor",
+    "PageProcessor",
+    "PageProcessorConfig",
+]
 
-class PageProcessor(ABC):
-    """Base class for page pre/post processors.
-
-    Subclasses must implement ``__call__`` which receives a :class:`Page`,
-    a ``file_path`` and a ``page_idx`` and returns the (possibly mutated)
-    page.
-    """
-
-    @abstractmethod
-    def __call__(self, page: Page, file_path: str | Path, page_idx: int) -> Page: ...
-
-
-class AsyncPageProcessor(ABC):
-    """Base class for async page pre/post processors.
-
-    Subclasses must implement ``__call__`` as an async method.
-    When ``to_thread`` is set on the config it is ignored for async
-    processors — they are always awaited directly.
-    """
-
-    @abstractmethod
-    async def __call__(
-        self, page: Page, file_path: str | Path, page_idx: int
-    ) -> Page: ...
-
-
-class PageProcessorConfig(VLMParseBaseModel):
-    """Base configuration for a page processor.
-
-    Subclasses must define a ``class_name`` :class:`Literal` field so
-    that the discriminated union can deserialise configs from plain dicts.
-
-    Parameters
-    ----------
-    to_thread:
-        When *True* the processor is executed via ``asyncio.to_thread``
-        so that blocking work does not stall the event loop.
-    """
-
-    class_name: str
-    to_thread: bool = False
-
-    def get_processor(self) -> PageProcessor | AsyncPageProcessor:
-        raise NotImplementedError
-
+from .data_model.document import Page  # noqa: F401 (used by processors below)
 
 # ---------------------------------------------------------------------------
 # Built-in preprocessor: native text-cell extraction
@@ -121,10 +81,20 @@ class UriAnnotatorConfig(PageProcessorConfig):
 # Discriminated union of all built-in processor configs
 # ---------------------------------------------------------------------------
 
+# Imported here (after all base classes are defined) to avoid circular imports.
+from vlmparse.clients.item_description_processors import (  # noqa: E402
+    DeepSeekOCR2ItemDescriptionConfig,
+    DeepSeekOCRItemDescriptionConfig,
+    VLMItemDescriptionConfig,
+)
+
 PageProcessorConfigs = Annotated[
     Union[
         ExtractTextCellsConfig,
         UriAnnotatorConfig,
+        DeepSeekOCRItemDescriptionConfig,
+        DeepSeekOCR2ItemDescriptionConfig,
+        VLMItemDescriptionConfig,
     ],
     Field(discriminator="class_name"),
 ]

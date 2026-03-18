@@ -17,7 +17,7 @@ class MistralOCRConverterConfig(ConverterConfig):
 
     base_url: str = "https://api.mistral.ai/v1"
     model_name: str = "mistral-ocr-latest"
-    api_key: str | None = None
+    api_key: str | None = Field(default=None, exclude=True, repr=False)
     timeout: int = 300
     aliases: list[str] = Field(
         default_factory=lambda: ["mistral-ocr-latest", "mistral-ocr"]

@@ -25,7 +25,13 @@ class MinerUDockerServerConfig(DockerServerConfig):
 
     @property
     def client_config(self):
-        return MinerUConverterConfig(base_url=f"http://localhost:{self.docker_port}")
+        from vlmparse.model_endpoint_config import ModelEndpointConfig
+
+        return MinerUConverterConfig(
+            endpoint=ModelEndpointConfig(
+                base_url=f"http://localhost:{self.docker_port}"
+            )
+        )
 
 
 class MinerUConverterConfig(ConverterConfig):
@@ -55,10 +61,12 @@ class MinerUConverter(BaseConverter):
         """Run async inference with MinerU API."""
         from httpx import AsyncClient
 
-        assert self.config.base_url is not None, "Base URL is required for API calls"
+        assert (
+            self.config.endpoint.base_url is not None
+        ), "Base URL is required for API calls"
 
         async with AsyncClient(
-            base_url=self.config.base_url, timeout=self.config.timeout
+            base_url=self.config.endpoint.base_url, timeout=self.config.timeout
         ) as client:
             img_byte_arr = await asyncio.to_thread(to_bytes_io, image)
             response = await client.post(

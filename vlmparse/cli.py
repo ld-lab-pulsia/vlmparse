@@ -152,6 +152,46 @@ def convert(
             "This is only applicable for compatible servers and may require additional configuration on the server side."
         ),
     ),
+    image_description: bool = typer.Option(
+        False,
+        "--image-description/--no-image-description",
+        help=(
+            "Add an image-description post-processor that describes detected figures/charts "
+            "using a VLM.  By default the same model and server as the main conversion are used."
+        ),
+    ),
+    image_description_model: str | None = typer.Option(
+        None,
+        "--image-description-model",
+        help=(
+            "Model to use for image description.  Defaults to the main conversion model. "
+            "Use 'deepseek-ai/DeepSeek-OCR', 'deepseek-ai/DeepSeek-OCR-2', or any "
+            "OpenAI-compatible model name."
+        ),
+    ),
+    image_description_uri: str | None = typer.Option(
+        None,
+        "--image-description-uri",
+        help="URI of the server for image description.  Defaults to the main server URI.",
+    ),
+    image_description_api_key: str | None = typer.Option(
+        None,
+        "--image-description-api-key",
+        help="API key for the image description server (if different from the main server).",
+    ),
+    image_description_categories: str | None = typer.Option(
+        None,
+        "--image-description-categories",
+        help=(
+            "Comma-separated list of item categories to describe "
+            "(default: 'picture,image,figure,chart')."
+        ),
+    ),
+    image_description_prompt: str | None = typer.Option(
+        None,
+        "--image-description-prompt",
+        help="Custom prompt sent to the VLM for each image crop.  Uses model default if not set.",
+    ),
     debug: bool = typer.Option(False, help="Run in debug mode"),
     _return_documents: bool = typer.Option(False, hidden=True),
 ):
@@ -171,9 +211,38 @@ def convert(
         debug: If True, run in debug mode (single-threaded, no concurrency)
     """
     from vlmparse.converter_with_server import ConverterWithServer
+    from vlmparse.model_endpoint_config import (
+        ImageDescriptionConfig,
+        ModelEndpointConfig,
+    )
 
     if with_vllm_server and provider == "registry":
         provider = "hf"
+
+    # Build ImageDescriptionConfig from flat CLI flags; None = disabled
+    img_desc: ImageDescriptionConfig | None = None
+    if image_description:
+        categories = (
+            [c.strip() for c in image_description_categories.split(",")]
+            if image_description_categories
+            else ["picture", "image", "figure", "chart"]
+        )
+        conn_override: ModelEndpointConfig | None = None
+        if (
+            image_description_model
+            or image_description_uri
+            or image_description_api_key
+        ):
+            conn_override = ModelEndpointConfig(
+                model_name=image_description_model or "vllm-model",
+                base_url=image_description_uri,
+                api_key=image_description_api_key or "",
+            )
+        img_desc = ImageDescriptionConfig(
+            connection=conn_override,
+            categories=categories,
+            prompt=image_description_prompt,
+        )
 
     with ConverterWithServer(
         model=model,
@@ -183,6 +252,7 @@ def convert(
         concurrency=concurrency,
         return_documents=_return_documents,
         use_response_api=use_response_api,
+        image_description=img_desc,
     ) as converter_with_server:
         return converter_with_server.parse(
             inputs=inputs,

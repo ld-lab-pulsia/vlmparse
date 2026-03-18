@@ -2,11 +2,12 @@ import datetime
 import os
 import time
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from loguru import logger
 
 from vlmparse.constants import DEFAULT_SERVER_PORT
+from vlmparse.model_endpoint_config import ImageDescriptionConfig, ModelEndpointConfig
 from vlmparse.servers.utils import get_model_from_uri
 from vlmparse.utils import get_file_paths
 
@@ -100,7 +101,10 @@ def get_client_config(
     ), "Model name could not be determined from parameters. Please provide a model name or a URI that includes the model name."
 
     if provider == "hf":
-        client_config = OpenAIConverterConfig(model_name=model, base_url=uri)
+        client_config = OpenAIConverterConfig(
+            model_name=model,
+            endpoint=ModelEndpointConfig(base_url=uri),
+        )
 
     elif provider == "registry":
         client_config = converter_config_registry.get(model, uri=uri)
@@ -117,9 +121,11 @@ def get_client_config(
 
         client_config = OpenAIConverterConfig(
             model_name=model,
-            base_url=GOOGLE_API_BASE_URL if uri is None else uri,
-            api_key=api_key,
-            default_model_name=model,
+            endpoint=ModelEndpointConfig(
+                base_url=GOOGLE_API_BASE_URL if uri is None else uri,
+                api_key=api_key,
+                model_name=model,
+            ),
         )
 
     elif provider == "openai":
@@ -130,9 +136,11 @@ def get_client_config(
             api_key = os.getenv("OPENAI_API_KEY", "")
         client_config = OpenAIConverterConfig(
             model_name=model,
-            base_url=uri,
-            api_key=api_key,
-            default_model_name=model,
+            endpoint=ModelEndpointConfig(
+                base_url=uri,
+                api_key=api_key,
+                model_name=model,
+            ),
         )
     elif provider == "azure":
         if api_key is None:
@@ -142,10 +150,12 @@ def get_client_config(
             api_key = os.getenv("AZURE_OPENAI_API_KEY", "")
         client_config = OpenAIConverterConfig(
             model_name=model,
-            base_url=uri if uri is not None else os.getenv("AZURE_OPENAI_ENDPOINT"),
-            api_key=api_key,
+            endpoint=ModelEndpointConfig(
+                base_url=uri if uri is not None else os.getenv("AZURE_OPENAI_ENDPOINT"),
+                api_key=api_key,
+                model_name=model,
+            ),
             is_azure=True,
-            default_model_name=model,
             use_response_api=use_response_api,
         )
 
@@ -167,6 +177,8 @@ class ConverterWithServer:
         forget_predefined_vllm_args: bool = False,
         return_documents: bool = False,
         use_response_api: bool = False,
+        # ---- image description post-processor ----
+        image_description: "ImageDescriptionConfig | None" = None,
     ):
         if model is None and uri is None:
             raise ValueError("Either 'model' or 'uri' must be provided")
@@ -186,6 +198,7 @@ class ConverterWithServer:
         self.server = None
         self.client = None
         self.use_response_api = use_response_api
+        self.image_description = image_description
 
     def start_server_and_client(self):
         from vlmparse.registries import (
@@ -238,6 +251,66 @@ class ConverterWithServer:
 
             self.client = client_config.get_client(
                 return_documents_in_batch_mode=self.return_documents
+            )
+
+    def _make_image_description_postproc(self):
+        """Build the right PageProcessorConfig for item-level image description.
+
+        Connection parameters come from ``self.image_description.connection``
+        if set, otherwise fall back to the main converter's connection.
+        """
+        from vlmparse.clients.item_description_processors import (
+            DeepSeekOCR2ItemDescriptionConfig,
+            DeepSeekOCRItemDescriptionConfig,
+            VLMItemDescriptionConfig,
+        )
+
+        assert self.image_description is not None
+        desc = self.image_description
+        self.client = cast(self.client, ConverterWithServer)  # type: ignore
+        # Start from the main converter's connection, then apply overrides
+        conn = self.client.config.endpoint.model_copy()
+        if desc.connection is not None:
+            if desc.connection.base_url is not None:
+                conn.base_url = desc.connection.base_url
+            if desc.connection.api_key:
+                conn.api_key = desc.connection.api_key
+            if desc.connection.timeout is not None:
+                conn.timeout = desc.connection.timeout
+            if desc.connection.max_retries != 1:
+                conn.max_retries = desc.connection.max_retries
+
+        categories = desc.categories
+        extra: dict = {}
+        if desc.prompt is not None:
+            extra["prompt"] = desc.prompt
+
+        # Route to the right config class based on the HF model name;
+        # if an explicit model_name is given in the override connection, use it.
+        hf_model = (
+            desc.connection.model_name
+            if desc.connection is not None
+            and desc.connection.model_name != conn.model_name
+            else self.client.config.model_name
+        )
+
+        if hf_model == "deepseek-ai/DeepSeek-OCR":
+            return DeepSeekOCRItemDescriptionConfig(
+                connection=conn, categories=categories, **extra
+            )
+        elif hf_model == "deepseek-ai/DeepSeek-OCR-2":
+            return DeepSeekOCR2ItemDescriptionConfig(
+                connection=conn, categories=categories, **extra
+            )
+        else:
+            # For a generic VLM the model_name in conn IS the served model id
+            if desc.connection is not None:
+                conn.model_name = desc.connection.model_name
+            return VLMItemDescriptionConfig(
+                connection=conn,
+                completion_kwargs={"temperature": 0.2, "max_tokens": 512},
+                categories=categories,
+                **extra,
             )
 
     def stop_server(self):
@@ -324,6 +397,28 @@ class ConverterWithServer:
         ):
             self.client.config.completion_kwargs |= completion_kwargs
 
+        # ---- image description post-processor (idempotent) ----
+        from vlmparse.clients.item_description_processors import (
+            DeepSeekOCR2ItemDescriptionConfig,
+            DeepSeekOCRItemDescriptionConfig,
+            VLMItemDescriptionConfig,
+        )
+
+        _desc_types = (
+            DeepSeekOCRItemDescriptionConfig,
+            DeepSeekOCR2ItemDescriptionConfig,
+            VLMItemDescriptionConfig,
+        )
+        self.client.config.page_postproc = [
+            p
+            for p in self.client.config.page_postproc
+            if not isinstance(p, _desc_types)
+        ]
+        if self.image_description is not None:
+            self.client.config.page_postproc.append(
+                self._make_image_description_postproc()
+            )
+
         if debug:
             self.client.debug = debug
 
@@ -336,7 +431,7 @@ class ConverterWithServer:
         logger.debug(f"Processing {len(file_paths)} files with {self.model} converter")
         tic = time.perf_counter()
 
-        documents = self.client.batch(file_paths)  # type: ignore
+        documents = self.client.batch(file_paths)
 
         toc = time.perf_counter()
         logger.debug(
