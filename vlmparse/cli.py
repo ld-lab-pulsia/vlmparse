@@ -234,7 +234,7 @@ def convert(
             or image_description_api_key
         ):
             conn_override = ModelEndpointConfig(
-                model_name=image_description_model or "vllm-model",
+                model_name=image_description_model or model,
                 base_url=image_description_uri,
                 api_key=image_description_api_key or "",
             )

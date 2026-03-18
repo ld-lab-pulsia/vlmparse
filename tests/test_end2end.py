@@ -52,7 +52,7 @@ def test_convert_mistral_ocr(file_path, model, tmp_output_dir):
 @pytest.mark.parametrize(
     "model",
     [
-        # "docling",
+        "docling",
         "lightonocr",
         "dotsocr",
         "nanonets/Nanonets-OCR2-3B",

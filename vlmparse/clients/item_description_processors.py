@@ -15,6 +15,7 @@ are skipped; all matching items on a page are described concurrently via
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from typing import Literal
 
 from loguru import logger
@@ -96,7 +97,7 @@ class BaseItemDescriptionProcessor(AsyncPageProcessor):
         )
         return response.choices[0].message.content or ""
 
-    async def __call__(self, page: Page, file_path: object, page_idx: int) -> Page:
+    async def __call__(self, page: Page, file_path: str | Path, page_idx: int) -> Page:
         if page.items is None or page.image is None:
             return page
 

@@ -267,9 +267,9 @@ class ConverterWithServer:
 
         assert self.image_description is not None
         desc = self.image_description
-        self.client = cast(self.client, ConverterWithServer)  # type: ignore
+        client = cast(ConverterWithServer, self.client)
         # Start from the main converter's connection, then apply overrides
-        conn = self.client.config.endpoint.model_copy()
+        conn = client.config.endpoint.model_copy()  # type: ignore
         if desc.connection is not None:
             if desc.connection.base_url is not None:
                 conn.base_url = desc.connection.base_url
@@ -291,7 +291,7 @@ class ConverterWithServer:
             desc.connection.model_name
             if desc.connection is not None
             and desc.connection.model_name != conn.model_name
-            else self.client.config.model_name
+            else client.config.model_name  # type: ignore
         )
 
         if hf_model == "deepseek-ai/DeepSeek-OCR":
