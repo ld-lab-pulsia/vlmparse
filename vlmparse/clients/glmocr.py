@@ -12,7 +12,10 @@ from vlmparse.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_ta
 from vlmparse.clients.pipe_utils.utils import clean_response
 from vlmparse.converter import BaseConverter, ConverterConfig
 from vlmparse.data_model.document import BoundingBox, Item, Page
-from vlmparse.servers.docker_compose_server import DockerComposeServerConfig
+from vlmparse.servers.container_group_server import (
+    ContainerGroupServerConfig,
+    ServiceDefinition,
+)
 from vlmparse.utils import to_base64
 
 DOCKER_PIPELINE_DIR = (
@@ -20,43 +23,76 @@ DOCKER_PIPELINE_DIR = (
 )
 
 
-class GLMOCRDockerServerConfig(DockerComposeServerConfig):
-    """Docker Compose configuration for GLM-OCR server."""
+class GLMOCRDockerServerConfig(ContainerGroupServerConfig):
+    """Container group configuration for GLM-OCR server."""
 
     model_name: str = "GLM-OCR"
     aliases: list[str] = Field(default_factory=lambda: ["glmocr", "glm-ocr"])
-    compose_file: str = str(DOCKER_PIPELINE_DIR / "compose.yaml")
     server_service: str = "glmocr-api"
-    compose_services: list[str] = Field(
-        default_factory=lambda: ["glmocr-api", "glmocr-vllm-server"]
-    )
-    gpu_service_names: list[str] = Field(default_factory=lambda: ["glmocr-vllm-server"])
     docker_port: int = 5002
-    container_port: int = 5002
-    environment: dict[str, str] = Field(
-        default_factory=lambda: {
-            "VLM_BACKEND": "vllm",
-            "API_PORT": "8080",
-        }
-    )
-    environment_services: list[str] = Field(default_factory=lambda: ["glmocr-api"])
+    gpu_services: list[str] = Field(default_factory=lambda: ["glmocr-vllm-server"])
     server_ready_indicators: list[str] = Field(
         default_factory=lambda: ["Running on", "Application startup complete"]
     )
+    services: dict[str, ServiceDefinition] = Field(default_factory=dict)
 
     def model_post_init(self, __context):
-        if not self.compose_env:
-            compose_env = {}
-            for key in [
-                "API_IMAGE_TAG_SUFFIX",
-                "VLM_IMAGE_TAG_SUFFIX",
-                "VLM_BACKEND",
-            ]:
-                value = os.getenv(key)
-                if value:
-                    compose_env[key] = value
-            if compose_env:
-                self.compose_env = compose_env
+        hf_home = os.getenv("HF_HOME", str(Path.home() / ".cache" / "huggingface"))
+        cuda_devices = os.getenv("CUDA_VISIBLE_DEVICES", "0")
+
+        # The glmocr-api container resolves the vllm server by its container name
+        # on the shared bridge network.  The container name is
+        # "{resolved_group_name}-glmocr-vllm-server".
+        vllm_container_name = f"{self.resolved_group_name}-glmocr-vllm-server"
+
+        self.services = {
+            "glmocr-vllm-server": ServiceDefinition(
+                image="vlmparse-glmocr-vllm-server:latest",
+                dockerfile_dir=DOCKER_PIPELINE_DIR / "vllm-server",
+                internal_port=8080,
+                ready_indicators=["Application startup complete."],
+                entrypoint=["/bin/bash", "-c"],
+                command=[
+                    "vllm serve zai-org/GLM-OCR"
+                    " --served-model-name glm-ocr"
+                    " --allowed-local-media-path /"
+                    " --port 8080"
+                    ' --speculative-config \'{"method": "mtp", "num_speculative_tokens": 1}\''
+                ],
+                environment={
+                    "CUDA_VISIBLE_DEVICES": cuda_devices,
+                    "HF_HOME": "/root/.cache/huggingface",
+                },
+                volumes={
+                    hf_home: {"bind": "/root/.cache/huggingface", "mode": "rw"},
+                },
+                shm_size="16g",
+            ),
+            "glmocr-api": ServiceDefinition(
+                image="vlmparse-glmocr-api:latest",
+                dockerfile_dir=DOCKER_PIPELINE_DIR,
+                internal_port=5002,
+                entrypoint=["/bin/bash", "-c"],
+                command=[
+                    # Copy the mounted config to a writable location, patch
+                    # api_host so it resolves to the vLLM sibling container
+                    # on the shared bridge network, then start the server.
+                    "cp /app/config-mount/config.yaml /app/GLM-OCR/glmocr/config.yaml"
+                    f" && sed -i 's/api_host: glmocr-vllm-server/api_host: {vllm_container_name}/'"
+                    " /app/GLM-OCR/glmocr/config.yaml"
+                    " && python -m glmocr.server --log-level ${LOG_LEVEL:-INFO}"
+                ],
+                environment={
+                    "LOG_LEVEL": os.getenv("LOG_LEVEL", "INFO"),
+                },
+                volumes={
+                    str(DOCKER_PIPELINE_DIR / "config.yaml"): {
+                        "bind": "/app/config-mount/config.yaml",
+                        "mode": "ro",
+                    },
+                },
+            ),
+        }
 
     @property
     def client_config(self):

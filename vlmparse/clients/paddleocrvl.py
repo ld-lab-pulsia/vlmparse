@@ -12,7 +12,10 @@ from vlmparse.clients.pipe_utils.html_to_md_conversion import html_to_md_keep_ta
 from vlmparse.clients.pipe_utils.utils import clean_response
 from vlmparse.converter import BaseConverter, ConverterConfig
 from vlmparse.data_model.document import BoundingBox, Item, Page
-from vlmparse.servers.docker_compose_server import DockerComposeServerConfig
+from vlmparse.servers.container_group_server import (
+    ContainerGroupServerConfig,
+    ServiceDefinition,
+)
 from vlmparse.utils import to_base64
 
 DOCKER_PIPELINE_DIR = (
@@ -20,48 +23,54 @@ DOCKER_PIPELINE_DIR = (
 )
 
 
-class PaddleOCRVLDockerServerConfig(DockerComposeServerConfig):
-    """Docker Compose configuration for PaddleOCR-VL server."""
+class PaddleOCRVLDockerServerConfig(ContainerGroupServerConfig):
+    """Container group configuration for PaddleOCR-VL server."""
 
     model_name: str = "PaddleOCR-VL-1.5"
     aliases: list[str] = Field(
         default_factory=lambda: ["paddleocrvl1.5", "paddleocr-vl-1.5"]
     )
-    compose_file: str = str(DOCKER_PIPELINE_DIR / "compose.yaml")
     server_service: str = "paddleocr-vl-api"
-    compose_services: list[str] = Field(
-        default_factory=lambda: ["paddleocr-vl-api", "paddleocr-vlm-server"]
-    )
-    gpu_service_names: list[str] = Field(
-        default_factory=lambda: ["paddleocr-vl-api", "paddleocr-vlm-server"]
-    )
     docker_port: int = 8080
-    container_port: int = 8080
-    environment: dict[str, str] = Field(
-        default_factory=lambda: {
-            "VLM_BACKEND": "vllm",
-        }
-    )
-    environment_services: list[str] = Field(
-        default_factory=lambda: ["paddleocr-vl-api"]
+    gpu_services: list[str] = Field(
+        default_factory=lambda: ["paddleocr-vl-api", "paddleocr-vlm-server"]
     )
     server_ready_indicators: list[str] = Field(
         default_factory=lambda: ["Application startup complete", "Uvicorn running"]
     )
+    services: dict[str, ServiceDefinition] = Field(default_factory=dict)
 
     def model_post_init(self, __context):
-        if not self.compose_env:
-            compose_env = {}
-            for key in [
-                "API_IMAGE_TAG_SUFFIX",
-                "VLM_IMAGE_TAG_SUFFIX",
-                "VLM_BACKEND",
-            ]:
-                value = os.getenv(key)
-                if value:
-                    compose_env[key] = value
-            if compose_env:
-                self.compose_env = compose_env
+        vlm_backend = os.getenv("VLM_BACKEND", "vllm")
+        api_image_tag = os.getenv("API_IMAGE_TAG_SUFFIX", "latest-nvidia-gpu-offline")
+        vlm_image_tag = os.getenv("VLM_IMAGE_TAG_SUFFIX", "latest-nvidia-gpu-offline")
+
+        # The api container resolves the vlm server by its container name on
+        # the shared bridge network.
+        vlm_container_name = f"{self.resolved_group_name}-paddleocr-vlm-server"
+
+        self.services = {
+            "paddleocr-vlm-server": ServiceDefinition(
+                image=f"ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddleocr-genai-{vlm_backend}-server:{vlm_image_tag}",
+                internal_port=8080,
+                ready_indicators=["Application startup complete", "Uvicorn running"],
+            ),
+            "paddleocr-vl-api": ServiceDefinition(
+                image=f"ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddleocr-vl:{api_image_tag}",
+                internal_port=8080,
+                entrypoint=["/bin/bash", "-c"],
+                command=[
+                    # Patch the pipeline config so the VLM server_url
+                    # resolves to the sibling container, then start serving.
+                    f"sed -i 's|http://paddleocr-vlm-server:8080|http://{vlm_container_name}:8080|'"
+                    f" /home/paddleocr/pipeline_config_{vlm_backend}.yaml"
+                    f" && paddlex --serve --pipeline /home/paddleocr/pipeline_config_{vlm_backend}.yaml"
+                ],
+                environment={
+                    "VLM_BACKEND": vlm_backend,
+                },
+            ),
+        }
 
     @property
     def client_config(self):
