@@ -3927,7 +3927,7 @@ wheels = [
 
 [[package]]
 name = "vlmparse"
-version = "0.1.19"
+version = "0.1.20"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -3974,6 +3974,7 @@ docling-core = [
 ]
 docling-parse = [
     { name = "docling-parse" },
+    { name = "rapidfuzz" },
 ]
 st-app = [
     { name = "streamlit" },
@@ -4026,6 +4027,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'test'" },
     { name = "pytest-mock", marker = "extra == 'test'" },
     { name = "rapidfuzz", marker = "extra == 'bench'", specifier = ">=3.14.0" },
+    { name = "rapidfuzz", marker = "extra == 'docling-parse'", specifier = ">=3.14.0" },
     { name = "ruff", marker = "extra == 'test'" },
     { name = "streamlit", marker = "extra == 'st-app'", specifier = ">=1.49.0" },
     { name = "tabulate", specifier = ">=0.9.0" },
