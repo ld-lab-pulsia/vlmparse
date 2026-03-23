@@ -1,5 +1,5 @@
 # ruff: noqa: B008
-from typing import Literal
+from typing import Literal, cast
 
 import typer
 from loguru import logger
@@ -233,8 +233,9 @@ def convert(
             or image_description_uri
             or image_description_api_key
         ):
+            model_name = cast(str, image_description_model or model)
             conn_override = ModelEndpointConfig(
-                model_name=image_description_model or model,
+                model_name=model_name,
                 base_url=image_description_uri,
                 api_key=image_description_api_key or "",
             )
