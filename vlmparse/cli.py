@@ -118,7 +118,7 @@ def convert(
             "image_description (describe the image), formula (formula extraction), chart (chart recognition)"
         ),
     ),
-    provider: Literal["registry", "hf", "google", "openai", "azure"] = typer.Option(
+    provider: Literal["registry", "hf", "google", "openai", "azure", "anthropic"] = typer.Option(
         "registry",
         "-p",
         "--provider",
@@ -152,6 +152,14 @@ def convert(
             "This is only applicable for compatible servers and may require additional configuration on the server side."
         ),
     ),
+    pages: str | None = typer.Option(
+        None,
+        "--pages",
+        help=(
+            "Pages to process (1-indexed). Accepts comma-separated values and ranges. "
+            "Examples: '1', '1,3,5', '2-5', '1,3-5,8'. If not specified, all pages are processed."
+        ),
+    ),
     debug: bool = typer.Option(False, help="Run in debug mode"),
     _return_documents: bool = typer.Option(False, hidden=True),
 ):
@@ -170,10 +178,13 @@ def convert(
         dpi: DPI to use for the conversion. If not specified, the default DPI will be used.
         debug: If True, run in debug mode (single-threaded, no concurrency)
     """
+    from vlmparse.converter import parse_page_selection
     from vlmparse.converter_with_server import ConverterWithServer
 
     if with_vllm_server and provider == "registry":
         provider = "hf"
+
+    parsed_pages = parse_page_selection(pages) if pages is not None else None
 
     with ConverterWithServer(
         model=model,
@@ -191,6 +202,7 @@ def convert(
             conversion_mode=conversion_mode,
             dpi=dpi,
             debug=debug,
+            pages=parsed_pages,
         )
 
 

@@ -13,6 +13,7 @@ Features:
 - ⚡ Async/concurrent processing for high throughput
 - 🐳 Automatic Docker server management for local models
 - 🔄 Unified interface across all VLM/OCR providers
+- 📄 Selective page processing (convert only the pages you need)
 - 📊 Built-in result visualization with Streamlit
 
 Supported Converters:
@@ -20,7 +21,7 @@ Supported Converters:
 - **Open Source Small VLMs**: `lightonocr2`, `mineru2.5`, `hunyuanocr`, `paddleocrvl-1.5`, `granite-docling`, `olmocr-2-fp8`, `dotsocr`, `chandra`, `deepseekocr2`, `nanonets/Nanonets-OCR2-3B`
 - **Open Source Generalist VLMs**: such as the Qwen family.
 - **Pipelines**: `docling`
-- **Proprietary LLMs**: `gemini`, `gpt`
+- **Proprietary LLMs**: `gemini`, `gpt`, `claude`
 
 ## Installation
 
@@ -62,6 +63,12 @@ With a general VLM (requires setting your api key as an environment variable):
 
 ```bash
 vlmparse convert "*.pdf" -o ./output --model gemini-2.5-flash-lite
+```
+
+Convert only specific pages (1-indexed, supports ranges: `"3"`, `"1,3,5"`, `"2-5"`, `"1,3-5,8"`):
+
+```bash
+vlmparse convert doc.pdf -o ./output --model gemini-2.5-flash-lite --pages "1,3-5,8"
 ```
 
 Convert with auto deployment of a small vlm (or any huggingface VLM model, requires a gpu + docker installation):
@@ -113,8 +120,9 @@ vlmparse view ./output
 Set API keys as environment variables:
 
 ```bash
-export GOOGLE_API_KEY="your-key"
-export OPENAI_API_KEY="your-key"
+export GOOGLE_API_KEY="your-key"       # Gemini models
+export OPENAI_API_KEY="your-key"       # GPT models
+export ANTHROPIC_API_KEY="your-key"    # Claude models
 ```
 
 ## Python API
@@ -134,6 +142,13 @@ print(document.to_markdown())
 
 # Batch convert multiple PDFs
 documents = client.batch(["file1.pdf", "file2.pdf"])
+```
+
+Process only specific pages (0-indexed list):
+
+```python
+client.pages = [0, 2, 4]  # pages 1, 3 and 5 of the PDF
+document = client("path/to/document.pdf")
 ```
 
 Docker server interface:

@@ -22,6 +22,7 @@ from vlmparse.clients.lightonocr import (
     LightOnOCRDockerServerConfig,
 )
 from vlmparse.clients.mineru import MinerUDockerServerConfig
+from vlmparse.clients.anthropic_converter import AnthropicConverterConfig
 from vlmparse.clients.mistral_converter import MistralOCRConverterConfig
 from vlmparse.clients.nanonetocr import NanonetOCR2DockerServerConfig
 from vlmparse.clients.ocrverse import OCRVerseDockerServerConfig
@@ -198,5 +199,24 @@ for mistral_model in ["mistral-ocr-latest", "mistral-ocr"]:
         lambda uri=None, model=mistral_model: MistralOCRConverterConfig(
             base_url="https://api.mistral.ai/v1" if uri is None else uri,
             api_key=os.getenv("MISTRAL_API_KEY", ""),
+        ),
+    )
+
+for claude_model in [
+    "claude-opus-4-6",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5-20251001",
+    "claude-opus-4-5",
+    "claude-sonnet-4-5",
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-haiku-20241022",
+    "claude-3-opus-20240229",
+]:
+    converter_config_registry.register(
+        claude_model,
+        lambda uri=None, model=claude_model: AnthropicConverterConfig(
+            model_name=model,
+            api_key=os.getenv("ANTHROPIC_API_KEY", ""),
+            default_model_name=model,
         ),
     )
