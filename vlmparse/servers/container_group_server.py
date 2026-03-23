@@ -105,8 +105,13 @@ class ContainerGroupServerConfig(BaseServerConfig):
         Override in subclasses that expose multiple services (e.g. layout +
         vLLM).  The base implementation just uses the primary server URL.
         """
-        return self.client_config.model_copy(
-            update={"base_url": service_urls[self.server_service]}
+        cfg = self.client_config
+        return cfg.model_copy(
+            update={
+                "endpoint": cfg.endpoint.model_copy(
+                    update={"base_url": service_urls[self.server_service]}
+                )
+            }
         )
 
     def client_config_for_uri(self, uri: str):

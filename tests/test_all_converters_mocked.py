@@ -236,8 +236,11 @@ class TestMinerUConverterMockedApi:
     ):
         """Repeated `__call__` should keep working and call API each page."""
         from vlmparse.clients.mineru import MinerUConverterConfig
+        from vlmparse.model_endpoint_config import ModelEndpointConfig
 
-        config = MinerUConverterConfig(base_url="http://mineru.test")
+        config = MinerUConverterConfig(
+            endpoint=ModelEndpointConfig(base_url="http://mineru.test")
+        )
         converter = config.get_client(
             num_concurrent_pages=2, debug=True, save_folder=str(tmp_output_dir)
         )
@@ -268,8 +271,11 @@ class TestMinerUConverterMockedApi:
     ):
         """Batch mode should return documents and call API for each page."""
         from vlmparse.clients.mineru import MinerUConverterConfig
+        from vlmparse.model_endpoint_config import ModelEndpointConfig
 
-        config = MinerUConverterConfig(base_url="http://mineru.test")
+        config = MinerUConverterConfig(
+            endpoint=ModelEndpointConfig(base_url="http://mineru.test")
+        )
         converter = config.get_client(
             num_concurrent_files=2,
             num_concurrent_pages=2,
@@ -305,7 +311,7 @@ class TestCustomURI:
                 "gemini-2.5-flash-lite", uri=custom_uri
             )
 
-            assert config.base_url == custom_uri
+            assert config.endpoint.base_url == custom_uri
 
             # Test it works
             converter = config.get_client(debug=True, save_folder=str(tmp_output_dir))

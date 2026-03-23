@@ -145,9 +145,11 @@ class PaddleOCRVLConverter(BaseConverter):
         return payload
 
     async def _post_json(self, endpoint: str, payload: dict) -> dict:
-        assert self.config.base_url is not None, "Base URL is required for API calls"
+        assert (
+            self.config.endpoint.base_url is not None
+        ), "Base URL is required for API calls"
         async with httpx.AsyncClient(
-            base_url=self.config.base_url, timeout=self.config.timeout
+            base_url=self.config.endpoint.base_url, timeout=self.config.timeout
         ) as client:
             response = await client.post(endpoint, json=payload)
 

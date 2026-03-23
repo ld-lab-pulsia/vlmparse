@@ -1,9 +1,14 @@
+import copy
 import re
 
 from loguru import logger
 from PIL import Image
 from pydantic import Field
 
+from vlmparse.clients.deepseekocr_constants import (
+    DEEPSEEK_OCR_V1_COMPLETION_KWARGS,
+    DEEPSEEK_OCR_V2_COMPLETION_KWARGS,
+)
 from vlmparse.clients.openai_converter import (
     OpenAIConverterClient,
     OpenAIConverterConfig,
@@ -61,20 +66,9 @@ class DeepSeekOCRConverterConfig(OpenAIConverterConfig):
         "table": "layout",
     }
 
-    completion_kwargs: dict | None = {
-        "temperature": 0.0,
-        "max_tokens": 8181,
-        "extra_body": {
-            "skip_special_tokens": False,
-            # args used to control custom logits processor
-            "vllm_xargs": {
-                "ngram_size": 30,
-                "window_size": 90,
-                # whitelist: <td>, </td>
-                "whitelist_token_ids": [128821, 128822],
-            },
-        },
-    }
+    completion_kwargs: dict | None = Field(
+        default_factory=lambda: copy.deepcopy(DEEPSEEK_OCR_V1_COMPLETION_KWARGS)
+    )
     dpi: int = 200
     aliases: list[str] = Field(default_factory=lambda: ["deepseekocr"])
 
@@ -288,20 +282,9 @@ class DeepSeekOCR2ConverterConfig(OpenAIConverterConfig):
         "table": "layout",
     }
 
-    completion_kwargs: dict | None = {
-        "temperature": 0.0,
-        "max_tokens": 8180,
-        "extra_body": {
-            "skip_special_tokens": False,
-            # args used to control custom logits processor
-            "vllm_xargs": {
-                "ngram_size": 20,
-                "window_size": 50,
-                # whitelist: <td>, </td>
-                "whitelist_token_ids": [128821, 128822],
-            },
-        },
-    }
+    completion_kwargs: dict | None = Field(
+        default_factory=lambda: copy.deepcopy(DEEPSEEK_OCR_V2_COMPLETION_KWARGS)
+    )
     dpi: int = 144  # Default DPI used in reference implementation
 
     def get_client(self, **kwargs) -> "DeepSeekOCR2ConverterClient":
