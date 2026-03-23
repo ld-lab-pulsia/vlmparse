@@ -1,7 +1,10 @@
 import os
 from collections.abc import Callable
 
-from vlmparse.clients.chandra import ChandraDockerServerConfig
+from vlmparse.clients.chandra import (
+    Chandra2DockerServerConfig,
+    ChandraDockerServerConfig,
+)
 from vlmparse.clients.deepseekocr import (
     DeepSeekOCR2DockerServerConfig,
     DeepSeekOCRDockerServerConfig,
@@ -50,6 +53,7 @@ SERVER_CONFIGS: list[
     type[DockerServerConfig | DockerComposeServerConfig | ContainerGroupServerConfig]
 ] = [
     ChandraDockerServerConfig,
+    Chandra2DockerServerConfig,
     LightOnOCRDockerServerConfig,
     DotsOCRDockerServerConfig,
     PaddleOCRVLDockerServerConfig,
