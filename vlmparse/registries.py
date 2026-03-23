@@ -29,6 +29,7 @@ from vlmparse.clients.olmocr import OlmOCRDockerServerConfig
 from vlmparse.clients.openai_converter import OpenAIConverterConfig
 from vlmparse.clients.paddleocrvl import PaddleOCRVLDockerServerConfig
 from vlmparse.converter import ConverterConfig
+from vlmparse.model_endpoint_config import ModelEndpointConfig
 from vlmparse.servers.container_group_server import ContainerGroupServerConfig
 from vlmparse.servers.docker_compose_server import DockerComposeServerConfig
 from vlmparse.servers.docker_server import DockerServerConfig
@@ -172,9 +173,11 @@ for gemini_model in [
         gemini_model,
         lambda uri=None, model=gemini_model: OpenAIConverterConfig(
             model_name=model,
-            base_url=GOOGLE_API_BASE_URL if uri is None else uri,
-            api_key=os.getenv("GOOGLE_API_KEY", ""),
-            default_model_name=model,
+            endpoint=ModelEndpointConfig(
+                base_url=GOOGLE_API_BASE_URL if uri is None else uri,
+                api_key=os.getenv("GOOGLE_API_KEY", ""),
+                model_name=model,
+            ),
         ),
     )
 for openai_model in [
@@ -186,9 +189,11 @@ for openai_model in [
         openai_model,
         lambda uri=None, model=openai_model: OpenAIConverterConfig(
             model_name=model,
-            base_url=None,
-            api_key=os.getenv("OPENAI_API_KEY", ""),
-            default_model_name=model,
+            endpoint=ModelEndpointConfig(
+                base_url=None,
+                api_key=os.getenv("OPENAI_API_KEY", ""),
+                model_name=model,
+            ),
         ),
     )
 

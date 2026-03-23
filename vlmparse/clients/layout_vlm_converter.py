@@ -124,7 +124,7 @@ class LayoutVLMConverter(BaseConverter):
         """
         b64 = await asyncio.to_thread(to_base64, image, "JPEG")
         async with httpx.AsyncClient(
-            base_url=self.config.base_url or "", timeout=self.config.timeout
+            base_url=self.config.endpoint.base_url or "", timeout=self.config.timeout
         ) as client:
             response = await client.post(
                 self.config.layout_endpoint, json={"image": b64}
