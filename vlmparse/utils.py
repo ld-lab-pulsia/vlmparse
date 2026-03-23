@@ -2,6 +2,7 @@ import base64
 import os
 from glob import glob
 from io import BytesIO
+from pathlib import Path
 
 from loguru import logger
 from PIL import Image
@@ -19,7 +20,9 @@ def from_base64(base64_str: str):
     return Image.open(BytesIO(image_data))
 
 
-def get_file_paths(inputs: str | list[str], raise_on_empty: bool = False) -> list[str]:
+def get_file_paths(
+    inputs: str | list[str], raise_on_empty: bool = False
+) -> list[str | Path]:
     """Expand file paths from glob patterns.
 
     Args:

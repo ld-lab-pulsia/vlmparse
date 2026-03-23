@@ -53,7 +53,10 @@ class BaseServerConfig(ModelIdentityMixin, ABC):
         subclasses (e.g. ContainerGroupServerConfig) should override this to
         derive all auxiliary service URLs from the same host and scheme.
         """
-        return self.client_config.model_copy(update={"base_url": uri})
+        cfg = self.client_config
+        return cfg.model_copy(
+            update={"endpoint": cfg.endpoint.model_copy(update={"base_url": uri})}
+        )
 
     def get_client(self, **kwargs):
         """Get a client instance configured for this server."""

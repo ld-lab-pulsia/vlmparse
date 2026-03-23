@@ -12,7 +12,6 @@ class OlmOCRDockerServerConfig(VLLMDockerServerConfig):
         default_factory=lambda: [
             "--limit-mm-per-prompt",
             '{"image": 1, "video": 0}',
-            "--disable-log-requests",
             "--uvicorn-log-level",
             "warning",
             "--max-model-len",

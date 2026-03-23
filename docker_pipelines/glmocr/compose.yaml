@@ -8,6 +8,7 @@ services:
       - |
         apt-get update && apt-get install -y git curl &&
         pip install --no-cache-dir git+https://github.com/huggingface/transformers.git &&
+        pip install --no-cache-dir --upgrade mistral-common &&
         vllm serve zai-org/GLM-OCR --served-model-name glm-ocr --allowed-local-media-path / --port 8080 --speculative-config '{"method": "mtp", "num_speculative_tokens": 1}'
     ports:
       - "${VLM_PORT:-8080}:8080"
@@ -33,28 +34,11 @@ services:
       start_period: 500s
 
   glmocr-api:
-    image: python:3.10-slim${API_IMAGE_TAG_SUFFIX:-}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: vlmparse-glmocr-api${API_IMAGE_TAG_SUFFIX:-}
     container_name: vlmparse-glmocr-api
-    working_dir: /app
-    entrypoint: ["/bin/bash", "-c"]
-    command:
-      - |
-        apt-get update && apt-get install -y git ffmpeg libsm6 libxext6   &&
-        echo '=== Cloning GLM-OCR repository ===' &&
-        cd /app &&
-        rm -rf GLM-OCR &&
-        git clone https://github.com/zai-org/GLM-OCR.git &&
-        cd GLM-OCR &&
-        echo '=== Installing in editable mode ===' &&
-        pip install --no-cache-dir -e .[layout] &&
-        echo '=== Installing transformers ===' &&
-        pip install --no-cache-dir git+https://github.com/huggingface/transformers.git &&
-        echo '=== Verifying installation ===' &&
-        python -c "import glmocr.pipeline; print('✓ glmocr.pipeline imported successfully')" &&
-        echo '=== Copying config file ===' &&
-        cp /app/config.yaml /app/GLM-OCR/glmocr/config.yaml &&
-        echo '=== Starting server ===' &&
-        python -m glmocr.server --log-level ${LOG_LEVEL:-INFO}
     ports:
       - "${API_PORT:-5002}:5002"
     environment:
@@ -64,7 +48,7 @@ services:
         condition: service_healthy
     stop_grace_period: 30s
     volumes:
-      - ./config.yaml:/app/config.yaml:ro
+      - ./config.yaml:/app/GLM-OCR/glmocr/config.yaml:ro
 
 networks:
   default:

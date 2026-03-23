@@ -47,4 +47,4 @@ class HunyuanOCRConverterConfig(OpenAIConverterConfig):
     }
     dpi: int = 200
     aliases: list[str] = Field(default_factory=lambda: ["hunyuanocr"])
-    stream: bool = True
+    stream: bool = False

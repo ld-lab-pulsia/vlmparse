@@ -19,10 +19,7 @@ GOOGLE_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 
 class OpenAIConverterConfig(ConverterConfig):
-    api_key: str = ""
     is_azure: bool = False
-    timeout: int | None = 500
-    max_retries: int = 1
     preprompt: str | None = None
     postprompt: str | dict[str, str] | None = PDF2MD_PROMPT
     prompts: dict[str, str] = Field(default_factory=dict)
@@ -95,26 +92,25 @@ class OpenAIConverterClient(BaseConverter):
             await self._close_model()
             from openai import AsyncAzureOpenAI, AsyncOpenAI
 
+            ep = self.config.endpoint
             if self.config.is_azure:
-                assert (
-                    self.config.base_url is not None
-                ), "Azure OpenAI requires a base URL"
+                assert ep.base_url is not None, "Azure OpenAI requires a base URL"
 
                 self._model = AsyncAzureOpenAI(
-                    base_url=self.config.base_url,
-                    api_key=self.config.api_key,
-                    timeout=self.config.timeout,
-                    max_retries=self.config.max_retries,
+                    base_url=ep.base_url,
+                    api_key=ep.api_key,
+                    timeout=ep.timeout,
+                    max_retries=ep.max_retries,
                     api_version=os.getenv(
                         "AZURE_OPENAI_API_VERSION", "2025-04-01-preview"
                     ),
                 )
             else:
                 self._model = AsyncOpenAI(
-                    base_url=self.config.base_url,
-                    api_key=self.config.api_key,
-                    timeout=self.config.timeout,
-                    max_retries=self.config.max_retries,
+                    base_url=ep.base_url,
+                    api_key=ep.api_key,
+                    timeout=ep.timeout,
+                    max_retries=ep.max_retries,
                 )
             self._model_loop = loop
         return self._model
@@ -160,7 +156,7 @@ class OpenAIConverterClient(BaseConverter):
         model = await self._get_async_model()
         if self.config.use_response_api:
             response_obj = await model.responses.create(
-                model=self.config.default_model_name,
+                model=self.config.endpoint.model_name,
                 input=messages,
                 **completion_kwargs,
             )
@@ -174,7 +170,7 @@ class OpenAIConverterClient(BaseConverter):
         else:
             if self.config.stream:
                 response_stream = await model.responses.create(
-                    model=self.config.default_model_name,
+                    model=self.config.endpoint.model_name,
                     input=messages,
                     stream=True,
                     **completion_kwargs,
@@ -187,7 +183,7 @@ class OpenAIConverterClient(BaseConverter):
                 return "".join(response_parts), None
             else:
                 response_obj = await model.chat.completions.create(
-                    model=self.config.default_model_name,
+                    model=self.config.endpoint.model_name,
                     messages=messages,
                     **completion_kwargs,
                 )

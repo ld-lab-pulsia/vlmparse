@@ -21,19 +21,18 @@ class ModelIdentityMixin(BaseModel):
     def _create_client_kwargs(self, base_url: str) -> dict:
         """Generate kwargs for client config with model identity.
 
-        Use this method in server configs to ensure consistent passing
-        of model_name and default_model_name to client configs.
-
-        Args:
-            base_url: The base URL for the client to connect to.
-
-        Returns:
-            Dictionary with base_url, model_name, and default_model_name.
+        Returns a dict with ``model_name`` and ``endpoint`` (a
+        :class:`ModelEndpointConfig`) ready to be splatted into a
+        ``ConverterConfig`` constructor.
         """
+        from vlmparse.model_endpoint_config import ModelEndpointConfig
+
         return {
-            "base_url": base_url,
             "model_name": self.model_name,
-            "default_model_name": self.get_effective_model_name(),
+            "endpoint": ModelEndpointConfig(
+                base_url=base_url,
+                model_name=self.get_effective_model_name(),
+            ),
         }
 
     def get_all_names(self) -> list[str]:
