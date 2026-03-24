@@ -65,6 +65,9 @@ class DeepSeekOCRConverterConfig(OpenAIConverterConfig):
         "ocr_layout": "layout",
         "table": "layout",
     }
+    supported_modes: list[str] = Field(
+        default_factory=lambda: ["ocr", "ocr_layout", "table", "image_description"]
+    )
 
     completion_kwargs: dict | None = Field(
         default_factory=lambda: copy.deepcopy(DEEPSEEK_OCR_V1_COMPLETION_KWARGS)
@@ -272,6 +275,7 @@ class DeepSeekOCR2ConverterConfig(OpenAIConverterConfig):
         default_factory=lambda: ["deepseekocr2", "DeepSeek-OCR-2"]
     )
     postprompt: str | None = None
+    inline_image_description: bool = True
     prompts: dict[str, str] = {
         "layout": "<|grounding|>Convert the document to markdown.",
         "ocr": "Free OCR.",
@@ -281,6 +285,9 @@ class DeepSeekOCR2ConverterConfig(OpenAIConverterConfig):
         "ocr_layout": "layout",
         "table": "layout",
     }
+    supported_modes: list[str] = Field(
+        default_factory=lambda: ["ocr", "ocr_layout", "table", "image_description"]
+    )
 
     completion_kwargs: dict | None = Field(
         default_factory=lambda: copy.deepcopy(DEEPSEEK_OCR_V2_COMPLETION_KWARGS)

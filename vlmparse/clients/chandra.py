@@ -508,6 +508,7 @@ class ChandraConverterConfig(OpenAIConverterConfig):
 
     model_name: str = "datalab-to/chandra"
     postprompt: str | None = None
+    inline_image_description: bool = True
     prompts: dict[str, str] = {
         "ocr": OCR_PROMPT,
         "ocr_layout": OCR_LAYOUT_PROMPT,
@@ -515,6 +516,9 @@ class ChandraConverterConfig(OpenAIConverterConfig):
     prompt_mode_map: dict[str, str] = {
         "table": "ocr_layout",
     }
+    supported_modes: list[str] = Field(
+        default_factory=lambda: ["ocr", "ocr_layout", "table"]
+    )
     bbox_scale: int = 1024
     max_retries: int = 0
     max_failure_retries: int | None = None
@@ -648,6 +652,7 @@ class Chandra2ConverterConfig(OpenAIConverterConfig):
 
     model_name: str = "datalab-to/chandra-ocr-2"
     postprompt: str | None = None
+    inline_image_description: bool = True
     prompts: dict[str, str] = {
         "ocr": OCR_PROMPT_V2,
         "ocr_layout": OCR_LAYOUT_PROMPT_V2,
@@ -655,6 +660,9 @@ class Chandra2ConverterConfig(OpenAIConverterConfig):
     prompt_mode_map: dict[str, str] = {
         "table": "ocr_layout",
     }
+    supported_modes: list[str] = Field(
+        default_factory=lambda: ["ocr", "ocr_layout", "table"]
+    )
     bbox_scale: int = 1000
     max_retries: int = 0
     max_failure_retries: int | None = None

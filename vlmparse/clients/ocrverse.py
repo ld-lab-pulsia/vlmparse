@@ -32,9 +32,10 @@ class OCRVerseConverterConfig(OpenAIConverterConfig):
 
     model_name: str = "DocTron/OCRVerse"
     preprompt: str | None = None
-    postprompt: str | None = (
-        "Extract the main content from the document in the image, keeping the original structure. Convert all formulas to LaTeX and all tables to HTML."
-    )
+    postprompt: str | None = None
+    prompts: dict[str, str] = {
+        "ocr": "Extract the main content from the document in the image, keeping the original structure. Convert all formulas to LaTeX and all tables to HTML.",
+    }
     completion_kwargs: dict | None = {
         "temperature": 0.0,
         "max_completion_tokens": 8192,

@@ -92,6 +92,12 @@ You can also list all running servers:
 vlmparse list
 ```
 
+You can get a list of registered models and their capabilities (ocr, ocr_layout, table, image_description) and inline image description with:
+
+```bash
+vlmparse registry
+```
+
 Show logs of a server (if only one server is running, the container name is not needed):
 ```bash
 vlmparse log <container_name>

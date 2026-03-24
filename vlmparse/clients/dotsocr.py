@@ -85,6 +85,9 @@ class DotsOCRConverterConfig(OpenAIConverterConfig):
         "ocr_layout": "prompt_layout_all_en",
         "table": "prompt_layout_all_en",
     }
+    supported_modes: list[str] = Field(
+        default_factory=lambda: ["ocr", "ocr_layout", "table"]
+    )
     completion_kwargs: dict | None = {
         "temperature": 0.1,
         "top_p": 1.0,

@@ -40,6 +40,7 @@ class MinerUConverterConfig(ConverterConfig):
     model_name: str = "opendatalab/MinerU2.5-2509-1.2B"
     aliases: list[str] = Field(default_factory=lambda: ["mineru25", "mineru2.5"])
     timeout: int = 600
+    supported_modes: list[str] = Field(default_factory=lambda: ["ocr_layout"])
 
     def get_client(self, **kwargs) -> "MinerUConverter":
         return MinerUConverter(config=self, **kwargs)

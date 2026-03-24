@@ -9,6 +9,7 @@ from typing import Any, Literal
 import httpx
 from loguru import logger
 from PIL import Image
+from pydantic import Field
 
 from vlmparse.converter import BaseConverter, ConverterConfig
 from vlmparse.data_model.document import BoundingBox, Item, Page, TextCell
@@ -53,6 +54,7 @@ class LayoutVLMConverterConfig(ConverterConfig):
     """
 
     model_name: str = "layout-vlm"
+    supported_modes: list[str] = Field(default_factory=lambda: ["ocr_layout"])
     vlm_base_url: str | None = None
     vlm_model_id: str = "default"
     layout_endpoint: str = "/predict"

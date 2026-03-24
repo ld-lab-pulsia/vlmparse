@@ -40,7 +40,10 @@ class GraniteDoclingConverterConfig(OpenAIConverterConfig):
 
     model_name: str = "ibm-granite/granite-docling-258M"
     preprompt: str | None = None
-    postprompt: str | None = "Convert this page to docling."
+    postprompt: str | None = None
+    prompts: dict[str, str] = {
+        "ocr": "Convert this page to docling.",
+    }
     completion_kwargs: dict | None = {
         "temperature": 0.0,
         "max_tokens": 8000,
@@ -70,7 +73,7 @@ class GraniteDoclingConverter(OpenAIConverterClient):
                             "url": f"data:image/png;base64,{to_base64(image)}"
                         },
                     },
-                    {"type": "text", "text": self.config.postprompt},
+                    {"type": "text", "text": self.config.prompts["ocr"]},
                 ],
             }
         ]
