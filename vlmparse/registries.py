@@ -159,23 +159,22 @@ class ConverterConfigRegistry:
         with self._lock:
             providers = self._registry.get(model_name)
 
-        if providers is None:
-            raise ValueError(f"Model '{model_name}' not found in registry.")
+            if providers is None:
+                raise ValueError(f"Model '{model_name}' not found in registry.")
 
-        if provider is not None:
-            factory = providers.get(provider)
-            if factory is None:
-                raise ValueError(
-                    f"Provider '{provider}' not found for model '{model_name}'. "
-                    f"Available providers: {list(providers.keys())}"
-                )
-        elif len(providers) == 1:
-            factory = next(iter(providers.values()))
-        else:
-            raise ValueError(
-                f"Multiple providers for model '{model_name}': "
-                f"{list(providers.keys())}. Specify a provider."
-            )
+            if provider is not None:
+                factory = providers.get(provider)
+                if factory is None:
+                    raise ValueError(
+                        f"Provider '{provider}' not found for model '{model_name}'. "
+                        f"Available providers: {list(providers.keys())}"
+                    )
+            elif len(providers) == 1:
+                factory = next(iter(providers.values()))
+            elif self.DEFAULT_PROVIDER in providers:
+                factory = providers[self.DEFAULT_PROVIDER]
+            else:
+                factory = next(iter(providers.values()))
 
         return factory(uri)
 
@@ -257,7 +256,7 @@ for mistral_model in ["mistral-ocr-latest", "mistral-ocr"]:
 
 # -- Generic provider factories (hf, google, openai, azure) --------------------
 # These allow creating configs for *any* model name via a provider, even if not
-# pre-registered. Used by get_client_config() to eliminate the provider if/elif.
+# pre-registered, and are used by get_client_config() to eliminate the provider if/elif.
 
 
 def _make_hf_factory(model: str, uri: str | None) -> ConverterConfig:

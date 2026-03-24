@@ -109,29 +109,28 @@ def get_client_config(
         client_config = _make_hf_factory(model, uri)
 
     elif provider == "registry":
-        # Try "registry" provider first (docker-backed models), fall back to auto-select
-        try:
+        available = converter_config_registry.list_providers(model)
+        if "registry" in available:
             client_config = converter_config_registry.get(
                 model, uri=uri, provider="registry"
             )
-        except ValueError:
+        else:
             client_config = converter_config_registry.get(model, uri=uri)
 
     elif provider == "google":
-        # Try the registry first (pre-registered Gemini models)
-        try:
+        if "google" in converter_config_registry.list_providers(model):
             client_config = converter_config_registry.get(
                 model, uri=uri, provider="google"
             )
-        except ValueError:
+        else:
             client_config = _make_google_factory(model, uri, api_key=api_key)
 
     elif provider == "openai":
-        try:
+        if "openai" in converter_config_registry.list_providers(model):
             client_config = converter_config_registry.get(
                 model, uri=uri, provider="openai"
             )
-        except ValueError:
+        else:
             client_config = _make_openai_factory(model, uri, api_key=api_key)
 
     elif provider == "azure":

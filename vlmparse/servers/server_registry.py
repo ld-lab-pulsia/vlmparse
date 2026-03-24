@@ -48,11 +48,10 @@ class DockerConfigRegistry:
                     return None
             elif len(providers) == 1:
                 factory = next(iter(providers.values()))
+            elif DEFAULT_PROVIDER in providers:
+                factory = providers[DEFAULT_PROVIDER]
             else:
-                raise ValueError(
-                    f"Multiple providers for model '{model_name}': "
-                    f"{list(providers.keys())}. Specify a provider."
-                )
+                factory = next(iter(providers.values()))
         return factory()
 
     def list_models(self) -> list[str]:
