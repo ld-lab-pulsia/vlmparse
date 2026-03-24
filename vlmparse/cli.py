@@ -568,9 +568,11 @@ def list_register():
         if name in server_model_names:
             continue
         with converter_config_registry._lock:
-            factory = converter_config_registry._registry.get(name)
-        if factory is None:
+            providers = converter_config_registry._registry.get(name)
+        if not providers:
             continue
+        # Pick the first provider's factory to resolve config
+        factory = next(iter(providers.values()))
         try:
             cfg = factory(None)
             mn = cfg.model_name

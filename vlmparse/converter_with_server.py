@@ -7,7 +7,7 @@ from typing import Literal, cast
 from loguru import logger
 
 from vlmparse.constants import DEFAULT_SERVER_PORT
-from vlmparse.model_endpoint_config import ImageDescriptionConfig, ModelEndpointConfig
+from vlmparse.model_endpoint_config import ImageDescriptionConfig
 from vlmparse.servers.utils import get_model_from_uri
 from vlmparse.utils import get_file_paths
 
@@ -90,8 +90,13 @@ def get_client_config(
     api_key: str | None = None,
     use_response_api: bool = False,
 ):
-    from vlmparse.clients.openai_converter import OpenAIConverterConfig
-    from vlmparse.registries import converter_config_registry
+    from vlmparse.registries import (
+        _make_azure_factory,
+        _make_google_factory,
+        _make_hf_factory,
+        _make_openai_factory,
+        converter_config_registry,
+    )
 
     if uri is not None and model is None and provider in ["registry", "hf"]:
         model = get_model_from_uri(uri)
@@ -101,62 +106,37 @@ def get_client_config(
     ), "Model name could not be determined from parameters. Please provide a model name or a URI that includes the model name."
 
     if provider == "hf":
-        client_config = OpenAIConverterConfig(
-            model_name=model,
-            endpoint=ModelEndpointConfig(base_url=uri),
-        )
+        client_config = _make_hf_factory(model, uri)
 
     elif provider == "registry":
-        client_config = converter_config_registry.get(model, uri=uri)
+        # Try "registry" provider first (docker-backed models), fall back to auto-select
+        try:
+            client_config = converter_config_registry.get(
+                model, uri=uri, provider="registry"
+            )
+        except ValueError:
+            client_config = converter_config_registry.get(model, uri=uri)
 
     elif provider == "google":
-        from vlmparse.registries import GOOGLE_API_BASE_URL
-
-        api_key = api_key if api_key is not None else os.getenv("GOOGLE_API_KEY")
-        if api_key is None:
-            assert (
-                os.getenv("GOOGLE_API_KEY") is not None
-            ), "Google API key must be provided via parameter or environment variable"
-            api_key = os.getenv("GOOGLE_API_KEY", "")
-
-        client_config = OpenAIConverterConfig(
-            model_name=model,
-            endpoint=ModelEndpointConfig(
-                base_url=GOOGLE_API_BASE_URL if uri is None else uri,
-                api_key=api_key,
-                model_name=model,
-            ),
-        )
+        # Try the registry first (pre-registered Gemini models)
+        try:
+            client_config = converter_config_registry.get(
+                model, uri=uri, provider="google"
+            )
+        except ValueError:
+            client_config = _make_google_factory(model, uri, api_key=api_key)
 
     elif provider == "openai":
-        if api_key is None:
-            assert (
-                os.getenv("OPENAI_API_KEY") is not None
-            ), "OpenAI API key must be provided via parameter or environment variable"
-            api_key = os.getenv("OPENAI_API_KEY", "")
-        client_config = OpenAIConverterConfig(
-            model_name=model,
-            endpoint=ModelEndpointConfig(
-                base_url=uri,
-                api_key=api_key,
-                model_name=model,
-            ),
-        )
+        try:
+            client_config = converter_config_registry.get(
+                model, uri=uri, provider="openai"
+            )
+        except ValueError:
+            client_config = _make_openai_factory(model, uri, api_key=api_key)
+
     elif provider == "azure":
-        if api_key is None:
-            assert (
-                os.getenv("AZURE_OPENAI_API_KEY") is not None
-            ), "Azure OpenAI API key must be provided via parameter or environment variable"
-            api_key = os.getenv("AZURE_OPENAI_API_KEY", "")
-        client_config = OpenAIConverterConfig(
-            model_name=model,
-            endpoint=ModelEndpointConfig(
-                base_url=uri if uri is not None else os.getenv("AZURE_OPENAI_ENDPOINT"),
-                api_key=api_key,
-                model_name=model,
-            ),
-            is_azure=True,
-            use_response_api=use_response_api,
+        client_config = _make_azure_factory(
+            model, uri, api_key=api_key, use_response_api=use_response_api
         )
 
     else:
