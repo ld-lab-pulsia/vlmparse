@@ -183,6 +183,7 @@ for gemini_model in [
         gemini_model,
         lambda uri=None, model=gemini_model: OpenAIConverterConfig(
             model_name=model,
+            inline_image_description=True,
             endpoint=ModelEndpointConfig(
                 base_url=GOOGLE_API_BASE_URL if uri is None else uri,
                 api_key=os.getenv("GOOGLE_API_KEY", ""),
@@ -199,6 +200,7 @@ for openai_model in [
         openai_model,
         lambda uri=None, model=openai_model: OpenAIConverterConfig(
             model_name=model,
+            inline_image_description=True,
             endpoint=ModelEndpointConfig(
                 base_url=None,
                 api_key=os.getenv("OPENAI_API_KEY", ""),

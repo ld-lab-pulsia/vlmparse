@@ -30,6 +30,8 @@ class ConverterConfig(VLMParseBaseModel):
         "formula",
         "chart",
     ] = "ocr"
+    supported_modes: list[str] = Field(default_factory=lambda: ["ocr"])
+    inline_image_description: bool = False
 
     page_preproc: list[PageProcessorConfigs] = Field(default_factory=list)
     page_postproc: list[PageProcessorConfigs] = Field(default_factory=list)

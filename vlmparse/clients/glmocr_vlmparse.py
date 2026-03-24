@@ -66,6 +66,7 @@ class GLMOCRVlmparseConverterConfig(LayoutVLMConverterConfig):
     aliases: list[str] = Field(
         default_factory=lambda: ["glmocr-vlmparse", "glm-ocr-vlmparse"]
     )
+    supported_modes: list[str] = Field(default_factory=lambda: ["ocr_layout"])
     max_tokens: int = 4096
     temperature: float = 0.8
     top_p: float | None = 0.9

@@ -70,6 +70,7 @@ class DoclingConverterConfig(ConverterConfig):
         "image_export_mode": "placeholder",
         "do_picture_classification": True,
     }
+    supported_modes: list[str] = Field(default_factory=lambda: ["ocr_layout"])
 
     def get_client(self, **kwargs) -> "DoclingConverter":
         return DoclingConverter(config=self, **kwargs)

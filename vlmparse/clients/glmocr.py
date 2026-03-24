@@ -70,6 +70,7 @@ class GLMOCRConverterConfig(ConverterConfig):
 
     model_name: str = "GLM-OCR"
     aliases: list[str] = Field(default_factory=lambda: ["glmocr", "glm-ocr"])
+    supported_modes: list[str] = Field(default_factory=lambda: ["ocr", "ocr_layout"])
     timeout: int = 600
 
     endpoint_parse: str = "/glmocr/parse"

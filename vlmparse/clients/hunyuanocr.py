@@ -37,9 +37,12 @@ class HunyuanOCRConverterConfig(OpenAIConverterConfig):
 
     model_name: str = "tencent/HunyuanOCR"
     preprompt: str | None = ""
-    postprompt: str | None = (
-        "Extract all information from the main body of the document image and represent it in markdown format, ignoring headers and footers. Tables should be expressed in HTML format, formulas in the document should be represented using LaTeX format, and the parsing should be organized according to the reading order."
-    )
+    postprompt: str | None = None
+    prompts: dict[str, str] = {
+        "ocr": (
+            "Extract all information from the main body of the document image and represent it in markdown format, ignoring headers and footers. Tables should be expressed in HTML format, formulas in the document should be represented using LaTeX format, and the parsing should be organized according to the reading order."
+        ),
+    }
     completion_kwargs: dict | None = {
         "temperature": 0.0,
         "extra_body": {"top_k": 1, "repetition_penalty": 1.0},

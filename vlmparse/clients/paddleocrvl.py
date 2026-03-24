@@ -77,6 +77,7 @@ class PaddleOCRVLConverterConfig(ConverterConfig):
     aliases: list[str] = Field(
         default_factory=lambda: ["paddleocrvl1.5", "paddleocr-vl-1.5"]
     )
+    supported_modes: list[str] = Field(default_factory=lambda: ["ocr", "ocr_layout"])
     timeout: int = 600
 
     endpoint_layout_parsing: str = "/layout-parsing"

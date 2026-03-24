@@ -60,7 +60,10 @@ class FireRedOCRConverterConfig(OpenAIConverterConfig):
 
     model_name: str = "FireRedTeam/FireRed-OCR"
     preprompt: str | None = None
-    postprompt: str | None = FIRERED_OCR_PROMPT
+    postprompt: str | None = None
+    prompts: dict[str, str] = {
+        "ocr": FIRERED_OCR_PROMPT,
+    }
     completion_kwargs: dict | None = {"temperature": 0.0, "max_tokens": 8192}
     max_image_size: int | None = None
     dpi: int = 200

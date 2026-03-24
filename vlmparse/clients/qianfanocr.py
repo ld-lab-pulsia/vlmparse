@@ -42,7 +42,11 @@ class QianfanOCRConverterConfig(OpenAIConverterConfig):
 
     model_name: str = "baidu/Qianfan-OCR"
     preprompt: str | None = None
-    postprompt: str | None = "Parse this document to Markdown."
+    postprompt: str | None = None
+    inline_image_description: bool = True
+    prompts: dict[str, str] = {
+        "ocr": "Parse this document to Markdown.",
+    }
     completion_kwargs: dict | None = {
         "temperature": 0.0,
         "max_tokens": 16384,
@@ -75,5 +79,8 @@ class QianfanOCRThinkingConverterConfig(QianfanOCRConverterConfig):
     Appends <think> to the prompt to trigger the layout-analysis thinking phase.
     """
 
-    postprompt: str | None = "Parse this document to Markdown.<think>"
+    postprompt: str | None = None
+    prompts: dict[str, str] = {
+        "ocr": "Parse this document to Markdown.<think>",
+    }
     aliases: list[str] = Field(default_factory=lambda: ["qianfanocr-thinking"])

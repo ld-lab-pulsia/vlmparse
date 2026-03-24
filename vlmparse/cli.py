@@ -517,21 +517,106 @@ def log(
         )
 
 
-@app.command("list-register")
+@app.command("registry")
 def list_register():
-    """List all model keys registered in client and server registries."""
-    from vlmparse.registries import converter_config_registry, docker_config_registry
+    """List all registered models with their aliases and supported conversion modes."""
+    from tabulate import tabulate
 
-    client_models = sorted(converter_config_registry.list_models())
-    server_models = sorted(docker_config_registry.list_models())
+    from vlmparse.registries import (
+        SERVER_CONFIGS,
+        converter_config_registry,
+        get_default,
+    )
 
-    print("\nClient Models Registry:")
-    for model in client_models:
-        print(f"  - {model}")
+    table_data: list[list[str]] = []
 
-    print("\nServer Models Registry:")
-    for model in server_models:
-        print(f"  - {model}")
+    # --- Server-backed models (one row per server config class) ---
+    for server_config_cls in SERVER_CONFIGS:
+        try:
+            server = server_config_cls()  # type: ignore
+            client_cfg = server.client_config
+        except Exception:
+            # Fallback if client_config fails
+            model_name = get_default(server_config_cls, "model_name") or "?"
+            aliases = get_default(server_config_cls, "aliases") or []
+            table_data.append([model_name, ", ".join(aliases), "ocr", "", "server"])
+            continue
+
+        model_name = client_cfg.model_name
+        aliases = get_default(server_config_cls, "aliases") or []
+        modes = ", ".join(client_cfg.supported_modes)
+        img_desc = "✓" if client_cfg.inline_image_description else ""
+        table_data.append([model_name, ", ".join(aliases), modes, img_desc, "server"])
+
+    # --- Cloud API models (no docker server) ---
+    # Collect ALL names registered by server configs (model_name, aliases, short names)
+    server_model_names: set[str] = set()
+    for server_config_cls in SERVER_CONFIGS:
+        aliases = get_default(server_config_cls, "aliases") or []
+        model_name = get_default(server_config_cls, "model_name")
+        names = [n for n in aliases + [model_name] if isinstance(n, str)]
+        if model_name and "/" in model_name:
+            names.append(model_name.split("/")[-1])
+        server_model_names.update(names)
+
+    # Group remaining registry entries by resolved model_name
+    from vlmparse.converter import ConverterConfig
+
+    cloud_groups: dict[str, list[str]] = {}  # model_name -> [registry names]
+    cloud_configs: dict[str, ConverterConfig] = {}  # model_name -> config
+    for name in sorted(converter_config_registry.list_models()):
+        if name in server_model_names:
+            continue
+        with converter_config_registry._lock:
+            factory = converter_config_registry._registry.get(name)
+        if factory is None:
+            continue
+        try:
+            cfg = factory(None)
+            mn = cfg.model_name
+            if mn not in cloud_groups:
+                cloud_groups[mn] = []
+                cloud_configs[mn] = cfg
+            if name != mn:
+                cloud_groups[mn].append(name)
+        except Exception:
+            if name not in cloud_groups:
+                cloud_groups[name] = []
+
+    for mn, alias_names in cloud_groups.items():
+        cfg = cloud_configs.get(mn)
+        modes = ", ".join(cfg.supported_modes) if cfg else "ocr"
+        img_desc = "✓" if (cfg and cfg.inline_image_description) else ""
+        table_data.append([mn, ", ".join(alias_names), modes, img_desc, "cloud"])
+
+    def wrap(text: str, width: int) -> str:
+        """Hard-wrap a string at `width` characters, inserting newlines."""
+        if len(text) <= width:
+            return text
+        parts = []
+        while len(text) > width:
+            parts.append(text[:width])
+            text = text[width:]
+        parts.append(text)
+        return "\n".join(parts)
+
+    MAX_MODEL_LEN = 30
+    MAX_ALIAS_LEN = 25
+    MAX_MODES_LEN = 25
+
+    wrapped_data = [
+        [
+            wrap(row[0], MAX_MODEL_LEN),
+            wrap(row[1], MAX_ALIAS_LEN),
+            wrap(row[2], MAX_MODES_LEN),
+            row[3],
+            row[4],
+        ]
+        for row in table_data
+    ]
+
+    headers = ["Model", "Aliases", "Supported Modes", "Inline Img Desc", "Type"]
+    print(tabulate(wrapped_data, headers=headers, tablefmt="grid"))
 
 
 @app.command("view")
