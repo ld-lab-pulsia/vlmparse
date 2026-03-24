@@ -1,3 +1,4 @@
+import asyncio
 import json
 import math
 import time
@@ -727,7 +728,7 @@ class Chandra2ConverterClient(OpenAIConverterClient):
                 should_retry = True
 
             if should_retry:
-                time.sleep(2 * (retries + 1))
+                await asyncio.sleep(2 * (retries + 1))
                 retries += 1
                 continue
             else:

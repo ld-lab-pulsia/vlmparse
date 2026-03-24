@@ -38,6 +38,7 @@ ALL_MODELS = [
     "deepseekocr2",
     "fireredocr",
     "ocrverse",
+    "chandra2",
 ]
 
 
