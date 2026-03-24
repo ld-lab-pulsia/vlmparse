@@ -92,29 +92,36 @@ for server_config_cls in SERVER_CONFIGS:
 class ConverterConfigRegistry:
     """Registry for mapping model names to their converter configurations.
 
-    Thread-safe registry that maps model names to their converter configuration factories.
+    Thread-safe registry that maps (model_name, provider) pairs to their
+    converter configuration factories. Supports multiple providers per model.
     """
+
+    DEFAULT_PROVIDER = "registry"
 
     def __init__(self):
         import threading
 
-        self._registry: dict[str, Callable[[str | None], ConverterConfig]] = {}
+        self._registry: dict[
+            str, dict[str, Callable[[str | None], ConverterConfig]]
+        ] = {}
         self._lock = threading.RLock()
 
     def register(
         self,
         model_name: str,
         config_factory: Callable[[str | None], ConverterConfig],
+        provider: str = DEFAULT_PROVIDER,
     ):
-        """Register a config factory for a model name (thread-safe)."""
+        """Register a config factory for a model name and provider (thread-safe)."""
         with self._lock:
-            self._registry[model_name] = config_factory
+            self._registry.setdefault(model_name, {})[provider] = config_factory
 
     def register_from_server(
         self,
         server_config_cls: type[
             DockerServerConfig | DockerComposeServerConfig | ContainerGroupServerConfig
         ],
+        provider: str = DEFAULT_PROVIDER,
     ):
         """Register converter config derived from a server config class.
 
@@ -136,26 +143,51 @@ class ConverterConfigRegistry:
 
         with self._lock:
             for name in names:
-                self._registry[name] = factory
+                self._registry.setdefault(name, {})[provider] = factory
 
     def get(
         self,
         model_name: str,
         uri: str | None = None,
+        provider: str | None = None,
     ) -> ConverterConfig:
-        """Get config for a model name (thread-safe). Raises ValueError if not registered."""
+        """Get config for a model name (thread-safe). Raises ValueError if not registered.
+
+        If provider is None and only one provider exists, returns that one.
+        If multiple providers exist and none is specified, raises ValueError.
+        """
         with self._lock:
-            factory = self._registry.get(model_name)
+            providers = self._registry.get(model_name)
 
-        if factory is not None:
-            return factory(uri)
+            if providers is None:
+                raise ValueError(f"Model '{model_name}' not found in registry.")
 
-        raise ValueError(f"Model '{model_name}' not found in registry.")
+            if provider is not None:
+                factory = providers.get(provider)
+                if factory is None:
+                    raise ValueError(
+                        f"Provider '{provider}' not found for model '{model_name}'. "
+                        f"Available providers: {list(providers.keys())}"
+                    )
+            elif len(providers) == 1:
+                factory = next(iter(providers.values()))
+            elif self.DEFAULT_PROVIDER in providers:
+                factory = providers[self.DEFAULT_PROVIDER]
+            else:
+                factory = next(iter(providers.values()))
+
+        return factory(uri)
 
     def list_models(self) -> list[str]:
         """List all registered model names (thread-safe)."""
         with self._lock:
             return list(self._registry.keys())
+
+    def list_providers(self, model_name: str) -> list[str]:
+        """List all providers for a given model name (thread-safe)."""
+        with self._lock:
+            providers = self._registry.get(model_name)
+            return list(providers.keys()) if providers else []
 
 
 # Global registry instance
@@ -190,6 +222,7 @@ for gemini_model in [
                 model_name=model,
             ),
         ),
+        provider="google",
     )
 for openai_model in [
     "gpt-5.2",
@@ -207,6 +240,7 @@ for openai_model in [
                 model_name=model,
             ),
         ),
+        provider="openai",
     )
 
 for mistral_model in ["mistral-ocr-latest", "mistral-ocr"]:
@@ -216,4 +250,70 @@ for mistral_model in ["mistral-ocr-latest", "mistral-ocr"]:
             base_url="https://api.mistral.ai/v1" if uri is None else uri,
             api_key=os.getenv("MISTRAL_API_KEY", ""),
         ),
+        provider="mistral",
+    )
+
+
+# -- Generic provider factories (hf, google, openai, azure) --------------------
+# These allow creating configs for *any* model name via a provider, even if not
+# pre-registered, and are used by get_client_config() to eliminate the provider if/elif.
+
+
+def _make_hf_factory(model: str, uri: str | None) -> ConverterConfig:
+    return OpenAIConverterConfig(
+        model_name=model,
+        endpoint=ModelEndpointConfig(base_url=uri),
+    )
+
+
+def _make_google_factory(
+    model: str,
+    uri: str | None,
+    api_key: str | None = None,
+) -> ConverterConfig:
+    api_key = api_key if api_key is not None else os.getenv("GOOGLE_API_KEY", "")
+    return OpenAIConverterConfig(
+        model_name=model,
+        inline_image_description=True,
+        endpoint=ModelEndpointConfig(
+            base_url=GOOGLE_API_BASE_URL if uri is None else uri,
+            api_key=api_key,
+            model_name=model,
+        ),
+    )
+
+
+def _make_openai_factory(
+    model: str,
+    uri: str | None,
+    api_key: str | None = None,
+) -> ConverterConfig:
+    api_key = api_key if api_key is not None else os.getenv("OPENAI_API_KEY", "")
+    return OpenAIConverterConfig(
+        model_name=model,
+        inline_image_description=True,
+        endpoint=ModelEndpointConfig(
+            base_url=uri,
+            api_key=api_key,
+            model_name=model,
+        ),
+    )
+
+
+def _make_azure_factory(
+    model: str,
+    uri: str | None,
+    api_key: str | None = None,
+    use_response_api: bool = False,
+) -> ConverterConfig:
+    api_key = api_key if api_key is not None else os.getenv("AZURE_OPENAI_API_KEY", "")
+    return OpenAIConverterConfig(
+        model_name=model,
+        endpoint=ModelEndpointConfig(
+            base_url=uri if uri is not None else os.getenv("AZURE_OPENAI_ENDPOINT"),
+            api_key=api_key,
+            model_name=model,
+        ),
+        is_azure=True,
+        use_response_api=use_response_api,
     )
