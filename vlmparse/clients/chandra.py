@@ -1,3 +1,4 @@
+import asyncio
 import json
 import math
 import time
@@ -18,6 +19,10 @@ from vlmparse.data_model.box import BoundingBox
 from vlmparse.data_model.document import Item, Page
 from vlmparse.servers.docker_server import VLLMDockerServerConfig
 from vlmparse.utils import to_base64
+
+# ---------------------------------------------------------------------------
+# Chandra v1 constants
+# ---------------------------------------------------------------------------
 
 ALLOWED_TAGS = [
     "math",
@@ -114,6 +119,114 @@ OCR this image to HTML.
 {PROMPT_ENDING}
 """.strip()
 
+# ---------------------------------------------------------------------------
+# Chandra v2 constants (datalab-to/chandra-ocr-2)
+# ---------------------------------------------------------------------------
+
+ALLOWED_TAGS_V2 = [
+    "math",
+    "br",
+    "i",
+    "b",
+    "u",
+    "del",
+    "sup",
+    "sub",
+    "table",
+    "tr",
+    "td",
+    "p",
+    "th",
+    "div",
+    "pre",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "ul",
+    "ol",
+    "li",
+    "input",
+    "a",
+    "span",
+    "img",
+    "hr",
+    "tbody",
+    "small",
+    "caption",
+    "strong",
+    "thead",
+    "big",
+    "code",
+    "chem",
+]
+ALLOWED_ATTRIBUTES_V2 = [
+    "class",
+    "colspan",
+    "rowspan",
+    "display",
+    "checked",
+    "type",
+    "border",
+    "value",
+    "style",
+    "href",
+    "alt",
+    "align",
+    "data-bbox",
+    "data-label",
+]
+
+PROMPT_ENDING_V2 = f"""
+Only use these tags {ALLOWED_TAGS_V2}, and these attributes {ALLOWED_ATTRIBUTES_V2}.
+
+Guidelines:
+* Inline math: Surround math with <math>...</math> tags. Math expressions should be rendered in KaTeX-compatible LaTeX. Use display for block math.
+* Tables: Use colspan and rowspan attributes to match table structure.
+* Formatting: Maintain consistent formatting with the image, including spacing, indentation, subscripts/superscripts, and special characters.
+* Images: Include a description of any images in the alt attribute of an <img> tag. Do not fill out the src property. Describe in detail inside the div tag. Also convert charts to high fidelity data, and convert diagrams to mermaid.
+* Forms: Mark checkboxes and radio buttons properly.
+* Text: join lines together properly into paragraphs using <p>...</p> tags.  Use <br> tags for line breaks within paragraphs, but only when absolutely necessary to maintain meaning.
+* Chemistry: Use <chem>...</chem> tags for chemical formulas with reactive SMILES.
+* Lists: Preserve indents and proper list markers.
+* Use the simplest possible HTML structure that accurately represents the content of the block.
+* Make sure the text is accurate and easy for a human to read and interpret.  Reading order should be correct and natural.
+""".strip()
+
+OCR_LAYOUT_PROMPT_V2 = f"""
+OCR this image to HTML, arranged as layout blocks.  Each layout block should be a div with the data-bbox attribute representing the bounding box of the block in x0 y0 x1 y1 format.  Bboxes are normalized 0-1000. The data-label attribute is the label for the block.
+
+Use the following labels:
+- Caption
+- Footnote
+- Equation-Block
+- List-Group
+- Page-Header
+- Page-Footer
+- Image
+- Section-Header
+- Table
+- Text
+- Complex-Block
+- Code-Block
+- Form
+- Table-Of-Contents
+- Figure
+- Chemical-Block
+- Diagram
+- Bibliography
+- Blank-Page
+
+{PROMPT_ENDING_V2}
+""".strip()
+
+OCR_PROMPT_V2 = f"""
+OCR this image to HTML.
+
+{PROMPT_ENDING_V2}
+""".strip()
+
 
 def scale_to_fit(
     img: Image.Image,
@@ -169,6 +282,88 @@ def detect_repeat_token(
         max_repeats = int(base_max_repeats * (1 + scaling_factor / seq_len))
 
         # Count how many times this sequence appears consecutively at the end
+        repeat_count = 0
+        pos = len(predicted_tokens) - seq_len
+        if pos < 0:
+            continue
+
+        while pos >= 0:
+            if predicted_tokens[pos : pos + seq_len] == candidate_seq:
+                repeat_count += 1
+                pos -= seq_len
+            else:
+                break
+
+        if repeat_count > max_repeats:
+            return True
+
+    return False
+
+
+def scale_to_fit_v2(
+    img: Image.Image,
+    max_size: tuple[int, int] = (3072, 2048),
+    min_size: tuple[int, int] = (1792, 28),
+    grid_size: int = 28,
+):
+    resample_method = Image.Resampling.LANCZOS
+    width, height = img.size
+
+    if width <= 0 or height <= 0:
+        return img
+
+    original_ar = width / height
+    current_pixels = width * height
+    max_pixels = max_size[0] * max_size[1]
+    min_pixels = min_size[0] * min_size[1]
+
+    scale = 1.0
+    if current_pixels > max_pixels:
+        scale = (max_pixels / current_pixels) ** 0.5
+    elif current_pixels < min_pixels:
+        scale = (min_pixels / current_pixels) ** 0.5
+
+    w_blocks = max(1, round((width * scale) / grid_size))
+    h_blocks = max(1, round((height * scale) / grid_size))
+
+    while (w_blocks * h_blocks * grid_size * grid_size) > max_pixels:
+        if w_blocks == 1 and h_blocks == 1:
+            break
+        if w_blocks == 1:
+            h_blocks -= 1
+            continue
+        if h_blocks == 1:
+            w_blocks -= 1
+            continue
+        ar_w_loss = abs(((w_blocks - 1) / h_blocks) - original_ar)
+        ar_h_loss = abs((w_blocks / (h_blocks - 1)) - original_ar)
+        if ar_w_loss < ar_h_loss:
+            w_blocks -= 1
+        else:
+            h_blocks -= 1
+
+    new_width = w_blocks * grid_size
+    new_height = h_blocks * grid_size
+
+    if (new_width, new_height) == (width, height):
+        return img
+
+    return img.resize((new_width, new_height), resample=resample_method)
+
+
+def detect_repeat_token_v2(
+    predicted_tokens: str,
+    base_max_repeats: int = 4,
+    window_size: int = 500,
+    cut_from_end: int = 0,
+    scaling_factor: float = 3.0,
+):
+    if cut_from_end > 0:
+        predicted_tokens = predicted_tokens[:-cut_from_end]
+
+    for seq_len in range(1, window_size // 2 + 1):
+        candidate_seq = predicted_tokens[-seq_len:]
+        max_repeats = int(base_max_repeats * (1 + scaling_factor / seq_len))
         repeat_count = 0
         pos = len(predicted_tokens) - seq_len
         if pos < 0:
@@ -437,6 +632,141 @@ class ChandraDockerServerConfig(VLLMDockerServerConfig):
     @property
     def client_config(self):
         return ChandraConverterConfig(
+            **self._create_client_kwargs(
+                f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}"
+            )
+        )
+
+
+# ---------------------------------------------------------------------------
+# Chandra v2 (datalab-to/chandra-ocr-2)
+# ---------------------------------------------------------------------------
+
+
+class Chandra2ConverterConfig(OpenAIConverterConfig):
+    """Chandra 2 converter configuration."""
+
+    model_name: str = "datalab-to/chandra-ocr-2"
+    postprompt: str | None = None
+    prompts: dict[str, str] = {
+        "ocr": OCR_PROMPT_V2,
+        "ocr_layout": OCR_LAYOUT_PROMPT_V2,
+    }
+    prompt_mode_map: dict[str, str] = {
+        "table": "ocr_layout",
+    }
+    bbox_scale: int = 1000
+    max_retries: int = 0
+    max_failure_retries: int | None = None
+    completion_kwargs: dict = Field(
+        default_factory=lambda: {
+            "temperature": 0.0,
+            "max_tokens": 12384,
+            "top_p": 0.1,
+        }
+    )
+    aliases: list[str] = Field(default_factory=lambda: ["chandra2", "chandra-ocr-2"])
+
+    def get_client(self, **kwargs) -> "Chandra2ConverterClient":
+        return Chandra2ConverterClient(config=self, **kwargs)
+
+
+class Chandra2ConverterClient(OpenAIConverterClient):
+    """Client for Chandra 2 model."""
+
+    config: Chandra2ConverterConfig
+
+    async def async_call_inside_page(self, page: Page) -> Page:
+        """Process a single page using Chandra 2 logic."""
+        assert page.image is not None, "Page image is required for processing"
+        prompt = self.get_prompt_for_mode() or OCR_PROMPT_V2
+
+        image = scale_to_fit_v2(page.image)
+        image_b64 = to_base64(image)
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{image_b64}"},
+                    },
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ]
+
+        retries = 0
+        max_retries = self.config.max_retries
+        base_temperature = self.config.completion_kwargs.get("temperature", 0.0)
+        result_content = ""
+
+        while True:
+            should_retry = False
+            temperature = base_temperature
+            if retries > 0:
+                temperature = min(base_temperature + 0.2 * retries, 0.8)
+
+            completion_kwargs = self.config.completion_kwargs.copy()
+            completion_kwargs["temperature"] = temperature
+            if retries > 0:
+                completion_kwargs["top_p"] = 0.95
+
+            result_content, usage = await self._get_chat_completion(
+                messages, completion_kwargs=completion_kwargs
+            )
+
+            has_repeat = detect_repeat_token_v2(result_content) or (
+                len(result_content) > 50
+                and detect_repeat_token_v2(result_content, cut_from_end=50)
+            )
+            if has_repeat and retries < max_retries:
+                logger.warning(
+                    f"Detected repeat token, retrying generation (attempt {retries + 1})..."
+                )
+                should_retry = True
+
+            if should_retry:
+                await asyncio.sleep(2 * (retries + 1))
+                retries += 1
+                continue
+            else:
+                break
+
+        logger.debug("Response length: " + str(len(result_content)))
+        page.raw_response = result_content
+        text = clean_response(result_content)
+
+        current_prompt_key = self.get_prompt_key()
+        is_layout_mode = current_prompt_key == "ocr_layout"
+
+        if is_layout_mode:
+            try:
+                layout_blocks = parse_layout(
+                    text, image, bbox_scale=self.config.bbox_scale
+                )
+                page.items = layout_blocks_to_items(layout_blocks)
+                logger.debug(f"Parsed {len(page.items)} layout blocks")
+            except Exception as e:
+                logger.warning(f"Error parsing layout blocks: {e}")
+                page.items = []
+
+        text = html_to_md_keep_tables(text)
+        page.text = text
+        page = self.add_usage(page, usage)
+        return page
+
+
+class Chandra2DockerServerConfig(VLLMDockerServerConfig):
+    """Configuration for Chandra 2 Docker server."""
+
+    model_name: str = "datalab-to/chandra-ocr-2"
+    aliases: list[str] = Field(default_factory=lambda: ["chandra2", "chandra-ocr-2"])
+
+    @property
+    def client_config(self):
+        return Chandra2ConverterConfig(
             **self._create_client_kwargs(
                 f"http://localhost:{self.docker_port}{self.get_base_url_suffix()}"
             )
