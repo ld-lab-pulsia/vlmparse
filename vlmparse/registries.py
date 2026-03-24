@@ -31,6 +31,10 @@ from vlmparse.clients.ocrverse import OCRVerseDockerServerConfig
 from vlmparse.clients.olmocr import OlmOCRDockerServerConfig
 from vlmparse.clients.openai_converter import OpenAIConverterConfig
 from vlmparse.clients.paddleocrvl import PaddleOCRVLDockerServerConfig
+from vlmparse.clients.qianfanocr import (
+    QianfanOCRDockerServerConfig,
+    QianfanOCRThinkingDockerServerConfig,
+)
 from vlmparse.converter import ConverterConfig
 from vlmparse.model_endpoint_config import ModelEndpointConfig
 from vlmparse.servers.container_group_server import ContainerGroupServerConfig
@@ -72,6 +76,8 @@ SERVER_CONFIGS: list[
     DotsOCR1p5DockerServerConfig,
     FireRedOCRDockerServerConfig,
     OCRVerseDockerServerConfig,
+    QianfanOCRDockerServerConfig,
+    QianfanOCRThinkingDockerServerConfig,
 ]
 
 # Register docker server configs
