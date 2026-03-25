@@ -71,7 +71,10 @@ test = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["vlmparse", "vlmparse.*"]  
+include = ["vlmparse", "vlmparse.*"]
+
+[tool.setuptools.package-data]
+vlmparse = ["docker_pipelines/**/*"]
 
 [project.scripts]
 vlmparse = "vlmparse.cli:main"

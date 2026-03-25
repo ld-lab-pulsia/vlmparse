@@ -5,7 +5,7 @@ from pydantic import Field
 from vlmparse.clients.openai_converter import OpenAIConverterConfig
 from vlmparse.servers.docker_server import VLLMDockerServerConfig
 
-DOCKERFILE_DIR = Path(__file__).parent.parent.parent / "docker_pipelines"
+DOCKERFILE_DIR = Path(__file__).parent.parent / "docker_pipelines"
 
 
 class LightOnOCRDockerServerConfig(VLLMDockerServerConfig):

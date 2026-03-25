@@ -17,7 +17,7 @@ from vlmparse.servers.container_group_server import (
 )
 
 DOCKER_PIPELINE_V2_DIR = (
-    Path(__file__).parent.parent.parent / "docker_pipelines" / "glmocr-vlmparse"
+    Path(__file__).parent.parent / "docker_pipelines" / "glmocr-vlmparse"
 )
 
 # Label → task type mapping from GLM-OCR config.yaml (label_task_mapping)

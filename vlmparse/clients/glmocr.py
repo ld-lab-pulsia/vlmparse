@@ -15,9 +15,7 @@ from vlmparse.data_model.document import BoundingBox, Item, Page
 from vlmparse.servers.docker_compose_server import DockerComposeServerConfig
 from vlmparse.utils import to_base64
 
-DOCKER_PIPELINE_DIR = (
-    Path(__file__).parent.parent.parent / "docker_pipelines" / "glmocr"
-)
+DOCKER_PIPELINE_DIR = Path(__file__).parent.parent / "docker_pipelines" / "glmocr"
 
 
 class GLMOCRDockerServerConfig(DockerComposeServerConfig):
