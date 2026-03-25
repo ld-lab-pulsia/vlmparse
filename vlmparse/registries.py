@@ -86,7 +86,10 @@ for server_config_cls in SERVER_CONFIGS:
     model_name = get_default(server_config_cls, "model_name")
     names = [n for n in aliases + [model_name] if isinstance(n, str)]
     for name in names:
-        docker_config_registry.register(name, lambda cls=server_config_cls: cls())  # type: ignore
+        docker_config_registry.register(
+            name,
+            lambda cls=server_config_cls: cls(),  # ty: ignore[missing-argument]
+        )
 
 
 class ConverterConfigRegistry:
@@ -136,7 +139,7 @@ class ConverterConfigRegistry:
             names.append(model_name.split("/")[-1])
 
         def factory(uri: str | None, cls=server_config_cls) -> ConverterConfig:
-            server = cls()  # type: ignore
+            server = cls()  # ty: ignore
             if uri is not None:
                 return server.client_config_for_uri(uri)
             return server.client_config

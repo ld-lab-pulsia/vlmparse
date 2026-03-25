@@ -269,6 +269,7 @@ def convert(
 def containers():
     """List all vlmparse deployments (networks, compose stacks, and containers)."""
     import docker
+    import docker.errors
 
     from vlmparse.servers.utils import _get_container_labels, _get_vlmparse_groups
 
@@ -322,7 +323,7 @@ def containers():
         )
         print(table)
 
-    except docker.errors.DockerException as e:  # type: ignore[name-defined]
+    except docker.errors.DockerException as e:
         logger.error(f"Failed to connect to Docker: {e}")
         logger.error(
             "Make sure Docker is running and you have the necessary permissions"
@@ -347,6 +348,7 @@ def stop(
             automatically stops the deployment when exactly one is running.
     """
     import docker
+    import docker.errors
 
     from vlmparse.servers.utils import (
         _get_container_vlmparse_network,
@@ -387,13 +389,13 @@ def stop(
                 if network.name.startswith("vlmparse"):
                     _stop_network_group(network.name)
                     return
-            except docker.errors.NotFound:  # type: ignore[name-defined]
+            except docker.errors.NotFound:
                 pass
 
             # Try to resolve as a container
             try:
                 target_container = client.containers.get(container)
-            except docker.errors.NotFound:  # type: ignore[name-defined]
+            except docker.errors.NotFound:
                 logger.error(f"Container or network not found: {container}")
                 return
 
@@ -423,7 +425,7 @@ def stop(
             pass
         logger.info("✓ Container stopped and removed successfully")
 
-    except docker.errors.DockerException as e:  # type: ignore[name-defined]
+    except docker.errors.DockerException as e:
         logger.error(f"Failed to connect to Docker: {e}")
         logger.error(
             "Make sure Docker is running and you have the necessary permissions"
@@ -448,6 +450,7 @@ def log(
         tail: Number of lines to show from the end of the logs
     """
     import docker
+    import docker.errors
 
     try:
         client = docker.from_env()
@@ -491,7 +494,7 @@ def log(
             # Try to get the specified container
             try:
                 target_container = client.containers.get(container)
-            except docker.errors.NotFound:  # type: ignore[name-defined]
+            except docker.errors.NotFound:
                 logger.error(f"Container not found: {container}")
                 return
 
@@ -510,7 +513,7 @@ def log(
             logs = target_container.logs().decode("utf-8", errors="replace")
             print(logs)
 
-    except docker.errors.DockerException as e:  # type: ignore[name-defined]
+    except docker.errors.DockerException as e:
         logger.error(f"Failed to connect to Docker: {e}")
         logger.error(
             "Make sure Docker is running and you have the necessary permissions"
@@ -533,7 +536,7 @@ def list_register():
     # --- Server-backed models (one row per server config class) ---
     for server_config_cls in SERVER_CONFIGS:
         try:
-            server = server_config_cls()  # type: ignore
+            server = server_config_cls()  # ty: ignore
             client_cfg = server.client_config
         except Exception:
             # Fallback if client_config fails

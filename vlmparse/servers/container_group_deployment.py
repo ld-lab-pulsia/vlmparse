@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import docker
+import docker.errors
+import docker.models.containers
+import docker.types
 from loguru import logger
 
 from .container_group import ContainerGroup
@@ -19,11 +22,11 @@ def _build_device_requests(gpu_device_ids: list[str] | None) -> list | None:
     """Build Docker device requests for GPU access."""
     if gpu_device_ids is None:
         # All GPUs
-        return [docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])]  # type: ignore[attr-defined]
+        return [docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])]
     if gpu_device_ids and gpu_device_ids[0] != "":
         # Specific GPUs
         return [
-            docker.types.DeviceRequest(  # type: ignore[attr-defined]
+            docker.types.DeviceRequest(
                 device_ids=gpu_device_ids, capabilities=[["gpu"]]
             )
         ]
@@ -64,7 +67,7 @@ def container_group_server(
         name=config.resolved_group_name, base_port=config.docker_port + 1
     )
     server_container = None
-    service_containers: dict[str, docker.models.containers.Container] = {}  # type: ignore[name-defined]
+    service_containers: dict[str, docker.models.containers.Container] = {}
     client = docker.from_env()
 
     group.__enter__()
@@ -162,7 +165,7 @@ def container_group_server(
                 container = service_containers[service_name]
                 try:
                     container.reload()
-                except docker.errors.NotFound as e:  # type: ignore[attr-defined]
+                except docker.errors.NotFound as e:
                     logger.error(
                         f"Container '{service_name}' stopped unexpectedly during startup"
                     )

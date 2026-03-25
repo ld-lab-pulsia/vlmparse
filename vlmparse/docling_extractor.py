@@ -42,7 +42,7 @@ def extract_page_text_cells(
         return None, None, None
 
     try:
-        from docling_parse.pdf_parsers import (  # type: ignore[import]
+        from docling_parse.pdf_parsers import (  # ty: ignore[unresolved-import]
             DecodePageConfig,
             pdf_parser,
         )

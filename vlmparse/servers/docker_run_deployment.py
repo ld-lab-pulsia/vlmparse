@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import docker
+import docker.errors
+import docker.types
 from loguru import logger
 
 if TYPE_CHECKING:
@@ -21,7 +23,7 @@ def _ensure_image_exists(
         client.images.get(image)
         logger.info(f"Docker image {image} found")
         return
-    except docker.errors.ImageNotFound:  # type: ignore[name-defined]
+    except docker.errors.ImageNotFound:
         logger.info(f"Docker image {image} not found, building...")
 
         if not dockerfile_path.exists():
@@ -49,7 +51,7 @@ def _ensure_image_exists(
                     logger.info(line)
             elif "error" in chunk:
                 logger.error(chunk["error"])
-                raise docker.errors.BuildError(chunk["error"], build_stream) from None  # type: ignore[name-defined]
+                raise docker.errors.BuildError(chunk["error"], build_stream) from None
             elif "status" in chunk:
                 # Handle status updates (e.g., downloading layers)
                 logger.debug(chunk["status"])
@@ -90,7 +92,7 @@ def docker_server(
             try:
                 client.images.get(config.docker_image)
                 logger.info(f"Docker image {config.docker_image} found locally")
-            except docker.errors.ImageNotFound:  # type: ignore[name-defined]
+            except docker.errors.ImageNotFound:
                 logger.info(
                     f"Docker image {config.docker_image} not found locally, pulling..."
                 )
@@ -107,12 +109,12 @@ def docker_server(
         if config.gpu_device_ids is None:
             # Default: Try to use all GPUs if available
             device_requests = [
-                docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])  # type: ignore[name-defined]
+                docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])
             ]
         elif len(config.gpu_device_ids) > 0 and config.gpu_device_ids[0] != "":
             # Use specific GPU devices
             device_requests = [
-                docker.types.DeviceRequest(  # type: ignore[name-defined]
+                docker.types.DeviceRequest(
                     device_ids=config.gpu_device_ids, capabilities=[["gpu"]]
                 )
             ]
@@ -179,7 +181,7 @@ def docker_server(
         while time.time() - start_time < timeout:
             try:
                 container.reload()
-            except docker.errors.NotFound as e:  # type: ignore[name-defined]
+            except docker.errors.NotFound as e:
                 logger.error("Container stopped unexpectedly during startup")
                 raise RuntimeError(
                     "Container crashed during initialization. Check Docker logs for details."
