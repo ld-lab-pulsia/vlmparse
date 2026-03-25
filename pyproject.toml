@@ -92,5 +92,5 @@ config-settings = { editable_mode = "compat" }
 [tool.uv.sources]
 
 
-[tool.ty]
+[tool.ty.src]
 exclude = ["vlmparse/docker_pipelines"]
