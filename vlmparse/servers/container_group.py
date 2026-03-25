@@ -5,6 +5,8 @@ of containers that belong to the same logical deployment group.
 """
 
 import docker
+import docker.models.containers
+import docker.models.networks
 from loguru import logger
 
 
@@ -29,8 +31,8 @@ class ContainerGroup:
         self.base_port = base_port
         self._port_offset = 0
         self._client = docker.from_env()
-        self._network: docker.models.networks.Network | None = None  # type: ignore[name-defined]
-        self._containers: dict[str, docker.models.containers.Container] = {}  # type: ignore[name-defined]
+        self._network: docker.models.networks.Network | None = None
+        self._containers: dict[str, docker.models.containers.Container] = {}
 
     # ------------------------------------------------------------------
     # Context manager

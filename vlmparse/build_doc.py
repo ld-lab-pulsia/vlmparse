@@ -34,7 +34,9 @@ def convert_pdfium_to_images(file_path, dpi=175):
             for img in images
         ]
 
-    except PIL.Image.DecompressionBombError as e:  # type: ignore[no-untyped-exception]
+    except (
+        PIL.Image.DecompressionBombError
+    ) as e:  # ty: ignore[possibly-missing-submodule]
         logger.opt(exception=True).warning(
             "Decompression bomb detected for {file_path}, reducing DPI",
             file_path=str(file_path),

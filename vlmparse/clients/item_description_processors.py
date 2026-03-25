@@ -151,7 +151,7 @@ class BaseItemDescriptionConfig(PageProcessorConfig):
         # Cache the processor on the config instance so the underlying
         # AsyncOpenAI client is reused across pages.
         try:
-            return self._cached_processor  # type: ignore[attr-defined]
+            return self._cached_processor  # ty: ignore[unresolved-attribute]
         except AttributeError:
             processor = BaseItemDescriptionProcessor(config=self)
             object.__setattr__(self, "_cached_processor", processor)

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import docker
+import docker.errors
 from loguru import logger
 
 if TYPE_CHECKING:
@@ -426,7 +427,7 @@ def docker_compose_server(
 
                 try:
                     container.reload()
-                except docker.errors.NotFound as e:  # type: ignore[name-defined]
+                except docker.errors.NotFound as e:
                     logger.error("Container stopped unexpectedly during startup")
                     raise RuntimeError(
                         "Container crashed during initialization. Check Docker logs for details."
