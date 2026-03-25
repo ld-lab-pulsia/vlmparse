@@ -87,8 +87,9 @@ for server_config_cls in SERVER_CONFIGS:
     names = [n for n in aliases + [model_name] if isinstance(n, str)]
     for name in names:
         docker_config_registry.register(
-            name, lambda cls=server_config_cls: cls()
-        )  # ty: ignore
+            name,
+            lambda cls=server_config_cls: cls(),  # ty: ignore[missing-argument]
+        )
 
 
 class ConverterConfigRegistry:
