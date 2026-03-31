@@ -39,6 +39,7 @@ ALL_MODELS = [
     "fireredocr",
     "ocrverse",
     "chandra2",
+    "dotsmocr",
 ]
 
 

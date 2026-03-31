@@ -10,6 +10,7 @@ from vlmparse.clients.deepseekocr import (
     DeepSeekOCRDockerServerConfig,
 )
 from vlmparse.clients.docling import DoclingDockerServerConfig
+from vlmparse.clients.dotsmocr import DotsMOCRDockerServerConfig
 from vlmparse.clients.dotsocr import (
     DotsOCR1p5DockerServerConfig,
     DotsOCRDockerServerConfig,
@@ -74,6 +75,7 @@ SERVER_CONFIGS: list[
     LightonOCR21BServerConfig,
     LightonOCR21BboxServerConfig,
     DotsOCR1p5DockerServerConfig,
+    DotsMOCRDockerServerConfig,
     FireRedOCRDockerServerConfig,
     OCRVerseDockerServerConfig,
     QianfanOCRDockerServerConfig,
