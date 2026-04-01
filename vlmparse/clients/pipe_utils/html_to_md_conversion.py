@@ -2,7 +2,7 @@ import re
 
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString
-from html_to_markdown import convert_to_markdown
+from html_to_markdown import ConversionOptions, convert
 
 
 def html_to_md_keep_tables(html: str, remove_head: bool = False) -> str:
@@ -32,13 +32,13 @@ def html_to_md_keep_tables(html: str, remove_head: bool = False) -> str:
 
     # --- html → markdown (tables excluded) ---------------------------------
     if len(str(soup)) > 0:
-        md_txt = convert_to_markdown(
-            str(soup),
-            strip=["table", "b", "strong", "i", "em"],
+        options = ConversionOptions(
+            strip_tags={"table", "b", "strong", "i", "em"},
             heading_style="atx",
             escape_misc=False,
             bullets="-",
         )
+        md_txt = convert(str(soup), options)["content"] or ""
     else:
         md_txt = ""
 
