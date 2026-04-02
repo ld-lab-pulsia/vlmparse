@@ -48,6 +48,10 @@ class Item(VLMParseBaseModel):
         """
         return map_to_unified_category(self.category)
 
+    def get_image(self, page: "Page"):  # noqa: F821
+        if page.image is not None and self.box is not None:
+            return page.image.crop(self.box.as_tuple())
+
 
 class TextCell(VLMParseBaseModel):
     """A native text cell extracted by docling-parse (before VLM processing).
@@ -138,6 +142,19 @@ class Page(VLMParseBaseModel):
             return "\n\n".join(item.text for item in self.items if item.text)
         return ""
 
+    def get_items(
+        self, category: str | None = None, unified_category: str | None = None
+    ) -> list[Item]:
+        if self.items is None:
+            return []
+        if category is not None:
+            return [item for item in self.items if item.category == category]
+        if unified_category is not None:
+            return [
+                item for item in self.items if item.unified_category == unified_category
+            ]
+        return self.items
+
 
 class Document(VLMParseBaseModel):
     file_path: str
@@ -202,3 +219,13 @@ class Document(VLMParseBaseModel):
             json_bytes = zipf.read("data.json")
             data = orjson.loads(json_bytes)
         return cls.model_validate(data)
+
+    def get_items(
+        self, category: str | None = None, unified_category: str | None = None
+    ) -> list[Item]:
+        items = []
+        for page in self.pages:
+            items.extend(
+                page.get_items(category=category, unified_category=unified_category)
+            )
+        return items
