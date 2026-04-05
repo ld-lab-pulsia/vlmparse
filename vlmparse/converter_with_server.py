@@ -42,7 +42,6 @@ def start_server(
 
     if docker_config is None:
         if provider == "registry":
-            print(f"DEBUG: Registry lookup failed for {model} (strict mode)")
             raise ValueError(
                 f"Model '{model}' not found in registry and provider='registry'. Use provider='hf' to serve arbitrary HuggingFace models."
             )
@@ -86,7 +85,7 @@ def start_server(
 def get_client_config(
     model: str | None,
     uri: str | None,
-    provider: Literal["registry", "hf", "google", "openai", "azure"] = "registry",
+    provider: Literal["registry", "hf", "google", "openai", "azure", "anthropic"] = "registry",
     api_key: str | None = None,
     use_response_api: bool = False,
 ):
@@ -138,6 +137,20 @@ def get_client_config(
             model, uri, api_key=api_key, use_response_api=use_response_api
         )
 
+    elif provider == "anthropic":
+        from vlmparse.clients.anthropic_converter import AnthropicConverterConfig
+
+        if api_key is None:
+            assert (
+                os.getenv("ANTHROPIC_API_KEY") is not None
+            ), "Anthropic API key must be provided via parameter or ANTHROPIC_API_KEY env variable"
+            api_key = os.getenv("ANTHROPIC_API_KEY", "")
+        client_config = AnthropicConverterConfig(
+            model_name=model,
+            api_key=api_key,
+            default_model_name=model,
+        )
+
     else:
         raise ValueError(f"Unsupported provider: {provider}")
     return client_config
@@ -150,7 +163,7 @@ class ConverterWithServer:
         uri: str | None = None,
         gpus: str | None = None,
         port: int | None = None,
-        provider: Literal["registry", "hf", "google", "openai", "azure"] = "registry",
+        provider: Literal["registry", "hf", "google", "openai", "azure", "anthropic"] = "registry",
         concurrency: int = 10,
         vllm_args: list[str] | None = None,
         forget_predefined_vllm_args: bool = False,
@@ -326,6 +339,7 @@ class ConverterWithServer:
         debug: bool = False,
         retrylast: bool = False,
         completion_kwargs: dict | None = None,
+        pages: list[int] | None = None,
     ):
         from vlmparse.clients.openai_converter import OpenAIConverterConfig
 
@@ -400,6 +414,9 @@ class ConverterWithServer:
 
         if debug:
             self.client.debug = debug
+
+        if pages is not None:
+            self.client.pages = pages
 
         if out_folder is not None:
             self.client.save_folder = out_folder

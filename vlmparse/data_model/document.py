@@ -73,6 +73,8 @@ class TextCell(VLMParseBaseModel):
 
 
 class Page(VLMParseBaseModel):
+    page_number: int | None = None
+    """0-indexed page number within the original PDF (set when processing a page subset)."""
     text: str | None = None
     raw_response: str | None = None
     items: list[Item] | None = None
