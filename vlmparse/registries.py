@@ -26,6 +26,7 @@ from vlmparse.clients.lightonocr import (
     LightOnOCRDockerServerConfig,
 )
 from vlmparse.clients.mineru import MinerUDockerServerConfig
+from vlmparse.clients.anthropic_converter import AnthropicConverterConfig
 from vlmparse.clients.mistral_converter import MistralOCRConverterConfig
 from vlmparse.clients.nanonetocr import NanonetOCR2DockerServerConfig
 from vlmparse.clients.ocrverse import OCRVerseDockerServerConfig
@@ -321,4 +322,18 @@ def _make_azure_factory(
         ),
         is_azure=True,
         use_response_api=use_response_api,
+    )
+
+for claude_model in [
+    "claude-opus-4-6",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5-20251001",
+]:
+    converter_config_registry.register(
+        claude_model,
+        lambda uri=None, model=claude_model: AnthropicConverterConfig(
+            model_name=model,
+            api_key=os.getenv("ANTHROPIC_API_KEY", ""),
+            default_model_name=model,
+        ),
     )

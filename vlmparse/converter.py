@@ -47,6 +47,45 @@ class ConverterConfig(VLMParseBaseModel):
         return BaseConverter(config=self, **kwargs)
 
 
+def parse_page_selection(pages_str: str) -> list[int]:
+    """Parse a page selection string into a sorted list of 0-indexed page numbers.
+
+    Examples:
+        "3"       → [2]
+        "1,3,5"   → [0, 2, 4]
+        "2-5"     → [1, 2, 3, 4]
+        "1,3-5,8" → [0, 2, 3, 4, 7]
+
+    Raises:
+        ValueError: If the string is malformed or contains invalid page numbers.
+    """
+    result: set[int] = set()
+    for part in pages_str.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            try:
+                start, end = part.split("-", 1)
+                start, end = int(start), int(end)
+            except ValueError:
+                raise ValueError(f"Invalid page range: '{part}'")
+            if start < 1 or end < start:
+                raise ValueError(
+                    f"Invalid page range '{part}': pages are 1-indexed and start must be ≤ end"
+                )
+            result.update(range(start - 1, end))
+        else:
+            try:
+                page = int(part)
+            except ValueError:
+                raise ValueError(f"Invalid page number: '{part}'")
+            if page < 1:
+                raise ValueError(f"Invalid page number '{part}': pages are 1-indexed")
+            result.add(page - 1)
+    return sorted(result)
+
+
 class BaseConverter:
     def __init__(
         self,
@@ -58,6 +97,7 @@ class BaseConverter:
         debug: bool = False,
         return_documents_in_batch_mode: bool = False,
         save_page_images: bool = False,
+        pages: list[int] | None = None,
     ):
         self.config = config
         self.num_concurrent_files = num_concurrent_files
@@ -69,6 +109,7 @@ class BaseConverter:
         self.debug = debug
         self.return_documents_in_batch_mode = return_documents_in_batch_mode
         self.save_page_images = save_page_images
+        self.pages = pages  # 0-indexed list of page numbers to process; None means all pages
 
     @property
     def num_concurrent_pages(self) -> int:
@@ -136,7 +177,28 @@ class BaseConverter:
         document = Document(file_path=str(file_path))
         try:
             num_pages = get_page_count(file_path)
-            document.pages = [Page() for _ in range(num_pages)]
+
+            if self.pages is not None:
+                page_indices = []
+                for i in self.pages:
+                    if 0 <= i < num_pages:
+                        page_indices.append(i)
+                    else:
+                        logger.warning(
+                            "Page {page} is out of range for {file_path} (total pages: {num_pages}), skipping",
+                            page=i + 1,
+                            file_path=str(file_path),
+                            num_pages=num_pages,
+                        )
+                if not page_indices:
+                    logger.warning(
+                        "No valid pages selected for {file_path}, returning empty document",
+                        file_path=str(file_path),
+                    )
+            else:
+                page_indices = list(range(num_pages))
+
+            document.pages = [Page(page_number=i) for i in page_indices]
 
             async def worker(page_idx: int, page: Page):
                 async with self.page_semaphore:
@@ -179,8 +241,8 @@ class BaseConverter:
                         )
 
             tasks = [
-                asyncio.create_task(worker(i, page))
-                for i, page in enumerate(document.pages)
+                asyncio.create_task(worker(page_idx, page))
+                for page_idx, page in zip(page_indices, document.pages)
             ]
             await asyncio.gather(*tasks)
         except KeyboardInterrupt:
@@ -236,7 +298,8 @@ class BaseConverter:
             doc_folder.mkdir(parents=True, exist_ok=True)
             for i, page in enumerate(document.pages, start=1):
                 page_text = page.text if page.text else ""
-                page_path = doc_folder / f"page_{i:04d}.md"
+                file_page_num = page.page_number + 1  # page_number is always set (0-indexed → 1-indexed)
+                page_path = doc_folder / f"page_{file_page_num:04d}.md"
                 with open(page_path, "w", encoding="utf-8") as f:
                     f.write(page_text)
             logger.debug(f"Saved {len(document.pages)} pages to {doc_folder}")
