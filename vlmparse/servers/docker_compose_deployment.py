@@ -336,9 +336,14 @@ def docker_compose_server(
                 f"Starting Docker Compose for {config.model_name} on port {config.docker_port}"
             )
 
+            up_cmd = compose_cmd + ["up", "-d"]
+            if config.rebuild:
+                up_cmd.append("--build")
+                logger.info("Rebuild requested, adding --build to docker compose up")
+
             try:
                 subprocess.run(
-                    compose_cmd + ["up", "-d"],
+                    up_cmd,
                     check=True,
                     capture_output=True,
                     text=True,

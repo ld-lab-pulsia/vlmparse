@@ -1,6 +1,3 @@
-FROM vllm/vllm-openai:nightly
+FROM vllm/vllm-openai:v0.21.0
 
-RUN apt-get update -qq && apt-get install -y -qq git && \
-    rm -rf /var/lib/apt/lists/* && \
-    pip install --no-cache-dir git+https://github.com/huggingface/transformers.git && \
-    pip install --no-cache-dir --upgrade mistral-common
+RUN pip install --no-cache-dir --upgrade mistral-common

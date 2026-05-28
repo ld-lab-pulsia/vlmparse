@@ -90,6 +90,7 @@ def container_group_server(
                     client,
                     service_def.image,
                     Path(service_def.dockerfile_dir),
+                    rebuild=config.rebuild,
                 )
 
             host_port = config.get_host_port(service_name)

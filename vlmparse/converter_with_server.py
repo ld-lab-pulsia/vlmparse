@@ -20,6 +20,7 @@ def start_server(
     vllm_args: list[str] | None = None,
     forget_predefined_vllm_args: bool = False,
     auto_stop: bool = False,
+    rebuild: bool = False,
 ):
     from vlmparse.registries import docker_config_registry
     from vlmparse.servers.docker_server import (
@@ -64,6 +65,7 @@ def start_server(
         if port is not None:
             docker_config.docker_port = port
         docker_config.gpu_device_ids = gpu_device_ids
+        docker_config.rebuild = rebuild
         if hasattr(docker_config, "update_command_args"):
             docker_config.update_command_args(
                 vllm_args,
@@ -156,6 +158,7 @@ class ConverterWithServer:
         forget_predefined_vllm_args: bool = False,
         return_documents: bool = False,
         use_response_api: bool = False,
+        rebuild: bool = False,
         # ---- image description post-processor ----
         image_description: "ImageDescriptionConfig | None" = None,
     ):
@@ -177,6 +180,7 @@ class ConverterWithServer:
         self.server = None
         self.client = None
         self.use_response_api = use_response_api
+        self.rebuild = rebuild
         self.image_description = image_description
 
     def start_server_and_client(self):
@@ -209,6 +213,7 @@ class ConverterWithServer:
                 vllm_args=self.vllm_args,
                 forget_predefined_vllm_args=self.forget_predefined_vllm_args,
                 auto_stop=True,
+                rebuild=self.rebuild,
             )
 
             if docker_config is not None:
