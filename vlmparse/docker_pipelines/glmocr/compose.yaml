@@ -1,13 +1,11 @@
 
 services:
   glmocr-vllm-server:
-    image: vllm/vllm-openai:nightly
+    image: vllm/vllm-openai:v0.21.0
     container_name: vlmparse-glmocr-vllm-server
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
-        apt-get update && apt-get install -y git curl &&
-        pip install --no-cache-dir git+https://github.com/huggingface/transformers.git &&
         pip install --no-cache-dir --upgrade mistral-common &&
         vllm serve zai-org/GLM-OCR --served-model-name glm-ocr --allowed-local-media-path / --port 8080 --speculative-config '{"method": "mtp", "num_speculative_tokens": 1}'
     ports:

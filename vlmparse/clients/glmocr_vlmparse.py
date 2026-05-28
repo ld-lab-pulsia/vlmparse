@@ -156,12 +156,6 @@ class GLMOCRVlmparseDockerServerConfig(ContainerGroupServerConfig):
                     "HF_HOME": "/root/.cache/huggingface",
                 },
                 volumes={
-                    str(
-                        DOCKER_PIPELINE_V2_DIR / "layout-server" / "layout_server.py"
-                    ): {
-                        "bind": "/app/layout_server.py",
-                        "mode": "ro",
-                    },
                     hf_home: {"bind": "/root/.cache/huggingface", "mode": "rw"},
                 },
                 shm_size="8g",
