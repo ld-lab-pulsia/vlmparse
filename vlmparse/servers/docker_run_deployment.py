@@ -17,8 +17,17 @@ def _ensure_image_exists(
     client: docker.DockerClient,
     image: str,
     dockerfile_path: Path,
+    rebuild: bool = False,
 ):
-    """Check if image exists, build it if not."""
+    """Check if image exists, build it if not (or rebuild if requested)."""
+    if rebuild:
+        logger.info(f"Rebuild requested for Docker image {image}")
+        try:
+            client.images.remove(image, force=True)
+            logger.info(f"Removed existing image {image}")
+        except docker.errors.ImageNotFound:
+            pass
+
     try:
         client.images.get(image)
         logger.info(f"Docker image {image} found")
@@ -85,19 +94,29 @@ def docker_server(
 
         if config.dockerfile_dir is not None:
             _ensure_image_exists(
-                client, config.docker_image, Path(config.dockerfile_dir)
+                client,
+                config.docker_image,
+                Path(config.dockerfile_dir),
+                rebuild=config.rebuild,
             )
         else:
             # Pull pre-built image
-            try:
-                client.images.get(config.docker_image)
-                logger.info(f"Docker image {config.docker_image} found locally")
-            except docker.errors.ImageNotFound:
+            if config.rebuild:
                 logger.info(
-                    f"Docker image {config.docker_image} not found locally, pulling..."
+                    f"Rebuild requested, re-pulling Docker image {config.docker_image}..."
                 )
                 client.images.pull(config.docker_image)
                 logger.info(f"Successfully pulled {config.docker_image}")
+            else:
+                try:
+                    client.images.get(config.docker_image)
+                    logger.info(f"Docker image {config.docker_image} found locally")
+                except docker.errors.ImageNotFound:
+                    logger.info(
+                        f"Docker image {config.docker_image} not found locally, pulling..."
+                    )
+                    client.images.pull(config.docker_image)
+                    logger.info(f"Successfully pulled {config.docker_image}")
 
         logger.info(
             f"Starting Docker container for {config.model_name} on port {config.docker_port}"

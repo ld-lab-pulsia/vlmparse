@@ -28,6 +28,7 @@ class BaseServerConfig(ModelIdentityMixin, ABC):
     docker_port: int = 8056
     container_port: int = 8000
     gpu_device_ids: list[str] | None = None
+    rebuild: bool = False
     environment: dict[str, str] = Field(default_factory=dict)
     server_ready_indicators: list[str] = Field(
         default_factory=lambda: [

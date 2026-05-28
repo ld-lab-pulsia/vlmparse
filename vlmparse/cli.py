@@ -36,6 +36,11 @@ def serve(
             "Otherwise they will be updated with vllm_args (may overwrite keys)."
         ),
     ),
+    rebuild: bool = typer.Option(
+        False,
+        "--rebuild",
+        help="Force rebuild (or re-pull) the Docker image before deploying.",
+    ),
 ):
     """Deploy a VLLM server in a Docker container.
 
@@ -58,6 +63,7 @@ def serve(
         vllm_args=vllm_args,
         forget_predefined_vllm_args=forget_predefined_vllm_args,
         auto_stop=False,
+        rebuild=rebuild,
     )
 
     logger.info(f"✓ VLLM server ready at {base_url}")
@@ -193,6 +199,11 @@ def convert(
         help="Custom prompt sent to the VLM for each image crop.  Uses model default if not set.",
     ),
     debug: bool = typer.Option(False, help="Run in debug mode"),
+    rebuild: bool = typer.Option(
+        False,
+        "--rebuild",
+        help="Force rebuild (or re-pull) the Docker image before deploying.",
+    ),
     _return_documents: bool = typer.Option(False, hidden=True),
 ):
     """Parse PDF documents and save results.
@@ -253,6 +264,7 @@ def convert(
         concurrency=concurrency,
         return_documents=_return_documents,
         use_response_api=use_response_api,
+        rebuild=rebuild,
         image_description=img_desc,
     ) as converter_with_server:
         return converter_with_server.parse(
