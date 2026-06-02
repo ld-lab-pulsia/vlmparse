@@ -166,6 +166,25 @@ wheels = [
 ]
 
 [[package]]
+name = "anthropic"
+version = "0.86.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "distro" },
+    { name = "docstring-parser" },
+    { name = "httpx" },
+    { name = "jiter" },
+    { name = "pydantic" },
+    { name = "sniffio" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/37/7a/8b390dc47945d3169875d342847431e5f7d5fa716b2e37494d57cfc1db10/anthropic-0.86.0.tar.gz", hash = "sha256:60023a7e879aa4fbb1fed99d487fe407b2ebf6569603e5047cfe304cebdaa0e5", size = 583820, upload-time = "2026-03-18T18:43:08.017Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/63/5f/67db29c6e5d16c8c9c4652d3efb934d89cb750cad201539141781d8eae14/anthropic-0.86.0-py3-none-any.whl", hash = "sha256:9d2bbd339446acce98858c5627d33056efe01f70435b22b63546fe7edae0cd57", size = 469400, upload-time = "2026-03-18T18:43:06.526Z" },
+]
+
+[[package]]
 name = "anyio"
 version = "4.12.1"
 source = { registry = "https://pypi.org/simple" }
@@ -799,6 +818,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fa/70/3fb70c2bb3d6536d29ad3efccc799c42976f7d7a3a16cd0051c37f258699/docling_parse-5.3.4-cp314-cp314-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:227ce0a0a8c16536ccec6e96399eeda4391fa38d2fa2b936f52855e680f1fd1b", size = 8166977, upload-time = "2026-02-23T10:11:46.859Z" },
     { url = "https://files.pythonhosted.org/packages/28/ef/47b435c15f16e7257e67d6c66879ab8258cac679ac541f32e1e26777728d/docling_parse-5.3.4-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:da2f0046e52345ab7486c9eb6880610656247d4a2d4b00a3b80c7012a89014a7", size = 8262064, upload-time = "2026-02-23T10:11:48.341Z" },
     { url = "https://files.pythonhosted.org/packages/91/f3/0af6d1168c48c5e2893638ced5d57597e4091ad62a15f760abe9c4ffef2b/docling_parse-5.3.4-cp314-cp314-win_amd64.whl", hash = "sha256:8e9fdaefa68383d29873aa59f13aee0f0ae7f25fb3222d6e8f4bd7382e5c4bb5", size = 9531221, upload-time = "2026-02-23T10:11:50.012Z" },
+]
+
+[[package]]
+name = "docstring-parser"
+version = "0.17.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b2/9d/c3b43da9515bd270df0f80548d9944e389870713cc1fe2b8fb35fe2bcefd/docstring_parser-0.17.0.tar.gz", hash = "sha256:583de4a309722b3315439bb31d64ba3eebada841f2e2cee23b99df001434c912", size = 27442, upload-time = "2025-07-21T07:35:01.868Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/e2/2537ebcff11c1ee1ff17d8d0b6f4db75873e3b0fb32c2d4a2ee31ecb310a/docstring_parser-0.17.0-py3-none-any.whl", hash = "sha256:cf2569abd23dce8099b300f9b4fa8191e9582dda731fd533daf54c4551658708", size = 36896, upload-time = "2025-07-21T07:35:00.684Z" },
 ]
 
 [[package]]
@@ -3930,6 +3958,7 @@ name = "vlmparse"
 version = "0.1.23"
 source = { editable = "." }
 dependencies = [
+    { name = "anthropic" },
     { name = "beautifulsoup4" },
     { name = "devtools" },
     { name = "docker" },
@@ -3991,6 +4020,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anthropic", specifier = ">=0.86.0" },
     { name = "beautifulsoup4", specifier = ">=4.14.2" },
     { name = "datasets", marker = "extra == 'bench'", specifier = ">=4.4.1" },
     { name = "devtools", specifier = ">=0.12.2" },
