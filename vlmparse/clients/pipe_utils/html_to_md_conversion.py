@@ -43,7 +43,7 @@ def html_to_md_keep_tables(html: str, remove_head: bool = False) -> str:
         # html-to-markdown >=3.5 returns a ConversionResult object,
         # earlier 3.x releases returned a dict.
         if isinstance(result, dict):
-            md_txt = cast("dict[str, Any]", result).get("content") or ""
+            md_txt = cast(dict[str, Any], result).get("content") or ""
         else:
             md_txt = getattr(result, "content", None) or ""
     else:
