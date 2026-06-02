@@ -213,6 +213,10 @@ GENERALIST_SUPPORTED_MODES: list[ConversionMode] = [
     "ocr",
     "ocr_layout",
     "ocr_layout_images",
+    "table",
+    "image_description",
+    "formula",
+    "chart",
 ]
 
 
