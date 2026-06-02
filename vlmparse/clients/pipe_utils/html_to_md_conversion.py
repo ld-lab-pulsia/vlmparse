@@ -1,4 +1,5 @@
 import re
+from typing import Any, cast
 
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString
@@ -33,12 +34,18 @@ def html_to_md_keep_tables(html: str, remove_head: bool = False) -> str:
     # --- html → markdown (tables excluded) ---------------------------------
     if len(str(soup)) > 0:
         options = ConversionOptions(
-            strip_tags={"table", "b", "strong", "i", "em"},
+            strip_tags=["table", "b", "strong", "i", "em"],
             heading_style="atx",
             escape_misc=False,
             bullets="-",
         )
-        md_txt = convert(str(soup), options)["content"] or ""
+        result: Any = convert(str(soup), options)
+        # html-to-markdown >=3.5 returns a ConversionResult object,
+        # earlier 3.x releases returned a dict.
+        if isinstance(result, dict):
+            md_txt = cast(dict[str, Any], result).get("content") or ""
+        else:
+            md_txt = getattr(result, "content", None) or ""
     else:
         md_txt = ""
 
