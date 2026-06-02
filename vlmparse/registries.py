@@ -36,7 +36,7 @@ from vlmparse.clients.qianfanocr import (
     QianfanOCRDockerServerConfig,
     QianfanOCRThinkingDockerServerConfig,
 )
-from vlmparse.converter import ConverterConfig
+from vlmparse.converter import ConversionMode, ConverterConfig
 from vlmparse.model_endpoint_config import ModelEndpointConfig
 from vlmparse.servers.container_group_server import ContainerGroupServerConfig
 from vlmparse.servers.docker_compose_server import DockerComposeServerConfig
@@ -209,7 +209,11 @@ GOOGLE_API_BASE_URL = os.getenv(
 )
 
 # Conversion modes supported by generalist VLMs (which can also detect boxes).
-GENERALIST_SUPPORTED_MODES = ["ocr", "ocr_layout", "ocr_layout_images"]
+GENERALIST_SUPPORTED_MODES: list[ConversionMode] = [
+    "ocr",
+    "ocr_layout",
+    "ocr_layout_images",
+]
 
 
 for gemini_model in [

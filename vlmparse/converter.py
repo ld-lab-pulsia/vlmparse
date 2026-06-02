@@ -15,6 +15,16 @@ from .constants import IMAGE_EXTENSIONS, PDF_EXTENSION
 from .data_model.document import Document, Page, ProcessingError
 from .page_processor import AsyncPageProcessor, PageProcessorConfigs
 
+ConversionMode = Literal[
+    "ocr",
+    "ocr_layout",
+    "ocr_layout_images",
+    "table",
+    "image_description",
+    "formula",
+    "chart",
+]
+
 
 class ConverterConfig(VLMParseBaseModel):
     model_name: str
@@ -22,26 +32,8 @@ class ConverterConfig(VLMParseBaseModel):
     endpoint: ModelEndpointConfig = Field(default_factory=ModelEndpointConfig)
     dpi: int = Field(default=175, ge=30, le=600)
     max_image_size: int | None = Field(default=4000, ge=50)
-    conversion_mode: Literal[
-        "ocr",
-        "ocr_layout",
-        "ocr_layout_images",
-        "table",
-        "image_description",
-        "formula",
-        "chart",
-    ] = "ocr"
-    supported_modes: list[
-        Literal[
-            "ocr",
-            "ocr_layout",
-            "ocr_layout_images",
-            "table",
-            "image_description",
-            "formula",
-            "chart",
-        ]
-    ] = Field(default_factory=lambda: ["ocr"])
+    conversion_mode: ConversionMode = "ocr"
+    supported_modes: list[ConversionMode] = Field(default_factory=lambda: ["ocr"])
     inline_image_description: bool = False
 
     page_preproc: list[PageProcessorConfigs] = Field(default_factory=list)
