@@ -277,7 +277,7 @@ def _parse_image_box_response(
                 )
             )
 
-        cleaned_parts.append(f"![{description}][image-placeholder]")
+        cleaned_parts.append(f"![{description}]([image-placeholder])")
         last_end = m.end()
 
     # Trailing text after the last <region>
