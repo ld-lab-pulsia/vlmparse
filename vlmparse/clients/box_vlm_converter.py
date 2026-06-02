@@ -1,19 +1,22 @@
-"""Generalist VLM converters with bounding-box detection.
+"""Generalist VLM converter with optional bounding-box detection.
 
-Two variants:
+A single :class:`GeneralistVLMConverter` dispatches on ``conversion_mode``:
 
-* **BoxVLMConverterClient** – full layout extraction.  The VLM returns a JSON
-  array where every detected region has a category, bounding box, and text.
+* ``ocr_layout`` – full layout extraction.  The VLM returns a JSON array where
+  every detected region has a category, bounding box, and text.
 
-* **ImageBoxVLMConverterClient** – image-only box extraction.  The VLM does a
-  normal markdown transcription but wraps every image/figure region in a
-  ``<region>`` tag that carries the bounding box.  A regex post-processes the
-  output to split it into ``Item`` objects (images get boxes, text segments
-  don't).
+* ``ocr_layout_images`` – image-only box extraction.  The VLM does a normal
+  markdown transcription but wraps every image/figure region in a ``<region>``
+  tag that carries the bounding box.  A regex post-processes the output to split
+  it into ``Item`` objects (images get boxes, text segments don't).
+
+* any other mode (``ocr``, ``table``, ``formula``, ``chart``,
+  ``image_description``) – delegates to the standard OpenAI behaviour.
 """
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 
@@ -44,6 +47,21 @@ def _gemini_box_to_bbox(coords: list[float]) -> BoundingBox:
         b=float(y_max),
         coord_origin="TOPLEFT",
     )
+
+
+def _scale_items_to_pixels(items: list[Item], width: int, height: int) -> None:
+    """Scale all Item boxes in-place from 0-1000 Gemini coords to pixel coords."""
+    sx = width / 1000.0
+    sy = height / 1000.0
+    for item in items:
+        box = item.box
+        item.box = BoundingBox(
+            l=box.l * sx,
+            t=box.t * sy,
+            r=box.r * sx,
+            b=box.b * sy,
+            coord_origin="TOPLEFT",
+        )
 
 
 def _build_messages(config, image, prompt_text):
@@ -104,6 +122,31 @@ def _build_full_layout_prompt(categories: dict[str, str]) -> str:
     return _FULL_LAYOUT_PROMPT_TEMPLATE.format(categories=lines)
 
 
+def _normalize_box(box_coords) -> list[float] | None:
+    """Accept flat ``[y,x,y,x]`` or nested ``[[y,x,y,x]]`` (list or tuple) and return a flat 4-element list."""
+    if not isinstance(box_coords, (list, tuple)) or not box_coords:
+        return None
+    # Unwrap single-element nested list/tuple: [[y, x, y, x]] -> [y, x, y, x]
+    if len(box_coords) == 1 and isinstance(box_coords[0], (list, tuple)):
+        box_coords = box_coords[0]
+    if len(box_coords) != 4:
+        return None
+    return [float(c) for c in box_coords]
+
+
+def _loads_json_or_python(text: str):
+    """Parse a JSON array, falling back to ``ast.literal_eval`` for Python-style
+    output (e.g. boxes written as tuples ``(a, b, c, d)``).
+
+    Using ``literal_eval`` instead of a regex avoids corrupting parentheses that
+    appear inside text/description fields.
+    """
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return ast.literal_eval(text)
+
+
 def _parse_full_layout_response(raw: str, valid_categories: set[str]) -> list[Item]:
     """Parse a JSON array of detected regions into ``Item`` objects."""
     text = raw.strip()
@@ -115,12 +158,12 @@ def _parse_full_layout_response(raw: str, valid_categories: set[str]) -> list[It
         text = text[start : end + 1]
 
     items: list[Item] = []
-    for entry in json.loads(text):
-        box_coords = entry.get("box") or entry.get("bbox")
+    for entry in _loads_json_or_python(text):
+        box_coords = _normalize_box(entry.get("box") or entry.get("bbox"))
         category = entry.get("category", "other")
         region_text = entry.get("text", "")
 
-        if not box_coords or len(box_coords) != 4:
+        if box_coords is None:
             logger.warning(f"Skipping entry with invalid box: {entry}")
             continue
 
@@ -137,68 +180,8 @@ def _parse_full_layout_response(raw: str, valid_categories: set[str]) -> list[It
     return items
 
 
-class BoxVLMConverterConfig(OpenAIConverterConfig):
-    """Config for full-layout VLM detection (all regions as JSON).
-
-    Attributes:
-        categories: ``{category: description}`` dict sent to the VLM.
-        box_prompt: Optional override for the auto-built prompt.
-    """
-
-    categories: dict[str, str] = Field(
-        default_factory=lambda: {
-            "text": "Regular text paragraph or block",
-            "title": "Section heading or document title",
-            "table": "Tabular data",
-            "figure": "Image, chart, diagram, or graph",
-            "formula": "Mathematical equation or formula",
-            "caption": "Caption associated with a figure or table",
-            "header": "Page header",
-            "footer": "Page footer or page number",
-            "list": "Bulleted or numbered list",
-        }
-    )
-    box_prompt: str | None = None
-
-    def get_client(self, **kwargs) -> "BoxVLMConverterClient":
-        return BoxVLMConverterClient(config=self, **kwargs)
-
-
-class BoxVLMConverterClient(OpenAIConverterClient):
-    """Full-layout VLM client – returns classified bounding boxes for every region."""
-
-    config: BoxVLMConverterConfig
-
-    def _get_detection_prompt(self) -> str:
-        return self.config.box_prompt or _build_full_layout_prompt(
-            self.config.categories
-        )
-
-    async def async_call_inside_page(self, page: Page) -> Page:
-        image = page.image
-        assert image is not None, "Page image is required for conversion"
-
-        messages = _build_messages(self.config, image, self._get_detection_prompt())
-        response, usage = await self._get_chat_completion(messages)
-        logger.debug("Box detection response: " + str(response))
-        page.raw_response = response
-
-        try:
-            items = _parse_full_layout_response(response, set(self.config.categories))
-        except (json.JSONDecodeError, KeyError, TypeError) as exc:
-            logger.error(f"Failed to parse box response: {exc}")
-            items = []
-
-        page.items = items
-        page.text = "\n\n".join(
-            it.text for it in sorted(items, key=lambda i: (i.box.t, i.box.l)) if it.text
-        )
-        page = self.add_usage(page, usage)
-        return page
-
-
 # ═══════════════════════════════════════════════════════════════════════════
-# Version 2 – Image-only box extraction  (markdown + <region> tags)
+# Image-only box extraction helpers  (markdown + <region> tags)
 # ═══════════════════════════════════════════════════════════════════════════
 
 _IMAGE_BOX_PROMPT_TEMPLATE = """\
@@ -266,13 +249,14 @@ def _parse_image_box_response(
     with ``<region>`` tags replaced by ``![description][image-placeholder]``.
     """
     items: list[Item] = []
-    cleaned = raw
+    cleaned_parts: list[str] = []
     last_end = 0
 
     for m in _REGION_TAG_RE.finditer(raw):
         # Text segment before this <region>
         text_before = raw[last_end : m.start()]
         items.extend(_text_to_items(text_before))
+        cleaned_parts.append(text_before)
 
         # Image item from <region>
         box_str = m.group("box")
@@ -293,25 +277,50 @@ def _parse_image_box_response(
                 )
             )
 
-        cleaned = cleaned.replace(
-            m.group(0),
-            f"![{description}][image-placeholder]",
-        )
+        cleaned_parts.append(f"![{description}][image-placeholder]")
         last_end = m.end()
 
     # Trailing text after the last <region>
-    items.extend(_text_to_items(raw[last_end:]))
+    trailing = raw[last_end:]
+    items.extend(_text_to_items(trailing))
+    cleaned_parts.append(trailing)
 
-    return items, cleaned
+    return items, "".join(cleaned_parts)
 
 
-class ImageBoxVLMConverterConfig(OpenAIConverterConfig):
-    """Config for image-only box detection (markdown output with <region> tags).
+class GeneralistVLMConverterConfig(OpenAIConverterConfig):
+    """Config for a generalist VLM that can also detect bounding boxes.
+
+    The behaviour is selected by ``conversion_mode``:
+
+    * ``ocr_layout`` – full layout: every region is detected and classified
+      with a bounding box (uses :attr:`categories` / :attr:`box_prompt`).
+    * ``ocr_layout_images`` – markdown OCR where only images/figures are boxed
+      (uses :attr:`image_categories` / :attr:`image_box_prompt`).
+    * any other mode (``ocr``, ``table``, ``formula``, ``chart``,
+      ``image_description``) – delegates to the standard OpenAI behaviour.
 
     Attributes:
+        categories: ``{category: description}`` dict for full-layout detection.
+        box_prompt: Optional override for the auto-built full-layout prompt.
         image_categories: ``{category: description}`` for image-like regions.
-        image_box_prompt: Optional override for the auto-built prompt.
+        image_box_prompt: Optional override for the auto-built image-box prompt.
     """
+
+    categories: dict[str, str] = Field(
+        default_factory=lambda: {
+            "text": "Regular text paragraph or block",
+            "title": "Section heading or document title",
+            "table": "Tabular data",
+            "figure": "Image, chart, diagram, or graph",
+            "formula": "Mathematical equation or formula",
+            "caption": "Caption associated with a figure or table",
+            "header": "Page header",
+            "footer": "Page footer or page number",
+            "list": "Bulleted or numbered list",
+        }
+    )
+    box_prompt: str | None = None
 
     image_categories: dict[str, str] = Field(
         default_factory=lambda: {
@@ -324,34 +333,62 @@ class ImageBoxVLMConverterConfig(OpenAIConverterConfig):
     )
     image_box_prompt: str | None = None
 
-    def get_client(self, **kwargs) -> "ImageBoxVLMConverterClient":
-        return ImageBoxVLMConverterClient(config=self, **kwargs)
+    def get_client(self, **kwargs) -> "GeneralistVLMConverter":
+        return GeneralistVLMConverter(config=self, **kwargs)
 
 
-class ImageBoxVLMConverterClient(OpenAIConverterClient):
-    """Image-only box VLM client – normal markdown OCR with detected image boxes.
+class GeneralistVLMConverter(OpenAIConverterClient):
+    """Generalist VLM client with optional bounding-box detection.
 
-    The VLM produces standard markdown but wraps images in ``<region>`` tags.
-    Post-processing splits the response into an ordered list of Items:
+    Dispatches on ``config.conversion_mode``:
 
-    * **image Items** have their bounding box and category from ``<region>``
-    * **text Items** are split on double-newlines with a placeholder box
-
-    ``page.text`` contains the cleaned markdown with image placeholders.
+    * ``ocr_layout`` – returns classified bounding boxes for every region.
+    * ``ocr_layout_images`` – normal markdown OCR with detected image boxes.
+    * anything else – delegates to :class:`OpenAIConverterClient`.
     """
 
-    config: ImageBoxVLMConverterConfig
+    config: GeneralistVLMConverterConfig
 
-    def _get_detection_prompt(self) -> str:
-        return self.config.image_box_prompt or _build_image_box_prompt(
-            self.config.image_categories,
-        )
-
-    async def async_call_inside_page(self, page: Page) -> Page:
+    async def _full_layout_page(self, page: Page) -> Page:
         image = page.image
         assert image is not None, "Page image is required for conversion"
 
-        messages = _build_messages(self.config, image, self._get_detection_prompt())
+        prompt = self.config.box_prompt or _build_full_layout_prompt(
+            self.config.categories
+        )
+        messages = _build_messages(self.config, image, prompt)
+        response, usage = await self._get_chat_completion(messages)
+        logger.debug("Box detection response: " + str(response))
+        page.raw_response = response
+
+        try:
+            items = _parse_full_layout_response(response, set(self.config.categories))
+        except (
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            ValueError,
+            SyntaxError,
+        ) as exc:
+            logger.error(f"Failed to parse box response: {exc}")
+            items = []
+
+        _scale_items_to_pixels(items, image.size[0], image.size[1])
+        page.items = items
+        page.text = "\n\n".join(
+            it.text for it in sorted(items, key=lambda i: (i.box.t, i.box.l)) if it.text
+        )
+        page = self.add_usage(page, usage)
+        return page
+
+    async def _image_box_page(self, page: Page) -> Page:
+        image = page.image
+        assert image is not None, "Page image is required for conversion"
+
+        prompt = self.config.image_box_prompt or _build_image_box_prompt(
+            self.config.image_categories,
+        )
+        messages = _build_messages(self.config, image, prompt)
         response, usage = await self._get_chat_completion(messages)
         logger.debug("Image-box response: " + str(response))
         page.raw_response = response
@@ -365,8 +402,17 @@ class ImageBoxVLMConverterClient(OpenAIConverterClient):
             logger.error(f"Failed to parse image-box response: {exc}")
             items, md_text = [], response
 
-        page.items = items if items else None
+        _scale_items_to_pixels(items, image.size[0], image.size[1])
+        page.items = items
         md_text = clean_response(md_text)
         page.text = html_to_md_keep_tables(md_text)
         page = self.add_usage(page, usage)
         return page
+
+    async def async_call_inside_page(self, page: Page) -> Page:
+        mode = getattr(self.config, "conversion_mode", None) or "ocr"
+        if mode == "ocr_layout":
+            return await self._full_layout_page(page)
+        if mode == "ocr_layout_images":
+            return await self._image_box_page(page)
+        return await super().async_call_inside_page(page)

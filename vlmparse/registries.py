@@ -1,6 +1,7 @@
 import os
 from collections.abc import Callable
 
+from vlmparse.clients.box_vlm_converter import GeneralistVLMConverterConfig
 from vlmparse.clients.chandra import (
     Chandra2DockerServerConfig,
     ChandraDockerServerConfig,
@@ -30,7 +31,6 @@ from vlmparse.clients.mistral_converter import MistralOCRConverterConfig
 from vlmparse.clients.nanonetocr import NanonetOCR2DockerServerConfig
 from vlmparse.clients.ocrverse import OCRVerseDockerServerConfig
 from vlmparse.clients.olmocr import OlmOCRDockerServerConfig
-from vlmparse.clients.openai_converter import OpenAIConverterConfig
 from vlmparse.clients.paddleocrvl import PaddleOCRVLDockerServerConfig
 from vlmparse.clients.qianfanocr import (
     QianfanOCRDockerServerConfig,
@@ -208,6 +208,9 @@ GOOGLE_API_BASE_URL = os.getenv(
     "GOOGLE_API_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/"
 )
 
+# Conversion modes supported by generalist VLMs (which can also detect boxes).
+GENERALIST_SUPPORTED_MODES = ["ocr", "ocr_layout", "ocr_layout_images"]
+
 
 for gemini_model in [
     "gemini-2.5-pro",
@@ -218,9 +221,10 @@ for gemini_model in [
 ]:
     converter_config_registry.register(
         gemini_model,
-        lambda uri=None, model=gemini_model: OpenAIConverterConfig(
+        lambda uri=None, model=gemini_model: GeneralistVLMConverterConfig(
             model_name=model,
             inline_image_description=True,
+            supported_modes=GENERALIST_SUPPORTED_MODES,
             endpoint=ModelEndpointConfig(
                 base_url=GOOGLE_API_BASE_URL if uri is None else uri,
                 api_key=os.getenv("GOOGLE_API_KEY", ""),
@@ -236,9 +240,10 @@ for openai_model in [
 ]:
     converter_config_registry.register(
         openai_model,
-        lambda uri=None, model=openai_model: OpenAIConverterConfig(
+        lambda uri=None, model=openai_model: GeneralistVLMConverterConfig(
             model_name=model,
             inline_image_description=True,
+            supported_modes=GENERALIST_SUPPORTED_MODES,
             endpoint=ModelEndpointConfig(
                 base_url=None,
                 api_key=os.getenv("OPENAI_API_KEY", ""),
@@ -265,8 +270,9 @@ for mistral_model in ["mistral-ocr-latest", "mistral-ocr"]:
 
 
 def _make_hf_factory(model: str, uri: str | None) -> ConverterConfig:
-    return OpenAIConverterConfig(
+    return GeneralistVLMConverterConfig(
         model_name=model,
+        supported_modes=GENERALIST_SUPPORTED_MODES,
         endpoint=ModelEndpointConfig(base_url=uri),
     )
 
@@ -277,9 +283,10 @@ def _make_google_factory(
     api_key: str | None = None,
 ) -> ConverterConfig:
     api_key = api_key if api_key is not None else os.getenv("GOOGLE_API_KEY", "")
-    return OpenAIConverterConfig(
+    return GeneralistVLMConverterConfig(
         model_name=model,
         inline_image_description=True,
+        supported_modes=GENERALIST_SUPPORTED_MODES,
         endpoint=ModelEndpointConfig(
             base_url=GOOGLE_API_BASE_URL if uri is None else uri,
             api_key=api_key,
@@ -294,9 +301,10 @@ def _make_openai_factory(
     api_key: str | None = None,
 ) -> ConverterConfig:
     api_key = api_key if api_key is not None else os.getenv("OPENAI_API_KEY", "")
-    return OpenAIConverterConfig(
+    return GeneralistVLMConverterConfig(
         model_name=model,
         inline_image_description=True,
+        supported_modes=GENERALIST_SUPPORTED_MODES,
         endpoint=ModelEndpointConfig(
             base_url=uri,
             api_key=api_key,
@@ -312,8 +320,9 @@ def _make_azure_factory(
     use_response_api: bool = False,
 ) -> ConverterConfig:
     api_key = api_key if api_key is not None else os.getenv("AZURE_OPENAI_API_KEY", "")
-    return OpenAIConverterConfig(
+    return GeneralistVLMConverterConfig(
         model_name=model,
+        supported_modes=GENERALIST_SUPPORTED_MODES,
         endpoint=ModelEndpointConfig(
             base_url=uri if uri is not None else os.getenv("AZURE_OPENAI_ENDPOINT"),
             api_key=api_key,

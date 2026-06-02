@@ -842,3 +842,99 @@ class TestCLIConvertInDepth:
                 call_args = openai_client.chat.completions.create.call_args_list[0]
                 assert "messages" in call_args[1]
                 assert len(call_args[1]["messages"]) > 0
+
+
+class TestBoxConversionModes:
+    """Test the ocr_layout and ocr_layout_images box-detection modes."""
+
+    BOX_LAYOUT_RESPONSE = (
+        '[{"category": "text", "box": [10, 20, 200, 980], "text": "Hello world"},'
+        ' {"category": "figure", "box": [300, 50, 700, 950], "text": "A chart"}]'
+    )
+
+    IMAGE_BOX_RESPONSE = (
+        "# Title\n\n"
+        "Some text here.\n\n"
+        '<region box="300,50,700,950" category="figure">A diagram</region>\n\n'
+        "More text."
+    )
+
+    def test_convert_ocr_layout_mode(
+        self, runner, file_path, mock_docker_operations, mock_openai_api, tmp_output_dir
+    ):
+        """Test convert with ocr_layout conversion mode (full-layout boxes)."""
+        with mock_docker_operations(include_client=False):
+            with mock_openai_api(content=self.BOX_LAYOUT_RESPONSE) as openai_client:
+                result = runner.invoke(
+                    app,
+                    [
+                        "convert",
+                        str(file_path),
+                        "--out-folder",
+                        str(tmp_output_dir),
+                        "--model",
+                        "gemini-2.5-flash-lite",
+                        "--uri",
+                        "http://localhost:8000/v1",
+                        "-c",
+                        "ocr_layout",
+                        "--debug",
+                    ],
+                )
+
+                assert result.exit_code == 0, result.output
+                assert openai_client.chat.completions.create.call_count == 2
+
+    def test_convert_ocr_layout_images_mode(
+        self, runner, file_path, mock_docker_operations, mock_openai_api, tmp_output_dir
+    ):
+        """Test convert with ocr_layout_images conversion mode (image boxes only)."""
+        with mock_docker_operations(include_client=False):
+            with mock_openai_api(content=self.IMAGE_BOX_RESPONSE) as openai_client:
+                result = runner.invoke(
+                    app,
+                    [
+                        "convert",
+                        str(file_path),
+                        "--out-folder",
+                        str(tmp_output_dir),
+                        "--model",
+                        "gemini-2.5-flash-lite",
+                        "--uri",
+                        "http://localhost:8000/v1",
+                        "-c",
+                        "ocr_layout_images",
+                        "--debug",
+                    ],
+                )
+
+                assert result.exit_code == 0, result.output
+                assert openai_client.chat.completions.create.call_count == 2
+
+    def test_full_layout_custom_categories_via_config(self):
+        """Custom layout categories are configurable through the Python API."""
+        from vlmparse.clients.box_vlm_converter import GeneralistVLMConverterConfig
+
+        custom = {"text": "Text block", "image": "Any image"}
+        config = GeneralistVLMConverterConfig(
+            model_name="gemini-2.5-flash-lite",
+            conversion_mode="ocr_layout",
+            categories=custom,
+        )
+        client = config.get_client()
+        assert config.categories == custom
+        assert type(client).__name__ == "GeneralistVLMConverter"
+
+    def test_image_box_custom_categories_via_config(self):
+        """Custom image categories are configurable through the Python API."""
+        from vlmparse.clients.box_vlm_converter import GeneralistVLMConverterConfig
+
+        custom = {"photo": "Any photograph", "chart": "Data chart"}
+        config = GeneralistVLMConverterConfig(
+            model_name="gemini-2.5-flash-lite",
+            conversion_mode="ocr_layout_images",
+            image_categories=custom,
+        )
+        client = config.get_client()
+        assert config.image_categories == custom
+        assert type(client).__name__ == "GeneralistVLMConverter"

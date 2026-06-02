@@ -25,18 +25,22 @@ class ConverterConfig(VLMParseBaseModel):
     conversion_mode: Literal[
         "ocr",
         "ocr_layout",
+        "ocr_layout_images",
         "table",
         "image_description",
         "formula",
         "chart",
     ] = "ocr"
-    supported_modes: Literal[
-        "ocr",
-        "ocr_layout",
-        "table",
-        "image_description",
-        "formula",
-        "chart",
+    supported_modes: list[
+        Literal[
+            "ocr",
+            "ocr_layout",
+            "ocr_layout_images",
+            "table",
+            "image_description",
+            "formula",
+            "chart",
+        ]
     ] = Field(default_factory=lambda: ["ocr"])
     inline_image_description: bool = False
 

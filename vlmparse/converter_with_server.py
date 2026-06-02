@@ -320,6 +320,7 @@ class ConverterWithServer:
         conversion_mode: Literal[
             "ocr",
             "ocr_layout",
+            "ocr_layout_images",
             "table",
             "image_description",
             "formula",

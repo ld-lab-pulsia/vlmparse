@@ -111,6 +111,7 @@ def convert(
     conversion_mode: Literal[
         "ocr",
         "ocr_layout",
+        "ocr_layout_images",
         "table",
         "image_description",
         "formula",
@@ -120,7 +121,8 @@ def convert(
         "-c",
         "--conversion-mode",
         help=(
-            "Conversion mode - ocr (plain), ocr_layout (OCR with layout), table (table-centric), "
+            "Conversion mode - ocr (plain), ocr_layout (OCR with layout bounding boxes), "
+            "ocr_layout_images (OCR with image bounding boxes only), table (table-centric), "
             "image_description (describe the image), formula (formula extraction), chart (chart recognition)"
         ),
     ),
