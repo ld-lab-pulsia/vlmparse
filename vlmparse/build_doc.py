@@ -83,3 +83,58 @@ def get_page_count(file_path):
                 return len(pdf)
     else:
         return 1
+
+
+def parse_page_selection(spec: str, num_pages: int | None = None) -> list[int]:
+    """Parse a 1-based page selection string into sorted, unique 0-based indices.
+
+    Supports single pages and ranges, e.g. ``"1-5,8,10"`` -> ``[0, 1, 2, 3, 4, 7, 9]``.
+
+    Args:
+        spec: Selection string. Comma-separated list of single pages ("3") and/or
+            inclusive ranges ("1-5"). Page numbers are 1-based.
+        num_pages: If provided, indices outside ``[0, num_pages)`` are dropped and a
+            warning is logged.
+
+    Returns:
+        Sorted list of unique 0-based page indices.
+
+    Raises:
+        ValueError: If the selection string is malformed or contains page numbers < 1.
+    """
+    indices: set[int] = set()
+    for part in spec.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            start_str, end_str = part.split("-", 1)
+            try:
+                start, end = int(start_str), int(end_str)
+            except ValueError as e:
+                raise ValueError(f"Invalid page range '{part}'") from e
+            if start < 1 or end < 1:
+                raise ValueError(f"Page numbers must be >= 1: '{part}'")
+            if end < start:
+                raise ValueError(f"Invalid page range '{part}': end < start")
+            indices.update(range(start - 1, end))
+        else:
+            try:
+                page = int(part)
+            except ValueError as e:
+                raise ValueError(f"Invalid page number '{part}'") from e
+            if page < 1:
+                raise ValueError(f"Page numbers must be >= 1: '{part}'")
+            indices.add(page - 1)
+
+    result = sorted(indices)
+    if num_pages is not None:
+        dropped = [i + 1 for i in result if i >= num_pages]
+        if dropped:
+            logger.warning(
+                "Ignoring out-of-range page(s) {dropped}; document has {num_pages} page(s)",
+                dropped=dropped,
+                num_pages=num_pages,
+            )
+        result = [i for i in result if i < num_pages]
+    return result
