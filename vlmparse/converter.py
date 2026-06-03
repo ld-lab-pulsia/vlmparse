@@ -66,7 +66,7 @@ class BaseConverter:
         self.return_documents_in_batch_mode = return_documents_in_batch_mode
         self.save_page_images = save_page_images
         self.pages_filter: list[int] | None = None
-        """Optional subset of 0-based page indices to convert. ``None`` converts all pages."""
+        # Optional subset of 0-based page indices to convert. ``None`` converts all pages.
 
     @property
     def num_concurrent_pages(self) -> int:
