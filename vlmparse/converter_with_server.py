@@ -334,6 +334,11 @@ class ConverterWithServer:
         completion_kwargs: dict | None = None,
         pages: list[int] | None = None,
     ):
+        """Parse input files into documents.
+
+        Args:
+            pages: Optional subset of 0-based page indices to convert. ``None`` converts all pages.
+        """
         from vlmparse.clients.openai_converter import OpenAIConverterConfig
 
         assert (
