@@ -332,7 +332,13 @@ class ConverterWithServer:
         debug: bool = False,
         retrylast: bool = False,
         completion_kwargs: dict | None = None,
+        pages: list[int] | None = None,
     ):
+        """Parse input files into documents.
+
+        Args:
+            pages: Optional subset of 0-based page indices to convert. ``None`` converts all pages.
+        """
         from vlmparse.clients.openai_converter import OpenAIConverterConfig
 
         assert (
@@ -373,6 +379,8 @@ class ConverterWithServer:
             self.client.config.dpi = int(dpi)
         if max_image_size is not None:
             self.client.config.max_image_size = int(max_image_size)
+
+        self.client.pages_filter = pages
 
         if conversion_mode is not None:
             self.client.config.conversion_mode = conversion_mode

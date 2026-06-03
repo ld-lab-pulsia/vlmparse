@@ -65,6 +65,8 @@ class BaseConverter:
         self.debug = debug
         self.return_documents_in_batch_mode = return_documents_in_batch_mode
         self.save_page_images = save_page_images
+        self.pages_filter: list[int] | None = None
+        # Optional subset of 0-based page indices to convert. ``None`` converts all pages.
 
     @property
     def num_concurrent_pages(self) -> int:
@@ -132,7 +134,20 @@ class BaseConverter:
         document = Document(file_path=str(file_path))
         try:
             num_pages = get_page_count(file_path)
-            document.pages = [Page() for _ in range(num_pages)]
+            if self.pages_filter is not None:
+                requested = list(dict.fromkeys(self.pages_filter))
+                out_of_range = [i for i in requested if i < 0 or i >= num_pages]
+                if out_of_range:
+                    logger.warning(
+                        "Ignoring out-of-range page index/indices {pages}; document has {num_pages} page(s)",
+                        pages=out_of_range,
+                        num_pages=num_pages,
+                    )
+                selected = [i for i in requested if 0 <= i < num_pages]
+            else:
+                selected = list(range(num_pages))
+
+            document.pages = [Page(page_number=idx) for idx in selected]
 
             async def worker(page_idx: int, page: Page):
                 async with self.page_semaphore:
@@ -175,8 +190,8 @@ class BaseConverter:
                         )
 
             tasks = [
-                asyncio.create_task(worker(i, page))
-                for i, page in enumerate(document.pages)
+                asyncio.create_task(worker(idx, page))
+                for page, idx in zip(document.pages, selected, strict=False)
             ]
             await asyncio.gather(*tasks)
         except KeyboardInterrupt:

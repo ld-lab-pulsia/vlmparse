@@ -80,6 +80,8 @@ class Page(VLMParseBaseModel):
     """Native text cells extracted by docling-parse, in image-pixel space (TOPLEFT)."""
     error: ProcessingError | None = None
     buffer_image: Optional[Image.Image | str | dict[str, Any]] = None
+    page_number: Optional[int] = None
+    """0-based index of this page in the source document."""
     latency: Optional[float] = None
     """Time taken to process the page in seconds."""
     prompt_tokens: Optional[int] = None

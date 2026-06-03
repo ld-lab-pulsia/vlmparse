@@ -146,6 +146,14 @@ def convert(
     dpi: int | None = typer.Option(
         None, "-d", "--dpi", help="DPI to use for the conversion"
     ),
+    pages: str | None = typer.Option(
+        None,
+        "--pages",
+        help=(
+            "Subset of pages to convert (1-based), e.g. '1-5,8,10'. "
+            "Converts all pages if not specified."
+        ),
+    ),
     max_image_size: int | None = typer.Option(
         None,
         "--max-image-size",
@@ -232,6 +240,12 @@ def convert(
     if with_vllm_server and provider == "registry":
         provider = "hf"
 
+    page_indices: list[int] | None = None
+    if pages is not None:
+        from vlmparse.build_doc import parse_page_selection
+
+        page_indices = parse_page_selection(pages)
+
     # Build ImageDescriptionConfig from flat CLI flags; None = disabled
     img_desc: ImageDescriptionConfig | None = None
     if image_description:
@@ -276,6 +290,7 @@ def convert(
             conversion_mode=conversion_mode,
             dpi=dpi,
             debug=debug,
+            pages=page_indices,
         )
 
 
