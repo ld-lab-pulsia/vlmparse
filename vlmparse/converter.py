@@ -147,6 +147,8 @@ class BaseConverter:
             else:
                 selected = list(range(num_pages))
 
+            document.pages = [Page(page_number=idx) for idx in selected]
+
             async def worker(page_idx: int, page: Page):
                 async with self.page_semaphore:
                     try:
