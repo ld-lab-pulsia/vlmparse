@@ -271,6 +271,26 @@ for mistral_model in ["mistral-ocr-latest", "mistral-ocr"]:
         provider="mistral",
     )
 
+for anthropic_model in [
+    "claude-opus-4-8",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5",
+]:
+    converter_config_registry.register(
+        anthropic_model,
+        lambda uri=None, model=anthropic_model: GeneralistVLMConverterConfig(
+            model_name=model,
+            inline_image_description=True,
+            supported_modes=GENERALIST_SUPPORTED_MODES,
+            endpoint=ModelEndpointConfig(
+                base_url="https://api.anthropic.com/v1/" if uri is None else uri,
+                api_key=os.getenv("ANTHROPIC_API_KEY", ""),
+                model_name=model,
+            ),
+        ),
+        provider="anthropic",
+    )
+
 
 # -- Generic provider factories (hf, google, openai, azure) --------------------
 # These allow creating configs for *any* model name via a provider, even if not
@@ -338,4 +358,22 @@ def _make_azure_factory(
         ),
         is_azure=True,
         use_response_api=use_response_api,
+    )
+
+
+def _make_anthropic_factory(
+    model: str,
+    uri: str | None,
+    api_key: str | None = None,
+) -> ConverterConfig:
+    api_key = api_key if api_key is not None else os.getenv("ANTHROPIC_API_KEY", "")
+    return GeneralistVLMConverterConfig(
+        model_name=model,
+        inline_image_description=True,
+        supported_modes=GENERALIST_SUPPORTED_MODES,
+        endpoint=ModelEndpointConfig(
+            base_url="https://api.anthropic.com/v1/" if uri is None else uri,
+            api_key=api_key,
+            model_name=model,
+        ),
     )
