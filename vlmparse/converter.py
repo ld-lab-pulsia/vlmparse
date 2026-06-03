@@ -135,10 +135,17 @@ class BaseConverter:
         try:
             num_pages = get_page_count(file_path)
             if self.pages_filter is not None:
-                selected = [i for i in self.pages_filter if 0 <= i < num_pages]
+                requested = list(dict.fromkeys(self.pages_filter))
+                out_of_range = [i for i in requested if i < 0 or i >= num_pages]
+                if out_of_range:
+                    logger.warning(
+                        "Ignoring out-of-range page index/indices {pages}; document has {num_pages} page(s)",
+                        pages=out_of_range,
+                        num_pages=num_pages,
+                    )
+                selected = [i for i in requested if 0 <= i < num_pages]
             else:
                 selected = list(range(num_pages))
-            document.pages = [Page(page_number=idx) for idx in selected]
 
             async def worker(page_idx: int, page: Page):
                 async with self.page_semaphore:
