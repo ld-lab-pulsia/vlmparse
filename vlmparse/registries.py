@@ -284,7 +284,7 @@ for anthropic_model in [
             supported_modes=GENERALIST_SUPPORTED_MODES,
             endpoint=ModelEndpointConfig(
                 base_url="https://api.anthropic.com/v1/" if uri is None else uri,
-                api_key=os.environ.get("ANTHROPIC_API_KEY"),
+                api_key=os.getenv("ANTHROPIC_API_KEY", ""),
                 model_name=model,
             ),
         ),
@@ -366,7 +366,7 @@ def _make_anthropic_factory(
     uri: str | None,
     api_key: str | None = None,
 ) -> ConverterConfig:
-    api_key = api_key if api_key is not None else os.environ.get("ANTHROPIC_API_KEY")
+    api_key = api_key if api_key is not None else os.getenv("ANTHROPIC_API_KEY", "")
     return GeneralistVLMConverterConfig(
         model_name=model,
         inline_image_description=True,
