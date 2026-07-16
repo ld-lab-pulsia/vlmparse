@@ -1120,13 +1120,15 @@ wheels = [
 
 [[package]]
 name = "html-to-markdown"
-version = "2.25.1"
+version = "3.8.3"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e0/57/88af63981ed6e3ff762b5a2467eaf070bf5680d79c7950aadc9190620564/html_to_markdown-2.25.1.tar.gz", hash = "sha256:f20cb00d86dd4990a6f8d8a76c6b7e4489041953fb6f753e74919e9a4c0cb931", size = 299946, upload-time = "2026-02-17T11:33:55.651Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/db/35/3575e67622381715b91c738e4712ff1a366e11273eabe6e3bec480d8595d/html_to_markdown-3.8.3.tar.gz", hash = "sha256:f7b6b678b6b6cbf59650f307df424930a815daf20b81c9d5fa0a8d7caf653710", size = 5627463, upload-time = "2026-07-09T17:18:48.899Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/71/ca/98da0af44088f4d91819c9a2a64560142dedadeea38081e68d848e3d5b37/html_to_markdown-2.25.1-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:8e523cc7b3efc9b3b3f785a9cb5b454c71ebf40ff7bd797ce785ff0bfbd612ae", size = 8863852, upload-time = "2026-02-17T11:33:48.349Z" },
-    { url = "https://files.pythonhosted.org/packages/54/2f/40c702da100236da810bb0ce49473ec6b0ea1aa9090759c02ac0fa8dfffa/html_to_markdown-2.25.1-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:014b5e0e974198ac5d6e0338ba73a70b75e3f81ef0809b52b73b547125daeae0", size = 9680263, upload-time = "2026-02-17T11:33:50.859Z" },
-    { url = "https://files.pythonhosted.org/packages/75/5e/9f493e2a998716f97bf4f781cadb507ef82b12a0e73682d9041d08648c61/html_to_markdown-2.25.1-cp310-abi3-win_amd64.whl", hash = "sha256:f7015a8be94ac25ba85397ee64038d7d6ca27db30c3027874f82942b3e3a03da", size = 9292370, upload-time = "2026-02-17T11:33:53.294Z" },
+    { url = "https://files.pythonhosted.org/packages/ad/51/79a5ca73516bf7907a7a6d33e6758d8f5cfface4138a03383c157419c5dc/html_to_markdown-3.8.3-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:e0f503163e2efcef2efc585022e9b8337ebe574ef025673a56d2676538c12ecc", size = 7343831, upload-time = "2026-07-09T17:18:40.085Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/2b/77fe92328a2f45de14945452278db8d02b8cdd84708de1734d0103a2aa7d/html_to_markdown-3.8.3-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:a8dfd029bf74c134b1753929c5543357f93174c8f412cb818ea6330611c21913", size = 6882815, upload-time = "2026-07-09T17:18:41.8Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/fa/0e78520d022d97b8f6007b040a2fc7bd90044a7200b4ea2fb011e29f0efb/html_to_markdown-3.8.3-cp310-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:221caa850cfeb8b74512866d725d370f308d0f53f2a129031110240a8a89548c", size = 7117410, upload-time = "2026-07-09T17:18:43.591Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/d4/faa9fbe65103abc7c9c6dd1d7fe59ae11dc192ed7780ae8d429afce7db13/html_to_markdown-3.8.3-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:65c0633bd626ac05a29b33d8639d8ae65d455d62c3566215ab72d062c501fe35", size = 7567845, upload-time = "2026-07-09T17:18:45.213Z" },
+    { url = "https://files.pythonhosted.org/packages/04/c5/269dda30742e905042d53dd268fb3573336d789f11a63410593866bf0150/html_to_markdown-3.8.3-cp310-abi3-win_amd64.whl", hash = "sha256:a5391712dad17c5e39c7624f909688bc506b80c865c85eb73b90bfe26e309bf0", size = 7564733, upload-time = "2026-07-09T17:18:46.9Z" },
 ]
 
 [[package]]
@@ -3927,7 +3929,7 @@ wheels = [
 
 [[package]]
 name = "vlmparse"
-version = "0.1.23"
+version = "0.1.27"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -3999,7 +4001,7 @@ requires-dist = [
     { name = "docling-parse", marker = "extra == 'docling-parse'" },
     { name = "fire", marker = "extra == 'bench'", specifier = ">=0.7.1" },
     { name = "fuzzysearch", marker = "extra == 'bench'", specifier = ">=0.8.1" },
-    { name = "html-to-markdown", specifier = ">=1.9.0" },
+    { name = "html-to-markdown", specifier = ">=3.0.0" },
     { name = "html-to-markdown", marker = "extra == 'bench'", specifier = ">=1.9.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "isort", marker = "extra == 'test'" },
