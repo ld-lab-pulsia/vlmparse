@@ -27,7 +27,7 @@ class ModelEndpointConfig(VLMParseBaseModel):
     """
 
     base_url: str | None = None
-    api_key: str = Field(default="", exclude=True, repr=False)
+    api_key: str = Field(default="default", exclude=True, repr=False)
     model_name: str = "vllm-model"
     timeout: int | None = None
     max_retries: int = 1
